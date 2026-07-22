@@ -1,0 +1,240 @@
+:root {
+  color-scheme: dark;
+  --bg: #05070d;
+  --panel: rgba(255, 255, 255, 0.04);
+  --panel-border: rgba(255, 255, 255, 0.09);
+  --text: rgba(255, 255, 255, 0.92);
+  --text-dim: rgba(255, 255, 255, 0.62);
+  --text-dimmer: rgba(255, 255, 255, 0.4);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* A few dozen soft, fixed-position "stars" behind everything -- cheap and
+   static (no animation cost) but enough to read as "space", tying the hub
+   visually to the games it's introducing. */
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(2px 2px at 10% 15%, rgba(255,255,255,0.9), transparent),
+    radial-gradient(2px 2px at 25% 60%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1.5px 1.5px at 40% 30%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(2px 2px at 55% 80%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1.5px 1.5px at 70% 10%, rgba(255,255,255,0.9), transparent),
+    radial-gradient(2px 2px at 85% 45%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1.5px 1.5px at 95% 70%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(2px 2px at 15% 90%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 65% 55%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(2px 2px at 30% 5%, rgba(255,255,255,0.6), transparent);
+  background-size: 100% 100%;
+}
+
+header.hero {
+  position: relative;
+  z-index: 1;
+  padding: 88px 24px 56px;
+  text-align: center;
+}
+
+.hero-inner { max-width: 720px; margin: 0 auto; }
+
+.eyebrow {
+  display: inline-block;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  color: var(--text-dimmer);
+  font-weight: 600;
+}
+
+.hero-title {
+  margin: 10px 0 0;
+  font-size: clamp(40px, 9vw, 72px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  background: linear-gradient(90deg, #4cd6c8 0%, #7c7cf0 35%, #d966e8 65%, #ff6b6b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 60px rgba(140, 120, 255, 0.25);
+}
+
+.hero-sub {
+  margin: 18px auto 0;
+  max-width: 520px;
+  color: var(--text-dim);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+main {
+  position: relative;
+  z-index: 1;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+.beta-banner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: linear-gradient(180deg, rgba(255, 190, 90, 0.1), rgba(255, 190, 90, 0.04));
+  border: 1px solid rgba(255, 190, 90, 0.3);
+  border-radius: 14px;
+  padding: 18px 20px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin-bottom: 48px;
+}
+.beta-banner strong { color: var(--text); }
+.beta-banner-icon { font-size: 22px; line-height: 1; margin-top: 1px; }
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 28px;
+  margin-bottom: 72px;
+}
+
+.game-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.game-card:hover, .game-card:focus-visible {
+  transform: translateY(-6px);
+  border-color: var(--accent);
+  box-shadow: 0 18px 40px -14px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.game-shot-wrap {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: #000;
+  overflow: hidden;
+}
+.game-shot {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s ease;
+}
+.game-card:hover .game-shot { transform: scale(1.04); }
+
+.beta-tag {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 190, 90, 0.6);
+  color: #ffcf80;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+}
+
+.game-card-body { padding: 22px 24px 26px; }
+
+.game-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.game-tagline {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text-dim);
+}
+.game-desc {
+  margin: 0 0 20px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.play-button {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #05070d;
+  background: var(--accent);
+  padding: 10px 18px;
+  border-radius: 999px;
+}
+
+.feedback-section h2 {
+  font-size: 26px;
+  margin-bottom: 8px;
+}
+.feedback-intro {
+  color: var(--text-dim);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 640px;
+  margin: 0 0 24px;
+}
+
+.feedback-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--panel-border);
+}
+.feedback-tab {
+  appearance: none;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.feedback-tab.active {
+  color: var(--text);
+  border-bottom-color: #7c7cf0;
+}
+.feedback-tab:hover { color: var(--text); }
+
+.feedback-panel { min-height: 200px; }
+
+footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 32px 24px 48px;
+  color: var(--text-dimmer);
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  header.hero { padding: 64px 20px 40px; }
+  .game-card-body { padding: 18px 18px 22px; }
+}

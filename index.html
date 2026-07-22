@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beta Arcade — playtest builds</title>
+<meta name="description" content="Playtest builds of games in active development. Play, poke around, and leave feedback." />
+<meta name="theme-color" content="#05070d" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕹️</text></svg>" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="starfield" aria-hidden="true"></div>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="eyebrow">KENT'S</span>
+    <h1 class="hero-title">BETA ARCADE</h1>
+    <p class="hero-sub">Games in active playtesting. New ones land here as they're ready to break.</p>
+  </div>
+</header>
+
+<main>
+  <section class="beta-banner" aria-label="Beta testing notice">
+    <span class="beta-banner-icon" aria-hidden="true">🚧</span>
+    <div>
+      <strong>Everything below is a beta.</strong>
+      Expect bugs, rough edges, and things that change under you — that's exactly what playtesting is for.
+      Play as much or as little as you like, and drop a comment on any game below to tell us what you found.
+    </div>
+  </section>
+
+  <section class="game-grid" id="game-grid" aria-label="Games"></section>
+
+  <section class="feedback-section">
+    <h2>Leave feedback</h2>
+    <p class="feedback-intro">
+      Found a bug? Have a suggestion? Just want to say a level was fun (or brutal)? Comments below are public and
+      visible to everyone, including other playtesters — pick the game you're talking about.
+    </p>
+    <div class="feedback-tabs" role="tablist" aria-label="Choose a game to comment on">
+      <button class="feedback-tab active" role="tab" aria-selected="true" data-target="feedback-lumina">Lumina</button>
+      <button class="feedback-tab" role="tab" aria-selected="false" data-target="feedback-downtown-devour">Downtown Devour</button>
+    </div>
+    <div class="feedback-panel active" id="feedback-lumina" role="tabpanel">
+      <script src="https://giscus.app/client.js"
+        data-repo="klefner/klefner.github.io"
+        data-repo-id="REPLACE_WITH_REPO_ID"
+        data-category="General"
+        data-category-id="REPLACE_WITH_CATEGORY_ID"
+        data-mapping="specific"
+        data-term="lumina-feedback"
+        data-strict="1"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="en"
+        crossorigin="anonymous"
+        async>
+      </script>
+    </div>
+    <div class="feedback-panel" id="feedback-downtown-devour" role="tabpanel" hidden>
+      <script src="https://giscus.app/client.js"
+        data-repo="klefner/klefner.github.io"
+        data-repo-id="REPLACE_WITH_REPO_ID"
+        data-category="General"
+        data-category-id="REPLACE_WITH_CATEGORY_ID"
+        data-mapping="specific"
+        data-term="downtown-devour-feedback"
+        data-strict="1"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="en"
+        crossorigin="anonymous"
+        async>
+      </script>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built by Kent Lefner. Each game links out to its own page — this is just the front door.</p>
+</footer>
+
+<script src="games.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
