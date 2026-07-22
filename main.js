@@ -32,18 +32,14 @@ function setupFeedbackTabs() {
   });
 }
 
-// Comments are backed by giscus (GitHub Discussions), but giscus requires
-// a one-time manual setup only the repo owner can do (enable Discussions,
-// install the giscus app, then fill in the real repoId/categoryId below --
-// see README.md). Until that's done, GISCUS_CONFIG stays unset and every
-// mount point shows a friendly placeholder instead of giscus's own raw
-// "not installed on this repo" error, which is what real playtesters were
-// seeing here before this existed.
+// Comments are backed by giscus (GitHub Discussions) -- Discussions is
+// enabled, the giscus app is installed, and these are the real IDs from
+// giscus.app for this repo.
 const GISCUS_CONFIG = {
   repo: 'klefner/klefner.github.io',
-  repoId: null,     // fill in once giscus.app gives you the real value
+  repoId: 'R_kgDOTgWUww',
   category: 'General',
-  categoryId: null,  // fill in once giscus.app gives you the real value
+  categoryId: 'DIC_kwDOTgWUw84DBv2S',
 };
 
 function renderFeedbackWidgets() {
