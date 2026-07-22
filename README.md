@@ -7,10 +7,13 @@ Live at https://klefner.github.io/ once GitHub Pages finishes its first deploy (
 
 Add one entry to the `GAMES` array in `games.js` (title, tagline, description, a screenshot in `assets/`, and the game's live URL) — the grid and everything else picks it up automatically. No other file needs to change.
 
-## One-time giscus setup (comments)
+## Feedback form
 
-The comment widgets on the page are placeholders until this is done once:
+Feedback is a plain embedded Google Form, not a public comment thread — playtesters shouldn't need a GitHub
+account just to leave feedback. The embed URL lives in `FEEDBACK_FORM_EMBED_URL` in `main.js`. The form itself
+asks which game the feedback is about, so there's one form (and one Sheet) covering every game, rather than a
+separate widget per game.
 
-1. In this repo's **Settings → General → Features**, check **Discussions**.
-2. Visit https://giscus.app, sign in, and point it at `klefner/klefner.github.io`. It'll ask you to install the giscus GitHub App on the repo if you haven't already — do that.
-3. Giscus will generate a config snippet with your real `data-repo-id` and `data-category-id` values. Copy those two values into **both** `<script>` blocks in `index.html` (the ones with `src="https://giscus.app/client.js"`), replacing `REPLACE_WITH_REPO_ID` and `REPLACE_WITH_CATEGORY_ID`. Everything else (the two different `data-term` values, one per game) can stay as-is — that's what keeps Lumina's comments and Downtown Devour's comments in separate threads under the hood, even though the category is shared.
+To point it at a different form (or add a field), edit the form itself in Google Forms, then update
+`FEEDBACK_FORM_EMBED_URL` only if the form's ID changes — grab it from **Send → embed (`<>`) → the URL inside
+`src="..."`**.

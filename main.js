@@ -16,61 +16,22 @@ function renderGameGrid() {
   `).join('');
 }
 
-function setupFeedbackTabs() {
-  const tabs = document.querySelectorAll('.feedback-tab');
-  const panels = document.querySelectorAll('.feedback-panel');
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      tabs.forEach((t) => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
-      panels.forEach((p) => { p.classList.remove('active'); p.hidden = true; });
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-      const panel = document.getElementById(tab.dataset.target);
-      panel.classList.add('active');
-      panel.hidden = false;
-    });
-  });
-}
+// Feedback is a plain embedded Google Form (see FEEDBACK_FORM_EMBED_URL)
+// rather than giscus/GitHub Discussions -- playtesters shouldn't need a
+// GitHub account just to leave a comment. The form itself asks which game
+// the feedback is about, so there's only one embed to maintain instead of
+// a per-game mount point. Responses land in a Google Sheet and email the
+// form owner directly; nothing here is public.
+const FEEDBACK_FORM_EMBED_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeHQnFBg76Bxkbz7tLZaKZ5LP_1dXWpTAJZTbJnqyj5eMNVvQ/viewform?embedded=true';
 
-// Comments are backed by giscus (GitHub Discussions) -- Discussions is
-// enabled, the giscus app is installed, and these are the real IDs from
-// giscus.app for this repo.
-const GISCUS_CONFIG = {
-  repo: 'klefner/klefner.github.io',
-  repoId: 'R_kgDOTgWUww',
-  category: 'General',
-  categoryId: 'DIC_kwDOTgWUw84DBv2S',
-};
-
-function renderFeedbackWidgets() {
-  const mounts = document.querySelectorAll('.giscus-mount');
-  const configured = GISCUS_CONFIG.repoId && GISCUS_CONFIG.categoryId;
-
-  mounts.forEach((mount) => {
-    if (!configured) {
-      mount.innerHTML = '<p class="giscus-placeholder">💬 Comments are being set up for this page — check back soon!</p>';
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://giscus.app/client.js';
-    script.setAttribute('data-repo', GISCUS_CONFIG.repo);
-    script.setAttribute('data-repo-id', GISCUS_CONFIG.repoId);
-    script.setAttribute('data-category', GISCUS_CONFIG.category);
-    script.setAttribute('data-category-id', GISCUS_CONFIG.categoryId);
-    script.setAttribute('data-mapping', 'specific');
-    script.setAttribute('data-term', mount.dataset.term);
-    script.setAttribute('data-strict', '1');
-    script.setAttribute('data-reactions-enabled', '1');
-    script.setAttribute('data-emit-metadata', '0');
-    script.setAttribute('data-input-position', 'top');
-    script.setAttribute('data-theme', 'dark_dimmed');
-    script.setAttribute('data-lang', 'en');
-    script.crossOrigin = 'anonymous';
-    script.async = true;
-    mount.appendChild(script);
-  });
+function renderFeedbackForm() {
+  const mount = document.getElementById('feedback-form-mount');
+  const iframe = document.createElement('iframe');
+  iframe.src = FEEDBACK_FORM_EMBED_URL;
+  iframe.title = 'Beta Arcade feedback form';
+  iframe.loading = 'lazy';
+  mount.appendChild(iframe);
 }
 
 renderGameGrid();
-setupFeedbackTabs();
-renderFeedbackWidgets();
+renderFeedbackForm();
