@@ -9,7 +9,7 @@ const GAMES = [
       'A calm puzzle game about drawing lines between glowing colored dots to complete a song. ' +
       'Longer, more creative routes score higher — and the whole board is generated fresh every wave.',
     screenshot: 'assets/lumina-screenshot.png',
-    url: 'https://klefner.github.io/lumina/',
+    url: 'https://lumina-8f0.pages.dev/',
     accent: '#4cd6c8',
   },
   {
