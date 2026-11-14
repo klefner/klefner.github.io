@@ -30,6 +30,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column}
 .overlay.show{display:flex}
 .dim{background:rgba(6,10,5,.72)}
+#half{background:linear-gradient(rgba(6,10,5,0) 0%,rgba(6,10,5,0) 48%,rgba(6,10,5,.86) 66%);justify-content:flex-end;padding-bottom:40px}
 #title{background:radial-gradient(ellipse at center,rgba(5,9,4,.35) 0%,rgba(5,9,4,.85) 75%)}
 .logo{font-family:'Creepster',cursive;font-size:112px;color:#9dff57;letter-spacing:4px;line-height:1;text-shadow:0 4px 0 #2b5a12,0 0 30px rgba(140,255,80,.45),0 10px 30px #000}
 .tag{font-family:'Bangers',cursive;font-size:26px;letter-spacing:3px;color:#f3c34b;margin:6px 0 22px;text-shadow:0 2px 0 #000}
@@ -139,6 +140,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
    <tr><td><span class="kbd">Esc</span></td><td colspan="2">Pause</td></tr>
   </table>
   <h2>Sound credits</h2>
+  <p style="font-size:14px">Music (all CC0, opengameart.org): "Zombies' March" by yd; "Halloween Hullabaloo" by StarlightFrost; "Spooky Action Loop (Hallow Quest)" by Zane Little Music; "Haunted Beach" by SterlingRay; "Metal Song - Energetic" by The Real Monoton Artist. Announcer voice: generated with the Kokoro text-to-speech model (Apache 2.0).</p>
   <p style="font-size:14px">Crowd cheering: "Free Crowd Cheering Sounds" by Gregor Quendel (opengameart.org), licensed CC-BY 4.0, trimmed and compressed. Zombie voice, eating, lunge, laugh and growl sounds: "ZombiePackSFX 2" and "ZombiePackSFX 3" by colodical (opengameart.org), licensed CC-BY 3.0, trimmed and compressed. All other recorded sounds are public domain (CC0) from OpenGameArt: "Zombies Sound Pack" by artisticdude, "Monster Sound Effects Pack" by Ogrebane, "37 hits/punches" and "8 wet squish, slurp impacts" by Independent.nu, "Squish Sound Effects" by EZduzziteh, "Deep Bone Crack/Break SFX" by Zane Little Music, "7 Eating Crunches" by starninjas, "5 break, crunch impacts" by Independent.nu, and "Applause in a large hall or church" by eXpl0it3r. The referee whistle is synthesized.</p>
   <h2>Touch controls (iPhone)</h2>
   <table>
@@ -189,7 +191,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.4.2';
+const VERSION='0.4.3';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -297,6 +299,7 @@ function audioInit(){annUnlock();
   try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch(e){}
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=0.6;master.connect(AC.destination);decodeAll();}catch(e){AC=null;return;}}
   if(AC.state!=='running')AC.resume().catch(()=>{});
+  if(mode==='title'||mode==='half'||(mode==='howto'&&!G))setTimeout(()=>screenSound(mode==='half'?'half':'title'),60);
   if(!unlocked){unlocked=true;
     try{const b=AC.createBuffer(1,1,22050),s=AC.createBufferSource();s.buffer=b;s.connect(AC.destination);s.start(0);}catch(e){}
     try{if(!silentEl){silentEl=document.createElement('audio');silentEl.src=silentWav();silentEl.loop=true;silentEl.setAttribute('playsinline','');silentEl.volume=0.01;}
@@ -305,7 +308,7 @@ function audioInit(){annUnlock();
 function noiseBuf(dur){const n=Math.max(1,Math.floor(AC.sampleRate*dur)),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;return b;}
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec);}
 // ===== recorded sound clips (sounds/*.mp3); synthesized sounds are the fallback =====
-const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,brains:1,laugh:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0},raw:{},buf:{},bags:{},last:{}};
+const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,brains:1,laugh:1,quip:6,halfq:4,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0},raw:{},buf:{},bags:{},last:{}};
 function sndNames(){const L=[];for(const k in SND.groups){const n=SND.groups[k];if(n)for(let i=1;i<=n;i++)L.push(k+i);else L.push(k);}return L;}
 for(const n of sndNames())fetch('sounds/'+n+'.mp3').then(r=>r.ok?r.arrayBuffer():null).then(b=>{if(b){SND.raw[n]=b;decodeSnd(n);}}).catch(()=>{});
 function decodeSnd(n){if(!AC||!SND.raw[n]||SND.buf[n])return;const b=SND.raw[n];SND.raw[n]=null;
@@ -326,7 +329,8 @@ function playS(group,vol=1,rate=null,delay=0,fx=null){
     if(fx&&fx.trem){const tg=AC.createGain(),l=AC.createOscillator(),lg=AC.createGain();l.frequency.value=fx.trem;lg.gain.value=0.45;tg.gain.value=0.55;l.connect(lg);lg.connect(tg.gain);out.connect(tg);out=tg;l.start(AC.currentTime+delay);l.stop(AC.currentTime+delay+b.duration/s.playbackRate.value+0.1);}
     out.connect(g);g.connect(master);s.start(AC.currentTime+delay);return s;}catch(e){return null;}}
 let amb=null;
-function ambUpdate(){const want=!!G&&['playcall','presnap','live','dead'].includes(mode)&&sfx.ok();
+function ambUpdate(){const want=((!!G&&['playcall','presnap','live','dead','half'].includes(mode))||mode==='title'||(mode==='howto'&&!G))&&sfx.ok();
+  if(amb&&amb.mode!==mode){amb.mode=mode;try{amb.g.gain.setTargetAtTime(mode==='half'?0.32:mode==='title'||mode==='howto'?0.09:0.14,AC.currentTime,0.6);}catch(e){}}
   if(want&&!amb&&SND.buf.crowd_amb){try{const s=AC.createBufferSource();s.buffer=SND.buf.crowd_amb;s.loop=true;const g=AC.createGain();g.gain.value=0.14;s.connect(g);g.connect(master);s.start();amb={s,g};}catch(e){}}
   if(!want&&amb){try{amb.s.stop();}catch(e){}amb=null;}}
 const sfx={
@@ -408,7 +412,8 @@ function annLoad(){if(ANN.loading||ANN.idx)return;ANN.loading=true;ANN.status='l
     if(!r.body||!tot)return r.arrayBuffer();const rd=r.body.getReader(),parts=[];let got=0;
     const pump=()=>rd.read().then(({done,value})=>{if(done){const u=new Uint8Array(got);let o=0;for(const v of parts){u.set(v,o);o+=v.length;}return u.buffer;}
       parts.push(value);got+=value.length;ANN.pct=Math.round(got/tot*100);return pump();});return pump();});
-  Promise.all([fetch('vox.json').then(r=>{if(!r.ok)throw new Error('vox.json '+r.status);return r.json();}),getBin()])
+  const js=fetch('vox.json').then(r=>{if(!r.ok)throw new Error('vox.json '+r.status);return r.json();}).then(i=>{ANN.idx=i;return i;});
+  Promise.all([js,getBin()])
     .then(([i,b])=>{ANN.idx=i;ANN.buf=b;ANN.status='ready';ANN.loading=false;refreshMenus();})
     .catch(e=>{ANN.status='failed';ANN.err=String(e&&e.message||e);ANN.loading=false;});}
 function annUnlock(){if(!ANN.idx&&!ANN.loading)annLoad();}
@@ -428,8 +433,10 @@ function annNext(){
   const fail=()=>{if(ANN.cur===it){ANN.cur=null;annNext();}};
   const ok=buf=>{if(ANN.cur!==it)return;
     const src=AC.createBufferSource(),g=AC.createGain();src.buffer=buf;g.gain.value=1.15;src.connect(g);g.connect(master);
-    src.onended=()=>{if(ANN.cur===it){ANN.cur=null;annNext();}};it.src=src;it.g=g;src.start();};
-  try{const pr=AC.decodeAudioData(ANN.buf.slice(it.e[0],it.e[0]+it.e[1]),ok,fail);if(pr&&pr.catch)pr.catch(fail);}catch(e){fail();}}
+    src.onended=()=>{musicDuck(false);if(ANN.cur===it){ANN.cur=null;annNext();}};it.src=src;it.g=g;musicDuck(true);src.start();};
+  const dec=bytes=>{try{const pr=AC.decodeAudioData(bytes,ok,fail);if(pr&&pr.catch)pr.catch(fail);}catch(e){fail();}};
+  if(ANN.buf)dec(ANN.buf.slice(it.e[0],it.e[0]+it.e[1]));
+  else fetch('vox.mp3',{headers:{Range:`bytes=${it.e[0]}-${it.e[0]+it.e[1]-1}`}}).then(r=>{if(r.status!==206){try{r.body&&r.body.cancel();}catch(e){}throw 0;}return r.arrayBuffer();}).then(dec).catch(fail);}
 function annTick(){if(ANN.cur&&now_s()>ANN.cur.deadline){annCut();annNext();}}
 function crowdExcite(l){if(!amb)return;try{const t=AC.currentTime,g=amb.g.gain;g.cancelScheduledValues(t);g.setTargetAtTime(0.14+l*0.24,t,0.25);g.setTargetAtTime(0.14,t+2,0.9);}catch(e){}}
 function annPick(key,arr){const b=ANN.bags[key]||(ANN.bags[key]=[]);if(!b.length){b.push(...arr.keys());for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}}return arr[b.pop()];}
@@ -563,20 +570,49 @@ class Menu{
 }
 function cycleDiff(d){const o=['Easy','Normal','Hard'];settings.diff=o[(o.indexOf(settings.diff)+d+3)%3];store.set('deadball_settings',settings);}
 function toggleAnn(){if(settings.ann!==false&&ANN.status==='failed'){annLoad();refreshMenus();return;}settings.ann=settings.ann===false;store.set('deadball_settings',settings);if(settings.ann!==false){annUnlock();setTimeout(()=>annSay('Welcome to Dead Ball!',3),100);}else annStop();}
-function toggleSound(){settings.sound=!settings.sound;store.set('deadball_settings',settings);if(settings.sound){audioInit();sfx.select();setTimeout(()=>sfx.groan(),150);}}
+function toggleSound(){settings.sound=!settings.sound;if(!settings.sound)musicStop();store.set('deadball_settings',settings);if(settings.sound){audioInit();sfx.select();setTimeout(()=>sfx.groan(),150);}}
+
+// ===== music + screen sound (title and halftime): song, crowd, and a vampire quip =====
+const TRACKS=[{id:'march',name:"Zombies' March"},{id:'hullabaloo',name:'Halloween Hullabaloo'},{id:'hallow',name:'Hallow Quest'},{id:'beach',name:'Haunted Beach'},{id:'metal',name:'Metal Mayhem'}];
+if(!settings.music)settings.music='march';
+const music={el:null,g:null,tok:0,duck:false};
+function musicLevel(){return music.duck?0.18:0.5;}
+function musicPlay(){if(!AC||!settings.sound||settings.music==='off')return musicStop();
+  if(!music.el){music.el=new Audio();music.el.loop=true;music.el.preload='auto';music.el.setAttribute('playsinline','');
+    try{const src=AC.createMediaElementSource(music.el);music.g=AC.createGain();music.g.gain.value=0;src.connect(music.g);music.g.connect(master);}catch(e){music.g=null;}}
+  const want='music/'+settings.music+'.mp3';music.tok++;
+  if(!music.el.src.endsWith(want)){music.el.src=want;}
+  try{if(music.g){music.g.gain.cancelScheduledValues(AC.currentTime);music.g.gain.setTargetAtTime(musicLevel(),AC.currentTime,0.4);}else music.el.volume=0.5;}catch(e){}
+  const pr=music.el.play();if(pr&&pr.catch)pr.catch(()=>{});}
+function musicStop(){if(!music.el)return;const t=++music.tok;
+  try{if(music.g)music.g.gain.setTargetAtTime(0,AC.currentTime,0.35);}catch(e){}
+  setTimeout(()=>{if(music.tok===t&&music.el)music.el.pause();},1400);}
+function musicDuck(on){music.duck=on;if(music.g&&AC)try{music.g.gain.setTargetAtTime(music.el&&!music.el.paused?musicLevel():0,AC.currentTime,0.12);}catch(e){}}
+const screenAud={mode:null,quip:false};
+function screenSound(kind){                 // called on entering the title or halftime screen, and again on the first tap
+  if(screenAud.mode!==kind){screenAud.mode=kind;screenAud.quip=false;}
+  if(!sfx.ok())return;musicPlay();
+  if(!screenAud.quip&&settings.ann!==false){screenAud.quip=true;const k=kind;
+    setTimeout(()=>{if(screenAud.mode!==k||!sfx.ok())return;const src=playS(k==='half'?'halfq':'quip',1.25);
+      if(src&&src.buffer){musicDuck(true);setTimeout(()=>musicDuck(false),src.buffer.duration*1000+150);}},k==='half'?3800:1200);}}
+function screenLeave(){screenAud.mode=null;musicStop();}
+function cycleMusic(d){const ids=[...TRACKS.map(t=>t.id),'off'];settings.music=ids[(ids.indexOf(settings.music)+(d||1)+ids.length)%ids.length];
+  store.set('deadball_settings',settings);if(settings.music==='off')musicStop();else musicPlay();}
+function musicName(){const t=TRACKS.find(t=>t.id===settings.music);return t?t.name:'Off';}
 const titleMenu=new Menu($('titleMenu'),[
   {label:'Start Game',act:()=>startGame()},
   {label:'Load Game',disabled:true,sub:'coming in a future update'},
   {label:'How to Play',act:()=>showHowTo()},
   {label:()=>`Difficulty: <b>${settings.diff}</b>`,act:()=>cycleDiff(1),side:d=>cycleDiff(d)},
   {label:()=>`Sound: <b>${settings.sound?'On':'Off'}</b>`,act:()=>toggleSound(),side:()=>toggleSound()},
-  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann===false?'Off':ANN.status==='ready'?'On':ANN.status==='failed'?'On (voice failed to load, tap to retry)':`On (loading ${ANN.pct}%)`}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
+  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann===false?'Off':ANN.status==='ready'||ANN.idx?'On':ANN.status==='failed'?'On (voice failed to load, tap to retry)':`On (loading ${ANN.pct}%)`}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
+  {label:()=>`Music: <b>${musicName()}</b>`,act:()=>cycleMusic(1),side:d=>cycleMusic(d)},
   {label:'Exit Game',act:()=>exitGame()}]);
 const pauseMenu=new Menu($('pauseMenu'),[
   {label:'Resume',act:()=>resumeGame()},
   {label:'How to Play',act:()=>showHowTo()},
   {label:()=>`Sound: <b>${settings.sound?'On':'Off'}</b>`,act:()=>toggleSound(),side:()=>toggleSound()},
-  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann===false?'Off':ANN.status==='ready'?'On':ANN.status==='failed'?'On (voice failed to load, tap to retry)':`On (loading ${ANN.pct}%)`}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
+  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann===false?'Off':ANN.status==='ready'||ANN.idx?'On':ANN.status==='failed'?'On (voice failed to load, tap to retry)':`On (loading ${ANN.pct}%)`}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
   {label:'Quit to Title',act:()=>toTitle()}]);
 const halfMenu=new Menu($('halfMenu'),[{label:'Start 2nd Half',act:()=>secondHalf()}]);
 const overMenu=new Menu($('overMenu'),[{label:'Play Again',act:()=>startGame()},{label:'Main Menu',act:()=>toTitle()}]);
@@ -589,7 +625,7 @@ $('howBack').onclick=()=>closeHowTo();
 let mode='title',prevMode=null,howFrom=null,activeMenu=titleMenu;
 function showOverlay(id){for(const o of document.querySelectorAll('.overlay'))o.classList.toggle('show',o.id===id);}
 function updateRecord(){$('rec').textContent=`Your record: ${record.w} W – ${record.l} L – ${record.t} T`;}
-function toTitle(){annStop();G=null;SS=16;mode='title';activeMenu=titleMenu;titleMenu.render();updateRecord();showOverlay('title');initDemo();}
+function toTitle(){annStop();G=null;setTimeout(()=>screenSound('title'),0);SS=16;mode='title';activeMenu=titleMenu;titleMenu.render();updateRecord();showOverlay('title');initDemo();}
 function exitGame(){mode='exit';activeMenu=exitMenu;showOverlay('exit');}
 function showHowTo(){howFrom=mode;mode='howto';showOverlay('howto');$('howto').querySelector('.panel').scrollTop=0;}
 function closeHowTo(){sfx.select();mode=howFrom;if(mode==='title'){activeMenu=titleMenu;showOverlay('title');}else if(mode==='pause'){activeMenu=pauseMenu;showOverlay('pause');}}
@@ -620,7 +656,7 @@ function announce(t,pri){if(!G)return;G.ticker.push({t,life:4.5});if(G.ticker.le
 
 function big(t,dur=1.5,col='#ffffff'){if(G)G.big={t,life:dur,max:dur,col};}
 
-function startGame(){
+function startGame(){screenLeave();
   G={cm:null,score:[0,0],quarter:1,clock:QLEN,poss:0,los:35,stage:0,crossed:false,userTeam:0,
      teams:[0,1].map(t=>ROSTER.map((r,i)=>makePlayer(t,i))),debris:[],splats:[],parts:[],ticker:[],big:null,
      ctrl:null,play:null,ball:null,timer:0,after:null,hut:false,res:null,stats:{yards:[0,0],limbs:[0,0],bigHits:0,kos:0},abducts:[],shake:0};
@@ -1080,8 +1116,8 @@ function advance(){
   }
   toPlayCall();
 }
-function halftime(){call('half',{},4);setTimeout(()=>{if(G)leadCall(3);},1600);mode='half';activeMenu=halfMenu;halfMenu.render();$('halfScore').innerHTML=scoreLine();showOverlay('half');sfx.groan();}
-function secondHalf(){for(const tm of G.teams)for(const p of tm){p.out=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
+function halftime(){call('half',{},4);setTimeout(()=>{if(G&&mode==='half')leadCall(3);},1600);mode='half';G.halfT=0;half.squads=null;screenSound('half');activeMenu=halfMenu;halfMenu.render();$('halfScore').innerHTML=scoreLine();showOverlay('half');sfx.groan();}
+function secondHalf(){screenLeave();for(const tm of G.teams)for(const p of tm){p.out=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
   G.quarter=3;G.clock=QLEN;showOverlay(null);announce('Second half! Everyone is stitched up. The spare parts stay where they fell.');startPossession(1,85);toPlayCall();}
 function scoreLine(){return `<span style="color:${TEAMS[0].trim}">${TEAMS[0].name.toUpperCase()} ${G.score[0]}</span> &nbsp;—&nbsp; <span style="color:#ff9a6a">${G.score[1]} ${TEAMS[1].name.toUpperCase()}</span>`;}
 function gameOver(){
@@ -1365,11 +1401,49 @@ function drawAbduct(A){const b=A.body,x=SX(b.y),y0=SY(b.x),hp=A.h*SS*0.9;
   ctx.restore();
   for(const v of A.vamps)drawVamp(v);}
 function hline(x,col,w,dash){ctx.save();ctx.strokeStyle=col;ctx.lineWidth=w;if(dash)ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(SX(0),SY(x));ctx.lineTo(SX(FW),SY(x));ctx.stroke();ctx.restore();}
+
+// ===== halftime show: lit-up crowds on both sidelines, cheer squads dancing at midfield =====
+const half={squads:null,flash:[]};
+function halfInit(){half.squads=[0,1].map(t=>({routine:makeRoutine(),danceT:Math.random()*0.5,members:[0,1,2].map(i=>({team:t,idx:2+(i%2),num:[11,21,31][i]+t*40,limbs:{la:1,ra:1,ll:1,rl:1,head:1},phase:i,dance:9}))}));}
+function drawHalftime(dt){
+  if(!half.squads)halfInit();const t=time;
+  // spotlights sweeping from the top corners
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<4;i++){const ox=i<2?40:W-40,a=Math.PI/2+Math.sin(t*0.7+i*1.7)*0.55+(i<2?-0.35:0.35),len=900,wd=0.16;
+    const g=ctx.createLinearGradient(ox,HUD,ox+Math.cos(a)*len,HUD+Math.sin(a)*len);const col=['255,225,120','190,120,255','255,150,90','120,255,140'][i];
+    g.addColorStop(0,`rgba(${col},0.32)`);g.addColorStop(1,`rgba(${col},0)`);ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(ox,HUD);
+    ctx.lineTo(ox+Math.cos(a-wd)*len,HUD+Math.sin(a-wd)*len);ctx.lineTo(ox+Math.cos(a+wd)*len,HUD+Math.sin(a+wd)*len);ctx.closePath();ctx.fill();}
+  ctx.restore();
+  // stands: home fans on the left, away fans on the right
+  for(const side of [0,1]){const T=STYLE_OF(side),x0=side?W-104:0,w=104;
+    const g=ctx.createLinearGradient(x0,0,x0+w,0);g.addColorStop(side?1:0,'#120b18');g.addColorStop(side?0:1,'#24182c');ctx.fillStyle=g;ctx.fillRect(x0,HUD,w,640);
+    for(let r=0;r<17;r++)for(let c=0;c<4;c++){const fx=x0+14+c*25+(r%2)*10,fy=HUD+26+r*36,ph=r*1.3+c*2.1+side,jump=Math.max(0,Math.sin(t*7+ph))*9;
+      ctx.fillStyle=(r+c)%3?T.jersey:T.trim;ctx.fillRect(fx-8,fy-jump+6,16,14);
+      ctx.strokeStyle=T.skin;ctx.lineWidth=3;ctx.beginPath();const wave=Math.sin(t*9+ph)*5;ctx.moveTo(fx-7,fy-jump+7);ctx.lineTo(fx-11+wave,fy-jump-8);ctx.moveTo(fx+7,fy-jump+7);ctx.lineTo(fx+11+wave,fy-jump-8);ctx.stroke();
+      ctx.fillStyle=T.skin;ctx.beginPath();ctx.arc(fx,fy-jump,7,0,7);ctx.fill();
+      if(T.species==='mummy'){ctx.strokeStyle=T.skinDk;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(fx-6,fy-jump-2);ctx.lineTo(fx+6,fy-jump);ctx.stroke();ctx.fillStyle='#ffd23a';ctx.fillRect(fx-4,fy-jump-1,2,2);ctx.fillRect(fx+2,fy-jump-1,2,2);}
+      else{ctx.fillStyle='#fff';ctx.fillRect(fx-4,fy-jump-2,3,3);ctx.fillRect(fx+1,fy-jump-1,2,2);}}
+    // camera flashes
+    if(Math.random()<0.25)half.flash.push({x:x0+Math.random()*w,y:HUD+Math.random()*620,l:0.18});}
+  half.flash=half.flash.filter(f=>(f.l-=1/60)>0);for(const f of half.flash){ctx.fillStyle=`rgba(255,255,255,${f.l*5})`;ctx.beginPath();ctx.arc(f.x,f.y,4+f.l*30,0,7);ctx.fill();}
+  // cheer squads, each dancing the same random routine together
+  const size=118;
+  half.squads.forEach((sq,si)=>{sq.danceT+=1/60;if(sq.danceT>3.8){sq.danceT=0;sq.routine=makeRoutine();}
+    sq.members.forEach((m,i)=>{const x=150+si*230+i*76+(si?40:0)-20,y=470+(i===1?-26:0);m.danceT=sq.danceT;m.routine=sq.routine;
+      ctx.save();ctx.translate(x,y);const st=danceXform(m,size*0.4);
+      drawZombie(ctx,0,0,size,{team:STYLE_OF(sq.members[0].team),body:'wr',view:'front',phase:t*8+i,speed:0.4,limbs:m.limbs,pose:st==='down'?'stand':'zombie',num:m.num,t,seed:i+si*5,ball:false});
+      const T=STYLE_OF(si),b=Math.sin(t*10+i)*6;
+      for(const s2 of [-1,1]){const px=s2*size*0.34,py=-size*1.02+b*(s2>0?1:-1);
+        for(let k=0;k<9;k++){const a=k/9*6.28;ctx.fillStyle=k%2?T.trim:T.jersey;ctx.beginPath();ctx.arc(px+Math.cos(a)*9,py+Math.sin(a)*9,7,0,7);ctx.fill();}}
+      ctx.restore();});});
+  ctx.font='34px Bangers, Arial';ctx.textAlign='center';ctx.fillStyle='#ffe14a';ctx.strokeStyle='#2a0f0f';ctx.lineWidth=6;
+  const tt='CADAVER CHEER SQUAD!';ctx.strokeText(tt,W/2,HUD+70+Math.sin(t*3)*4);ctx.fillText(tt,W/2,HUD+70+Math.sin(t*3)*4);}
 function draw(){
   ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
   ctx.clearRect(0,0,W,H);
   const sh=G&&G.shake>0?G.shake:0;if(sh){ctx.save();ctx.translate(rand(-sh,sh),rand(-sh,sh));}
   if(!G){drawField([]);const ps=demo.slice().sort((a,b)=>b.x-a.x);for(const p of ps)drawPlayer(p);ctx.fillStyle='#0d120b';ctx.fillRect(0,0,W,HUD);return;}
+  if(mode==='half'){viewCX=60;viewCY=MID;SS=22;drawField(G.splats);drawHalftime();if(sh)ctx.restore();drawHUD();return;}
   drawField(G.splats);
   for(const d of G.debris)drawDebris(d);
   for(const q of G.parts)if(q.k==='goo'){ctx.globalAlpha=Math.min(1,q.life*2);ctx.fillStyle=q.c;ctx.beginPath();ctx.arc(SX(q.y),SY(q.x),q.r*SS,0,7);ctx.fill();}
