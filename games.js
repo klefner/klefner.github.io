@@ -23,4 +23,15 @@ const GAMES = [
     url: 'https://klefner.github.io/Holesy/',
     accent: '#ff6b6b',
   },
+  {
+    id: 'dead-ball',
+    title: 'Dead Ball',
+    tagline: 'Football. Undead.',
+    description:
+      'Zombie football with a rotting brain for a ball: cross midfield before it goes putrid or it bursts. ' +
+      'Tackles knock limbs off, and a one-legged receiver plays like one. Keyboard on PC, touch controls on iPhone.',
+    screenshot: 'assets/dead-ball-screenshot.png',
+    url: 'https://klefner.github.io/dead-ball/',
+    accent: '#9dff57',
+  },
 ];
