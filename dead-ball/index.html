@@ -22,7 +22,9 @@ html,body{margin:0;height:100%;background:#070a06;overflow:hidden;font-family:'R
 #btnAct{width:170px;height:170px;font-size:30px;right:30px;bottom:40px;border-color:#ffe14a}
 #btnBurst{right:220px;bottom:30px;width:116px;height:116px}
 #btnSwitch{right:40px;bottom:380px;width:116px;height:116px;font-size:20px}
-#btnPause{width:72px;height:72px;font-size:24px;left:12px;top:132px;border-radius:14px}
+#btnPause{display:none!important}
+#menuBtn{position:absolute;left:8px;top:64px;z-index:30;display:none;padding:6px 14px;font:24px Bangers,Arial,sans-serif;letter-spacing:1px;color:#fff;background:rgba(20,30,15,.85);border:2px solid #9dff57;border-radius:10px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#menuBtn:hover{background:#2f5a24}
 .thr{width:104px;height:104px;font-size:40px;background:rgba(60,50,8,.55);border-color:#ffe14a;color:#ffe14a}
 #thr1{right:300px;bottom:190px}#thr2{right:40px;bottom:236px}#thr3{right:170px;bottom:262px}
 #wrap{position:absolute;left:50%;top:50%;width:720px;height:1280px;transform:translate(-50%,-50%);overflow:hidden;box-shadow:0 0 60px #000}
@@ -75,6 +77,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 </head>
 <body>
 <div id="wrap">
+<div id="menuBtn">&#9776; MENU</div>
 <canvas id="cv" width="720" height="1280"></canvas>
 <div id="touch" class="touchui">
   <div id="joyZone"></div>
@@ -191,7 +194,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.4.7';
+const VERSION='0.4.8';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -683,7 +686,7 @@ function djUpdate(){            // start a new cue each time the ball goes dead;
   if(mode==='live'&&dj.gap){dj.gap=false;setTimeout(()=>{if(mode==='live'){djClear();if(music.el)music.el.pause();}},500);}}
 const titleMenu=new Menu($('titleMenu'),[
   {label:'Start Game',act:()=>startGame()},
-  {label:'Load Game',disabled:true,sub:'coming in a future update'},
+  {label:'Continue Game',get disabled(){return !hasSave();},get sub(){return saveLabel();},act:()=>continueGame()},
   {label:'How to Play',act:()=>showHowTo()},
   {label:()=>`Difficulty: <b>${settings.diff}</b>`,act:()=>cycleDiff(1),side:d=>cycleDiff(d)},
   {label:()=>`Sound: <b>${settings.sound?'On':'Off'}</b>`,act:()=>toggleSound(),side:()=>toggleSound()},
@@ -692,10 +695,13 @@ const titleMenu=new Menu($('titleMenu'),[
   {label:'Exit Game',act:()=>exitGame()}]);
 const pauseMenu=new Menu($('pauseMenu'),[
   {label:'Resume',act:()=>resumeGame()},
+  {label:'Save & Quit to Title',sub:'continue later from the last play call',act:()=>saveAndQuit()},
+  {label:'New Game',act:()=>{clearSave();startGame();}},
   {label:'How to Play',act:()=>showHowTo()},
   {label:()=>`Sound: <b>${settings.sound?'On':'Off'}</b>`,act:()=>toggleSound(),side:()=>toggleSound()},
   {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann===false?'Off':ANN.status==='ready'||ANN.idx?'On':ANN.status==='failed'?'On (voice failed to load, tap to retry)':`On (loading ${ANN.pct}%)`}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
-  {label:'Quit to Title',act:()=>toTitle()}]);
+  {label:()=>`Music: <b>${musicName()}</b>`,act:()=>cycleMusic(1),side:d=>cycleMusic(d)},
+  {label:'Quit without Saving',act:()=>toTitle()}]);
 const halfMenu=new Menu($('halfMenu'),[{label:'Start 2nd Half',act:()=>secondHalf()}]);
 const overMenu=new Menu($('overMenu'),[{label:'Play Again',act:()=>startGame()},{label:'Main Menu',act:()=>toTitle()}]);
 const exitMenu=new Menu($('exitMenu'),[{label:'Back to Title',act:()=>toTitle()}]);
@@ -711,7 +717,7 @@ function toTitle(){annStop();G=null;setTimeout(()=>screenSound('title'),0);SS=16
 function exitGame(){mode='exit';activeMenu=exitMenu;showOverlay('exit');}
 function showHowTo(){howFrom=mode;mode='howto';showOverlay('howto');$('howto').querySelector('.panel').scrollTop=0;}
 function closeHowTo(){sfx.select();mode=howFrom;if(mode==='title'){activeMenu=titleMenu;showOverlay('title');}else if(mode==='pause'){activeMenu=pauseMenu;showOverlay('pause');}}
-function pauseGame(){if(!G||mode==='pause')return;annStop();prevMode=mode;mode='pause';activeMenu=pauseMenu;pauseMenu.i=0;pauseMenu.render();showOverlay('pause');}
+function pauseGame(){if(!G||!['playcall','presnap','live','dead'].includes(mode))return;annStop();prevMode=mode;mode='pause';activeMenu=pauseMenu;pauseMenu.i=0;pauseMenu.render();showOverlay('pause');}
 function resumeGame(){mode=prevMode;for(const k in keys)keys[k]=false;if(mode==='playcall')showOverlay('playcall');else showOverlay(null);}
 
 function onKey(c){
@@ -738,10 +744,34 @@ function announce(t,pri){if(!G)return;G.ticker.push({t,life:4.5});if(G.ticker.le
 
 function big(t,dur=1.5,col='#ffffff'){if(G)G.big={t,life:dur,max:dur,col};}
 
-function startGame(){screenLeave();dj.gap=false;
-  G={cm:null,score:[0,0],quarter:1,clock:QLEN,poss:0,los:35,stage:0,crossed:false,userTeam:0,
+
+// ===== save / continue: a snapshot is taken before every play; it is written to this device every 3rd play, at halftime, and on Save & Quit =====
+var SAVE_KEY='deadball_save';
+function newG(){return {cm:null,score:[0,0],quarter:1,clock:QLEN,poss:0,los:35,stage:0,crossed:false,userTeam:0,playsDone:0,
      teams:[0,1].map(t=>ROSTER.map((r,i)=>makePlayer(t,i))),debris:[],splats:[],parts:[],ticker:[],big:null,
-     ctrl:null,play:null,ball:null,timer:0,after:null,hut:false,res:null,stats:{yards:[0,0],limbs:[0,0],bigHits:0,kos:0},abducts:[],shake:0};
+     ctrl:null,play:null,ball:null,timer:0,after:null,hut:false,res:null,stats:{yards:[0,0],limbs:[0,0],bigHits:0,kos:0},abducts:[],shake:0};}
+function snapshot(){const cm=G.cm?Object.assign({},G.cm,{used:[...G.cm.used]}):null;
+  return {v:VERSION,at:Date.now(),diff:settings.diff,score:G.score.slice(),quarter:G.quarter,clock:G.clock,poss:G.poss,los:G.los,stage:G.stage,crossed:G.crossed,
+    userTeam:G.userTeam,playsDone:G.playsDone,stats:JSON.parse(JSON.stringify(G.stats)),cm:cm&&JSON.parse(JSON.stringify(cm)),
+    players:G.teams.map(tm=>tm.map(p=>({limbs:Object.assign({},p.limbs),out:p.out,ko:!!p.ko,spd:p.spd}))),
+    debris:G.debris.filter(d=>!d.sink).slice(-60).map(d=>Object.assign({},d,{vx:0,vy:0,vz:0,z:0})),splats:G.splats.slice(-160)};}
+function saveNow(){if(G&&G.snap){store.set(SAVE_KEY,G.snap);G.savedAt=G.playsDone;}}
+function hasSave(){return !!store.get(SAVE_KEY,null);}
+function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
+function saveLabel(){const S=store.get(SAVE_KEY,null);if(!S)return 'no saved game yet';const m=Math.floor(S.clock/60),sec=String(Math.floor(S.clock%60)).padStart(2,'0');
+  return `Q${S.quarter} ${m}:${sec} · ${TEAMS[0].name} ${S.score[0]} – ${S.score[1]} ${TEAMS[1].name}`;}
+function continueGame(){const S=store.get(SAVE_KEY,null);if(!S)return;screenLeave();dj.gap=false;
+  G=newG();Object.assign(G,{score:S.score,quarter:S.quarter,clock:S.clock,userTeam:S.userTeam,playsDone:S.playsDone||0,stats:S.stats||G.stats,
+    debris:S.debris||[],splats:S.splats||[]});
+  if(S.cm){G.cm=Object.assign(S.cm,{used:new Set(S.cm.used||[])});}
+  S.players.forEach((tm,t)=>tm.forEach((q,i)=>{const p=G.teams[t][i];p.limbs=q.limbs;p.out=q.out;p.ko=q.ko;p.spd=q.spd;}));
+  SS=18;camCX=S.los;camCY=MID;viewCX=S.los;viewCY=MID;showOverlay(null);
+  annStop();announce('Welcome back to Dead Ball! Right where we left off.',3);
+  G.poss=S.poss;G.los=S.los;G.stage=S.stage;G.crossed=S.crossed;G.savedAt=G.playsDone;
+  toPlayCall();}
+function saveAndQuit(){saveNow();toTitle();}
+function startGame(){screenLeave();dj.gap=false;
+  G=newG();
   SS=18;camCX=35;camCY=MID;viewCX=35;viewCY=MID;showOverlay(null);
   annStop();announce('Welcome to DEAD BALL! The Graveyard Shift get the ball first.',3);sfx.cheer();
   startPossession(0,35);toPlayCall();
@@ -768,6 +798,7 @@ function cpuOffCall(){const w={dive:3,slant:3,screen:2,bomb:1.5};if(G.stage>=2&&
   if(armsOf(G.play.qb)===0)return 'dive';return weighted(w);}
 function cpuDefCall(){return weighted({blitz:2.5,zone:3,man:3});}
 function toPlayCall(){
+  G.snap=snapshot();if(G.playsDone>0&&G.playsDone%3===0&&G.savedAt!==G.playsDone)saveNow();
   G.play={off:G.poss,def:1-G.poss,offCall:null,defCall:null,time:0,qb:null,carrier:null,run:false,canPass:false,handed:false,thrown:false,ended:false,recv:{},drop:4};
   setupFormation();
   const P=G.play,userOff=P.off===G.userTeam;
@@ -1140,7 +1171,7 @@ function updateLive(dt){
 }
 function endPlay(type,info){
   const P=G.play;if(P.ended)return;P.ended=true;mode='dead';G.timer=1.7;G.res=Object.assign({type},info);
-  const gain=Math.round(dir(P.off)*(info.x-G.los));P.callGain=gain;commRecord(P,type,info,gain);
+  const gain=Math.round(dir(P.off)*(info.x-G.los));P.callGain=gain;G.playsDone=(G.playsDone||0)+1;commRecord(P,type,info,gain);
   {const sk=type==='tackle'&&info.by===P.qb&&gain<0&&!P.thrown&&!P.handed,o={off:P.off};
    if(type==='td')crowdReact('td',o);else if(type==='turnover')crowdReact('to',o);else if(type==='incomplete')crowdReact('inc',o);
    else if(sk)crowdReact('sack',o);else if((type==='tackle'||type==='oob')&&gain>=15)crowdReact('big',o);else if(type==='tackle'&&gain<0)crowdReact('loss',o);}
@@ -1202,10 +1233,11 @@ function advance(){
   toPlayCall();
 }
 function halftime(){dj.gap=true;djClear();call('half',{},4);setTimeout(()=>{if(G&&mode==='half')leadCall(3);},1600);mode='half';G.halfT=0;half.squads=null;screenSound('half');activeMenu=halfMenu;halfMenu.render();$('halfScore').innerHTML=scoreLine();showOverlay('half');sfx.groan();}
-function secondHalf(){screenLeave();dj.gap=false;for(const tm of G.teams)for(const p of tm){p.out=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
-  G.quarter=3;G.clock=QLEN;showOverlay(null);announce('Second half! Everyone is stitched up. The spare parts stay where they fell.');startPossession(1,85);toPlayCall();}
+function secondHalf(){screenLeave();dj.gap=false;G.savedAt=-1;for(const tm of G.teams)for(const p of tm){p.out=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
+  G.quarter=3;G.clock=QLEN;showOverlay(null);announce('Second half! Everyone is stitched up. The spare parts stay where they fell.');startPossession(1,85);toPlayCall();saveNow();}
 function scoreLine(){return `<span style="color:${TEAMS[0].trim}">${TEAMS[0].name.toUpperCase()} ${G.score[0]}</span> &nbsp;—&nbsp; <span style="color:#ff9a6a">${G.score[1]} ${TEAMS[1].name.toUpperCase()}</span>`;}
 function gameOver(){
+  clearSave();
   mode='over';activeMenu=overMenu;overMenu.i=0;overMenu.render();
   const [a,b]=G.score;let t;
   if(a>b){t='YOU WIN!';record.w++;sfx.cheer();sfx.applause();}else if(a<b){t='BACK TO THE GRAVE';record.l++;sfx.groan();}else{t='DEAD HEAT';record.t++;}
@@ -1582,6 +1614,8 @@ function bindBtn(el,code,fn){
 bindBtn($('btnAct'),'Space');bindBtn($('btnBurst'),'ShiftLeft');bindBtn($('btnSwitch'),'Tab');
 bindBtn($('thr1'),'KeyQ');bindBtn($('thr2'),'KeyE');bindBtn($('thr3'),'KeyV');
 bindBtn($('btnPause'),null,()=>pauseGame());
+{const mb=$('menuBtn');const go=e=>{e.preventDefault();e.stopPropagation();audioInit();pauseGame();};mb.addEventListener('pointerdown',go);mb.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});}
+function menuBtnUpdate(){const on=!!G&&['playcall','presnap','live','dead'].includes(mode);const mb=$('menuBtn');if(mb.style.display!==(on?'block':'none'))mb.style.display=on?'block':'none';}
 document.addEventListener('touchmove',e=>{if(!e.target.closest||!e.target.closest('.panel'))e.preventDefault();},{passive:false});
 document.addEventListener('touchstart',()=>{enableTouch();audioInit();},{passive:true});
 document.addEventListener('touchend',()=>audioInit(),{passive:true});
@@ -1604,7 +1638,7 @@ function updateTouchUI(){
 // ===== loop =====
 let last=performance.now();
 function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
-  try{update(dt);draw();updateTouchUI();ambUpdate();musicUpdate();djUpdate();}catch(e){console.error(e);}
+  try{update(dt);draw();updateTouchUI();ambUpdate();musicUpdate();djUpdate();menuBtnUpdate();}catch(e){console.error(e);}
   for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
