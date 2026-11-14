@@ -40,6 +40,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 .mi.dis{opacity:.42;cursor:default}
 .mi .sub{display:block;font-family:'Roboto Condensed';font-size:13px;letter-spacing:1px;color:#aab79c;margin-top:-2px}
 .hint{margin-top:16px;font-size:14px;color:#9fae90}
+.ver{position:absolute;bottom:14px;right:18px;font-size:16px;letter-spacing:1px;color:#9fae90;opacity:.9;pointer-events:none}
 .rec{margin-top:14px;font-size:16px;color:#f3c34b;letter-spacing:1px}
 .panel{background:rgba(14,20,11,.97);border:2px solid #3d5c2c;border-radius:12px;padding:18px 24px;width:640px;max-height:1160px;overflow-y:auto;box-shadow:0 10px 40px #000}
 .panel h1{font-family:'Creepster';color:#9dff57;font-size:44px;margin:0 0 6px;letter-spacing:2px;text-align:center}
@@ -90,6 +91,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <div id="titleMenu" class="menu"></div>
   <div class="rec" id="rec"></div>
   <div class="hint" id="titleHint">↑ ↓ choose &nbsp;·&nbsp; ← → change &nbsp;·&nbsp; Enter select &nbsp;·&nbsp; or click. &nbsp;(If keys don't respond, click the game once.)</div>
+  <div class="ver"></div>
 </div>
 
 <div id="howto" class="overlay dim">
@@ -160,6 +162,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 <div id="pause" class="overlay dim">
   <div class="big">PAUSED</div>
   <div id="pauseMenu" class="menu"></div>
+  <div class="ver"></div>
 </div>
 
 <div id="half" class="overlay dim">
@@ -184,6 +187,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 </div>
 
 <script>
+const VERSION='0.3.0';
+document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
+
 'use strict';
 // ===== constants =====
 const W=720,H=1280,HUD=120,FH=H-HUD,FW=53.333,MID=FW/2,QLEN=180;
