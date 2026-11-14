@@ -191,7 +191,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.4.6';
+const VERSION='0.4.7';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -299,7 +299,7 @@ function audioInit(){annUnlock();
   try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch(e){}
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=0.6;master.connect(AC.destination);decodeAll();}catch(e){AC=null;return;}}
   if(AC.state!=='running')AC.resume().catch(()=>{});
-  if(mode==='title'||mode==='half'||(mode==='howto'&&!G))setTimeout(()=>screenSound(mode==='half'?'half':'title'),60);
+  if(mode==='title'||mode==='half'||(mode==='howto'&&!G))setTimeout(()=>{if(mode==='title'||mode==='half'||(mode==='howto'&&!G))screenSound(mode==='half'?'half':'title');},60);
   else if(G&&settings.sound&&settings.music!=='off'&&!music.el)musicPlay();
   if(!unlocked){unlocked=true;
     try{const b=AC.createBuffer(1,1,22050),s=AC.createBufferSource();s.buffer=b;s.connect(AC.destination);s.start(0);}catch(e){}
@@ -442,7 +442,8 @@ addEventListener('blur',()=>{for(const k in keys)keys[k]=false;if(mode==='live'|
 // ===== live announcer: spoken play-by-play + color commentary =====
 // Every call gets a priority. A more important call cuts off a less important one; lines that wait too long are dropped,
 // so the voice is always talking about what is happening now.
-const ANN={ok:true,q:[],cur:null,bags:{},idx:null,buf:null,loading:false,status:'loading',pct:0,err:''};   // pre-recorded ghoul announcer: one pack of clips, sliced and decoded on demand
+function annQuipStop(){if(ANN.quipSrc){try{ANN.quipSrc.stop();}catch(e){}ANN.quipSrc=null;}ANN.busyUntil=0;}
+const ANN={busyUntil:0,quipSrc:null,ok:true,q:[],cur:null,bags:{},idx:null,buf:null,loading:false,status:'loading',pct:0,err:''};   // pre-recorded ghoul announcer: one pack of clips, sliced and decoded on demand
 const now_s=()=>performance.now()/1000;
 const annKey=t=>t.replace(/[!]{2,}/g,'!').replace(/\s+/g,' ').trim();
 function annLoad(){if(ANN.loading||ANN.idx)return;ANN.loading=true;ANN.status='loading';ANN.pct=0;
@@ -466,7 +467,7 @@ function annSay(text,pri,voice){
   ANN.q.push(it);ANN.q.sort((a,b)=>b.pri-a.pri);if(ANN.q.length>3)ANN.q.length=3;
   if(!ANN.cur)annNext();}
 function annNext(){
-  const t=now_s();ANN.q=ANN.q.filter(x=>t-x.born<x.ttl);const it=ANN.q.shift();if(!it){ANN.cur=null;return;}
+  const t=now_s();if(t<ANN.busyUntil){clearTimeout(ANN.wait);ANN.wait=setTimeout(annNext,(ANN.busyUntil-t)*1000+30);return;}ANN.q=ANN.q.filter(x=>t-x.born<x.ttl);const it=ANN.q.shift();if(!it){ANN.cur=null;return;}
   it.start=t;it.deadline=t+it.e[2]+1.2;ANN.cur=it;
   const fail=()=>{if(ANN.cur===it){ANN.cur=null;annNext();}};
   const ok=buf=>{if(ANN.cur!==it)return;
@@ -634,9 +635,12 @@ function screenSound(kind){if(music.el&&kind&&!music.el.src.endsWith('music/'+se
   if(screenAud.mode!==kind){screenAud.mode=kind;screenAud.quip=false;}
   if(!sfx.ok())return;musicPlay();
   if(!screenAud.quip&&settings.ann!==false){screenAud.quip=true;const k=kind;
-    setTimeout(()=>{if(screenAud.mode!==k||!sfx.ok())return;const src=playS(k==='half'?'halfq':'quip',1.25);
-      if(src&&src.buffer){musicDuck(true);setTimeout(()=>musicDuck(false),src.buffer.duration*1000+150);}},k==='half'?3800:1200);}}
-function screenLeave(){screenAud.mode=null;}   // music keeps playing; musicUpdate silences it during live plays
+    const go=(tries)=>{if(screenAud.mode!==k||!sfx.ok())return;
+      if(ANN.cur||now_s()<ANN.busyUntil){if(tries<15)setTimeout(()=>go(tries+1),400);return;}   // wait for the announcer to finish
+      const src=playS(k==='half'?'halfq':'quip',1.25);
+      if(src&&src.buffer){ANN.quipSrc=src;ANN.busyUntil=now_s()+src.buffer.duration+0.2;musicDuck(true);setTimeout(()=>musicDuck(false),src.buffer.duration*1000+150);}};
+    setTimeout(()=>go(0),k==='half'?3800:1200);}}
+function screenLeave(){screenAud.mode=null;annQuipStop();}   // music keeps playing; musicUpdate silences it during live plays
 function cycleMusic(d){const ids=[...TRACKS.map(t=>t.id),'off'];settings.music=ids[(ids.indexOf(settings.music)+(d||1)+ids.length)%ids.length];
   store.set('deadball_settings',settings);if(settings.music==='off')musicStop();else musicPlay();}
 function musicName(){const t=TRACKS.find(t=>t.id===settings.music);return t?t.name:'Off';}
