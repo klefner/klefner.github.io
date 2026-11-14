@@ -12,9 +12,9 @@ html,body{margin:0;height:100%;background:#070a06;overflow:hidden;font-family:'R
 .touchui.on{display:block}
 .touchui>*{pointer-events:auto;position:absolute}
 #joyZone{left:0;top:45%;width:50%;bottom:0}
-#joyBase{width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;border:3px solid rgba(157,255,87,.45);background:rgba(10,20,8,.35);pointer-events:none;left:160px;top:1090px;opacity:.55}
+#joyBase{width:210px;height:210px;margin:-105px 0 0 -105px;border-radius:50%;border:3px solid rgba(157,255,87,.45);background:rgba(10,20,8,.35);pointer-events:none;left:160px;top:1090px;opacity:.55}
 #joyBase.act{opacity:1}
-#joyKnob{position:absolute;left:50%;top:50%;width:66px;height:66px;margin:-33px 0 0 -33px;border-radius:50%;background:rgba(157,255,87,.75);box-shadow:0 0 14px rgba(157,255,87,.5)}
+#joyKnob{position:absolute;left:50%;top:50%;width:76px;height:76px;margin:-38px 0 0 -38px;border-radius:50%;background:rgba(157,255,87,.75);box-shadow:0 0 14px rgba(157,255,87,.5)}
 .tbtn{display:flex;align-items:center;justify-content:center;text-align:center;border-radius:50%;font-family:'Bangers',Arial,sans-serif;letter-spacing:1px;color:#fff;background:rgba(25,45,18,.5);border:3px solid rgba(157,255,87,.7);width:104px;height:104px;font-size:22px;line-height:1;text-shadow:0 2px 0 #000}
 .tbtn.down{background:rgba(157,255,87,.55);transform:scale(.94)}
 .tbtn.used{opacity:.3}
@@ -131,6 +131,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <table>
    <tr><th>Key</th><th>On offense</th><th>On defense</th></tr>
    <tr><td><span class="kbd">Arrows</span> / <span class="kbd">WASD</span></td><td>Move your player</td><td>Move your player</td></tr>
+   <tr><td><span class="kbd">Hold left mouse</span></td><td>Run toward the pointer (any angle, precise)</td><td>Run toward the pointer</td></tr>
    <tr><td><span class="kbd">Q</span> <span class="kbd">E</span> <span class="kbd">V</span></td><td>Quarterback throws to that receiver (the letter floats over him): Q = left receiver, E = right receiver, V = running back</td><td>—</td></tr>
    <tr><td><span class="kbd">Space</span></td><td>Stiff-arm (ball carrier)</td><td>Dive tackle</td></tr>
    <tr><td><span class="kbd">Shift</span></td><td>Adrenaline Twitch: a speed burst, once per play</td><td>Same</td></tr>
@@ -187,7 +188,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 </div>
 
 <script>
-const VERSION='0.3.1';
+const VERSION='0.3.2';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -669,8 +670,10 @@ function handleUser(dt){
   const P=G.play,B=G.ball;let c=G.ctrl;
   if(!c||c.out){G.ctrl=c=nearestTo(G.userTeam,ballPt());if(!c)return;}
   let ix=0,iy=0,amag=1;if(isDown('ArrowLeft','KeyA'))ix--;if(isDown('ArrowRight','KeyD'))ix++;if(isDown('ArrowUp','KeyW'))iy--;if(isDown('ArrowDown','KeyS'))iy++;
-  if(joy.active&&Math.hypot(joy.x,joy.y)>0.18){ix=joy.x;iy=joy.y;amag=Math.min(1,Math.hypot(ix,iy)*1.3);}
+  if(joy.active&&Math.hypot(joy.x,joy.y)>0.12){ix=joy.x;iy=joy.y;amag=Math.min(1,0.35+Math.hypot(ix,iy)*0.9);}
   {const sx=ix,sy=iy;ix=-sy;iy=sx;}   // screen (right,down) -> world (+x is up the field, +y is screen right)
+  if(mouse.down){const tx=viewCX-(mouse.y-HUD-FH/2)/SS,ty=viewCY+(mouse.x-W/2)/SS,dx=tx-c.x,dy=ty-c.y,d=Math.hypot(dx,dy);
+    if(d>0.35){ix=dx;iy=dy;amag=Math.min(1,0.4+d/2.5);}else{ix=0;iy=0;}}
   const m=Math.hypot(ix,iy);
   if(c.stun<=0&&c.dive<=0){
     if(m===0&&B.state==='air'&&B.target===c){const dx=B.tx-c.x,dy=B.ty-c.y,d=Math.hypot(dx,dy);const sp=speedOf(c);if(d>0.2)steer(c,dx/d*sp*Math.min(1,d/1.2),dy/d*sp*Math.min(1,d/1.2),dt);else steer(c,0,0,dt);}
@@ -1167,7 +1170,7 @@ function drawTicker(){
 }
 function drawHint(){
   if(touchOn||(mode!=='live'&&mode!=='presnap'))return;const P=G.play;
-  const t=P.off===G.userTeam?'Arrows/WASD move · Q / E / V throw · Tab take over · Space stiff-arm · Shift burst · Esc pause':'Arrows/WASD move · Space dive · Tab switch · Shift burst · Esc pause';
+  const t=P.off===G.userTeam?'WASD or hold mouse to move · Q / E / V throw · Tab take over · Space stiff-arm · Shift burst · Esc pause':'WASD or hold mouse to move · Space dive · Tab switch · Shift burst · Esc pause';
   ctx.font='13px Roboto Condensed, Arial';const w=ctx.measureText(t).width+16;ctx.fillStyle='rgba(8,12,6,0.6)';ctx.fillRect(W-w-10,H-74,w,22);ctx.fillStyle='#c4d1b6';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,W-w-2,H-63);
 }
 function drawBig(){
@@ -1217,24 +1220,31 @@ function draw(){
   ctx.globalAlpha=1;
   for(const q of G.parts)if(q.k==='gas'){ctx.globalAlpha=Math.min(0.45,q.life*0.3);ctx.fillStyle=q.c;ctx.beginPath();ctx.arc(SX(q.y),SY(q.x),q.r*SS,0,7);ctx.fill();}
   ctx.globalAlpha=1;
+  if(mouse.down&&mode==='live'){const s=9+Math.sin(time*10)*2;ctx.strokeStyle='rgba(255,225,74,0.9)';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(mouse.x,mouse.y,s,0,7);ctx.stroke();ctx.beginPath();ctx.arc(mouse.x,mouse.y,2.5,0,7);ctx.fillStyle='#ffe14a';ctx.fill();}
   if(sh)ctx.restore();
   drawHUD();drawTicker();drawHint();drawBig();
 }
 
 // ===== touch controls =====
 let touchOn=false,tuiState='';
+const JOYR=85;   // joystick throw in game px (was 55: too twitchy to hold an angle)
+const mouse={down:false,x:0,y:0};
+cv.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||e.button!==0||touchOn)return;if(!(mode==='live'||mode==='presnap'))return;const p=toGame(e.clientX,e.clientY);Object.assign(mouse,{down:true,x:p.x,y:p.y});cap(cv,e);});
+cv.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;const p=toGame(e.clientX,e.clientY);mouse.x=p.x;mouse.y=p.y;});
+for(const ev of ['pointerup','pointercancel'])cv.addEventListener(ev,e=>{if(e.pointerType==='mouse')mouse.down=false;});
+addEventListener('blur',()=>{mouse.down=false;});
 const joy={active:false,id:null,ox:160,oy:1090,x:0,y:0};
 const touchEl=$('touch'),joyZone=$('joyZone'),joyBase=$('joyBase'),joyKnob=$('joyKnob');
 function enableTouch(){if(touchOn)return;touchOn=true;
   $('titleHint').textContent='Tap a menu item to choose. Best played with the phone held upright.';
   document.querySelector('.pchint').textContent='Tap a play to call it';}
 function showJoy(){joyBase.style.left=joy.ox+'px';joyBase.style.top=joy.oy+'px';joyBase.classList.toggle('act',joy.active);
-  joyKnob.style.transform=`translate(${joy.x*55}px,${joy.y*55}px)`;}
+  joyKnob.style.transform=`translate(${joy.x*JOYR}px,${joy.y*JOYR}px)`;}
 function cap(el,e){try{el.setPointerCapture(e.pointerId);}catch(_){}}
 joyZone.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();if(joy.active)return;const p=toGame(e.clientX,e.clientY);
   Object.assign(joy,{active:true,id:e.pointerId,ox:p.x,oy:p.y,x:0,y:0});cap(joyZone,e);showJoy();});
 joyZone.addEventListener('pointermove',e=>{if(!joy.active||e.pointerId!==joy.id)return;e.preventDefault();const p=toGame(e.clientX,e.clientY);
-  let dx=p.x-joy.ox,dy=p.y-joy.oy;const R=55,d=Math.hypot(dx,dy);
+  let dx=p.x-joy.ox,dy=p.y-joy.oy;const R=JOYR,d=Math.hypot(dx,dy);
   if(d>R){joy.ox+=dx/d*(d-R);joy.oy+=dy/d*(d-R);dx=dx/d*R;dy=dy/d*R;}
   joy.x=dx/R;joy.y=dy/R;showJoy();});
 function endJoy(e){if(e&&e.pointerId!==joy.id)return;Object.assign(joy,{active:false,id:null,x:0,y:0,ox:160,oy:1090});showJoy();}
