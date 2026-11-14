@@ -42,8 +42,8 @@ function zArm(c,S,B,sh,el,hand,claw,mum){
   zLimb(c,[sh,[sx,sy]],B.armW+3.5,S.jersey);                         // short sleeve
   c.strokeStyle=S.trim;c.lineWidth=2;c.beginPath();c.moveTo(sx-(B.armW*0.5),sy);c.lineTo(sx+(B.armW*0.5),sy);c.stroke();
   zHand(c,S,hand[0],hand[1],B.armW*0.62,claw);}
-function zNumber(c,S,n,x,y,sz){c.font=`900 ${sz}px Arial Black, Arial, sans-serif`;c.textAlign='center';c.textBaseline='middle';
-  c.lineWidth=3;c.strokeStyle=S.jerseyDk;c.strokeText(n,x,y);c.fillStyle=S.trim;c.fillText(n,x,y);}
+function zNumber(c,S,n,x,y,sz){c.save();c.translate(x,y);if(c.getTransform().a<0)c.scale(-1,1);x=0;y=0;c.font=`900 ${sz}px Arial Black, Arial, sans-serif`;c.textAlign='center';c.textBaseline='middle';
+  c.lineWidth=3;c.strokeStyle=S.jerseyDk;c.strokeText(n,x,y);c.fillStyle=S.trim;c.fillText(n,x,y);c.restore();}
 function zTorso(c,S,B,o,sy,hy,back){           // jersey with shoulder pads, belly, rips or bandage strips
   const w=B.w,top=15*w,bot=(B.belly?17:10)*w;
   c.beginPath();c.moveTo(-top,sy+4);c.quadraticCurveTo(-top-2,hy-6,-bot,hy);c.quadraticCurveTo(0,hy+(B.belly?7:3),bot,hy);
@@ -128,14 +128,20 @@ function zHead(c,S,B,o,hx,hy,view){
   zHelmet(c,S,hx,hy,r,view,o);}
 function drawZombie(c,x,y,size,o){
   const S=o.team,B=ZBODY[o.body||'qb'],L=o.limbs||{la:1,ra:1,ll:1,rl:1,head:1},mum=S.species==='mummy';
-  let view=o.view||'front',pose=o.pose||'run';const ph=o.phase||0,spd=o.speed==null?1:o.speed;
-  c.save();c.translate(x,y);const k=size/100;c.scale(k*(o.flip?-1:1),k);
+  let view=o.view||'front',pose=o.pose||'run';if(view!=='side'&&pose!=='down'&&pose!=='dive')o=Object.assign({},o,{flip:false});const ph=o.phase||0,spd=o.speed==null?1:o.speed;
+  const nLegs=(L.ll?1:0)+(L.rl?1:0);
+  if(nLegs===0&&pose!=='down'&&pose!=='dive'&&pose!=='stand')pose='crawl';                 // no legs: drag himself along on his arms
+  const hop=nLegs===1&&['run','carry','zombie','block'].includes(pose)&&spd>0.15;          // one leg: hops
+  const hopH=hop?Math.abs(Math.sin(ph*0.5))*13*Math.min(1,spd+0.3):0;
+  c.save();c.translate(x,y);const k=size/100;c.scale(k*(o.flip&&(view==='side'||pose==='down'||pose==='dive'||pose==='crawl')?-1:1),k);
   // shadow
-  c.fillStyle='rgba(0,0,0,0.28)';c.beginPath();c.ellipse(0,1,pose==='down'||pose==='dive'?52:24*B.w+4,7,0,0,7);c.fill();
+  c.fillStyle='rgba(0,0,0,0.28)';c.beginPath();c.ellipse(0,1,pose==='down'||pose==='dive'||pose==='crawl'?52:(24*B.w+4)*(1-hopH/40),7*(1-hopH/40),0,0,7);c.fill();
+  if(hop)c.translate(0,-hopH);
   if(pose==='down'){c.translate(46,-9);c.rotate(-Math.PI/2);view='side';}          // flat on his back, head to the left
   else if(pose==='dive'){c.translate(-44,-26);c.rotate(Math.PI/2*0.82);view='side';}  // airborne, head first to the right
-  const bob=pose==='stand'||pose==='down'?Math.sin((o.t||0)*2.2)*0.8:-Math.abs(Math.sin(ph))*3*spd;
-  const lean=view==='side'&&pose!=='stand'&&pose!=='down'?6*spd:0;
+  else if(pose==='crawl'){c.translate(-38+Math.sin(ph)*2,-12);c.rotate(Math.PI/2*0.9);view='side';}  // belly down, head first to the right
+  const bob=hop||pose==='crawl'?0:pose==='stand'||pose==='down'?Math.sin((o.t||0)*2.2)*0.8:-Math.abs(Math.sin(ph))*3*spd;
+  const lean=view==='side'&&pose!=='stand'&&pose!=='down'&&pose!=='crawl'?6*spd:0;
   const hip=-B.leg+bob,sh=hip-B.torso,hd=sh-19*B.head;
   c.translate(0,0);
   const legOK={l:L.ll,r:L.rl},armOK={l:L.la,r:L.ra};
@@ -143,6 +149,7 @@ function drawZombie(c,x,y,size,o){
   const legs=[];
   for(const [s,key] of [[-1,'l'],[1,'r']]){
     const hx=s*7*B.w;let foot,knee;
+    if(hop){foot=[s*1.5,-hopH*0.35];knee=[hx+(view==='side'?6:0),hip*0.5-hopH*0.25];legs.push([s,[hx,hip],foot,knee,key]);continue;}
     if(view==='side'){const a=ph+(s>0?Math.PI:0);const st=pose==='stand'?0:Math.sin(a)*14*spd*(B.leg/30),lift=pose==='stand'?0:Math.max(0,Math.cos(a))*9*spd;
       foot=[st+lean*0.2,-lift];knee=[(st*0.55)+5*spd+lean*0.5,hip*0.5-lift*0.6];legs.push([s,[lean,hip],foot,knee,key]);}
     else{const a=ph+(s>0?Math.PI:0),lift=pose==='stand'?0:Math.max(0,Math.sin(a))*B.leg*0.32*spd;
@@ -151,7 +158,8 @@ function drawZombie(c,x,y,size,o){
   for(const [s,hp,ft,kn,key] of legs){if(legOK[key])zLeg(c,S,B,s,hp,ft,kn,mum);else zStump(c,hp[0],hp[1]+3,B.legW*0.7,true);}
   // ---------- arms helper
   const armPts=(s)=>{const sx=view==='side'?lean+(s>0?2:-2):s*16*B.w,sp=[sx,sh+6];let el,hn;
-    if(pose==='zombie'||pose==='block'){ if(view==='side'){el=[sx+B.arm*0.55,sh+8+(s>0?0:2)];hn=[sx+B.arm*1.05,sh+10+Math.sin((o.t||0)*3+s)*2];}
+    if(pose==='crawl'){const r=Math.sin(ph+(s>0?0:Math.PI));el=[sx+17,sh-30-r*6];hn=[sx+23,sh-58-r*10];}
+    else if(pose==='zombie'||pose==='block'){ if(view==='side'){el=[sx+B.arm*0.55,sh+8+(s>0?0:2)];hn=[sx+B.arm*1.05,sh+10+Math.sin((o.t||0)*3+s)*2];}
                        else if(view==='front'){el=[s*12*B.w,sh+12];hn=[s*8*B.w,sh+16+Math.sin((o.t||0)*3+s)*1.5];}
                        else{el=[s*20*B.w,sh+14];hn=[s*19*B.w,sh+22];} }
     else if(pose==='carry'&&s>0){el=view==='side'?[sx+4,sh+B.arm*0.6]:[s*15*B.w,sh+B.arm*0.6];hn=view==='side'?[sx+9,sh+B.arm*0.45]:[s*4,sh+B.arm*0.5];}
@@ -159,7 +167,7 @@ function drawZombie(c,x,y,size,o){
       if(view==='side'){el=[sx+sw*9,sh+B.arm*0.5];hn=[sx+sw*16+4,sh+B.arm*0.88-Math.abs(sw)*4];}
       else{el=[s*(19*B.w+2),sh+B.arm*0.5-sw*3];hn=[s*(19*B.w+1),sh+B.arm*0.95-sw*7];}}
     return [sp,el,hn];};
-  const drawArm=(s,key)=>{const [sp,el,hn]=armPts(s);if(armOK[key])zArm(c,S,B,sp,el,hn,pose==='zombie',mum);else zStump(c,sp[0],sp[1],B.armW*0.75,true);};
+  const drawArm=(s,key)=>{const [sp,el,hn]=armPts(s);if(armOK[key])zArm(c,S,B,sp,el,hn,pose==='zombie'||pose==='crawl',mum);else zStump(c,sp[0],sp[1],B.armW*0.75,true);};
   const behind=view==='back'||pose==='zombie'?[]:[];
   // far arm in side view goes behind the body
   if(view==='side')drawArm(-1,'l');
@@ -178,6 +186,6 @@ function drawZombie(c,x,y,size,o){
   if(view==='front'){drawArm(-1,'l');drawArm(1,'r');}
   else if(view==='side'){drawArm(1,'r');}
   else if(pose!=='zombie'){drawArm(-1,'l');drawArm(1,'r');}
-  if(pose==='carry'&&L.ra)ball();
+  if(pose==='carry'&&L.ra&&o.ball!==false)ball();
   c.restore();}
 if(typeof module!=='undefined')module.exports={drawZombie,ZSTYLE,ZBODY};

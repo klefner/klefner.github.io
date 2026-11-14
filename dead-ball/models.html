@@ -39,9 +39,9 @@ function frame(now){const t=now/1000;
     drawZombie(c,x,y,small?48:140,{team:ZSTYLE[sp],body:b,view:p==='carry'||p==='zombie'?'side':'front',phase:t*9,speed:p==='stand'?0:1,num:nums[sp][b],t,seed:i,pose:p});label(n,x,y+30,12);});
   y0+=270;
   label('LIMB LOSS',W/2,y0+18,20,'#fff');
-  const losses=[[{la:0,ra:1,ll:1,rl:1,head:1},'no left arm'],[{la:1,ra:1,ll:0,rl:1,head:1},'no left leg'],[{la:0,ra:0,ll:1,rl:1,head:1},'no arms'],[{la:1,ra:1,ll:1,rl:1,head:0},'headless'],[{la:0,ra:1,ll:1,rl:0,head:1},'arm + leg gone'],[{la:1,ra:0,ll:1,rl:1,head:1},'no right arm, side']];
-  losses.forEach(([L,n],i)=>{const x=110+i*196,y=y0+220;const sp=i%2?'mummy':'zombie',b=['rb','wr','line','qb','rb','qb'][i];
-    drawZombie(c,x,y,small?48:140,{team:ZSTYLE[sp],body:b,view:i===5?'side':'front',phase:t*7,speed:0.6,num:nums[sp][b],t,seed:i,pose:'run',limbs:L});label(n,x,y+30,12);});
+  const losses=[[{la:0,ra:1,ll:1,rl:1,head:1},'no left arm'],[{la:1,ra:1,ll:0,rl:1,head:1},'no left leg'],[{la:0,ra:0,ll:1,rl:1,head:1},'no arms'],[{la:1,ra:1,ll:1,rl:1,head:0},'headless'],[{la:0,ra:1,ll:1,rl:0,head:1},'arm + leg gone'],[{la:1,ra:1,ll:0,rl:1,head:1},'one leg: hops'],[{la:1,ra:1,ll:0,rl:0,head:1},'no legs: crawls']];
+  losses.forEach(([L,n],i)=>{const x=95+i*168,y=y0+220;const sp=i%2?'mummy':'zombie',b=['rb','wr','line','qb','rb','qb','wr'][i];
+    drawZombie(c,x,y,small?48:130,{team:ZSTYLE[sp],body:b,view:i>=5?'side':'front',phase:t*7,speed:0.6,num:nums[sp][b],t,seed:i,pose:'run',limbs:L});label(n,x,y+30,12);});
   y0+=270;
   label('A PLAY IN PROGRESS (in-game size)',W/2,y0+18,20,'#fff');
   const crowd=[];for(let i=0;i<7;i++){crowd.push({sp:'zombie',b:['qb','rb','wr','wr','line','line','line'][i],x:200+i*110,y:y0+250+Math.sin(i)*20,view:'back'});}
