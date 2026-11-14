@@ -191,7 +191,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.4.5';
+const VERSION='0.4.6';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -309,7 +309,7 @@ function audioInit(){annUnlock();
 function noiseBuf(dur){const n=Math.max(1,Math.floor(AC.sampleRate*dur)),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;return b;}
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec);}
 // ===== recorded sound clips (sounds/*.mp3); synthesized sounds are the fallback =====
-const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,brains:1,laugh:1,quip:6,halfq:4,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0},raw:{},buf:{},bags:{},last:{}};
+const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,brains:1,laugh:1,quip:6,halfq:4,ooh:2,aww:2,boo:2,yeah:2,eww:2,gogo:1,chant_brains:1,chant_def:1,laughc:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0},raw:{},buf:{},bags:{},last:{}};
 function sndNames(){const L=[];for(const k in SND.groups){const n=SND.groups[k];if(n)for(let i=1;i<=n;i++)L.push(k+i);else L.push(k);}return L;}
 for(const n of sndNames())fetch('sounds/'+n+'.mp3').then(r=>r.ok?r.arrayBuffer():null).then(b=>{if(b){SND.raw[n]=b;decodeSnd(n);}}).catch(()=>{});
 function decodeSnd(n){if(!AC||!SND.raw[n]||SND.buf[n])return;const b=SND.raw[n];SND.raw[n]=null;
@@ -327,13 +327,50 @@ function playS(group,vol=1,rate=null,delay=0,fx=null){
   try{const s=AC.createBufferSource();s.buffer=b;s.playbackRate.value=rate==null?0.86+Math.random()*0.28:rate;const g=AC.createGain();g.gain.value=vol;
     let out=s;
     if(fx&&fx.filter){const f=AC.createBiquadFilter();f.type=fx.filter;f.frequency.value=fx.freq;f.Q.value=fx.q||0.8;out.connect(f);out=f;}
+    if(fx&&fx.pan!=null&&AC.createStereoPanner){const pn=AC.createStereoPanner();pn.pan.value=fx.pan;out.connect(pn);out=pn;}
     if(fx&&fx.trem){const tg=AC.createGain(),l=AC.createOscillator(),lg=AC.createGain();l.frequency.value=fx.trem;lg.gain.value=0.45;tg.gain.value=0.55;l.connect(lg);lg.connect(tg.gain);out.connect(tg);out=tg;l.start(AC.currentTime+delay);l.stop(AC.currentTime+delay+b.duration/s.playbackRate.value+0.1);}
     out.connect(g);g.connect(master);s.start(AC.currentTime+delay);return s;}catch(e){return null;}}
+// ===== the crowd: home fans (Graveyard Shift) on the left speaker, away fans (Moldy Mummies) on the right; each side cheers its own team =====
 let amb=null;
+const CROWD={hype:[0,0],live:[0,0],gap:false};
+const sidePan=t=>t==null?0:(t===0?-0.8:0.8);
 function ambUpdate(){const want=((!!G&&['playcall','presnap','live','dead','half'].includes(mode))||mode==='title'||(mode==='howto'&&!G))&&sfx.ok();
-  if(amb&&amb.mode!==mode){amb.mode=mode;try{amb.g.gain.setTargetAtTime(mode==='half'?0.32:mode==='title'||mode==='howto'?0.09:0.14,AC.currentTime,0.6);}catch(e){}}
-  if(want&&!amb&&SND.buf.crowd_amb){try{const s=AC.createBufferSource();s.buffer=SND.buf.crowd_amb;s.loop=true;const g=AC.createGain();g.gain.value=0.14;s.connect(g);g.connect(master);s.start();amb={s,g};}catch(e){}}
-  if(!want&&amb){try{amb.s.stop();}catch(e){}amb=null;}}
+  if(want&&!amb&&SND.buf.crowd_amb){try{amb={};for(const t of [0,1]){const s=AC.createBufferSource();s.buffer=SND.buf.crowd_amb;s.loop=true;s.playbackRate.value=t?1.04:0.97;
+      const g=AC.createGain();g.gain.value=0;let out=s;if(AC.createStereoPanner){const pn=AC.createStereoPanner();pn.pan.value=sidePan(t);s.connect(pn);out=pn;}
+      out.connect(g);g.connect(master);s.start(0,t*7.3);amb[t]={s,g,lv:-1};}}catch(e){amb=null;}}
+  if(!want&&amb){for(const t of [0,1])try{amb[t].s.stop();}catch(e){}amb=null;}
+  if(amb)crowdUpdate();}
+function crowdUpdate(){                     // loudness of each side follows the action
+  const dt=1/60;for(const t of [0,1]){CROWD.hype[t]*=Math.exp(-dt/2.2);if(mode!=='live')CROWD.live[t]*=Math.exp(-dt/0.8);}
+  const base=mode==='half'?0.26:(mode==='title'||mode==='howto')?0.05:0.08;
+  for(const t of [0,1]){const v=Math.min(0.75,base+0.5*CROWD.live[t]+0.35*CROWD.hype[t]);const a=amb[t];
+    if(Math.abs(v-a.lv)>0.01){a.lv=v;try{a.g.gain.setTargetAtTime(v,AC.currentTime,v>a.g.gain.value?0.25:0.7);}catch(e){}}}}
+function crowdSay(group,team,vol,delay){if(!sfx.ok())return;playS(group,vol||0.7,0.94+Math.random()*0.12,delay||0,{pan:sidePan(team)});}
+function crowdHype(t,amt){CROWD.hype[t]=Math.min(1,CROWD.hype[t]+amt);}
+function crowdExcite(l){if(G&&G.play)crowdHype(G.play.off,l*0.5);}
+function crowdReact(kind,o){if(!G||!sfx.ok())return;const off=o.off,def=1-off;
+  switch(kind){
+    case 'td':playS('cheer_td',0.75,1,0,{pan:sidePan(off)});crowdSay('yeah',off,0.85,0.25);crowdSay(Math.random()<0.5?'boo':'aww',def,0.55,0.7);crowdHype(off,1);break;
+    case 'bighit':crowdSay('ooh',null,0.8);crowdSay('yeah',o.hitter,0.5,0.8);crowdHype(o.hitter,0.6);break;
+    case 'limb':crowdSay('eww',null,0.6,0.2);if(Math.random()<0.5)crowdSay('laughc',o.hitter,0.45,1.0);break;
+    case 'ko':crowdSay('ooh',null,0.85);crowdSay('laughc',o.hitter,0.5,1.3);break;
+    case 'sack':crowdSay('yeah',def,0.75);crowdSay('aww',off,0.5,0.35);crowdHype(def,0.6);break;
+    case 'to':crowdSay('yeah',def,0.85);playS('cheer_small',0.55,1,0,{pan:sidePan(def)});crowdSay('boo',off,0.6,0.55);crowdHype(def,0.9);break;
+    case 'inc':crowdSay('aww',off,0.5);if(Math.random()<0.4)crowdSay('yeah',def,0.35,0.45);break;
+    case 'big':crowdSay('yeah',off,0.7);crowdHype(off,0.7);break;
+    case 'loss':crowdSay('yeah',def,0.45);break;
+    case 'burst':crowdSay('eww',null,0.8);crowdSay('laughc',def,0.5,1.1);break;
+    case 'fresh':playS('cheer_small',0.5,1,0,{pan:sidePan(off)});crowdHype(off,0.4);break;
+    case 'safety':crowdSay('yeah',def,0.8);crowdSay('boo',off,0.6,0.45);break;}}
+function crowdLive(c,gain,toGo,P){           // the home side of the ball carrier rises as he breaks loose and nears the goal line
+  const e=Math.max(0,Math.min(1,(gain-4)/22))*0.7+(gain>=6&&toGo<=25?0.35:0);
+  CROWD.live[P.off]=Math.max(CROWD.live[P.off]*0.97,Math.min(1,e));CROWD.live[P.def]=Math.max(CROWD.live[P.def]*0.97,Math.min(0.5,e*0.4));
+  if(!P.gogo&&gain>=12&&toGo<=30){P.gogo=1;crowdSay('gogo',P.off,0.75);}}
+function crowdGap(){                         // between plays: chants
+  if(!G||!G.play||!sfx.ok())return;const off=G.poss,toGo=off===0?110-G.los:G.los-10;
+  if(toGo<=20)crowdSay('chant_brains',off,0.6,0.4);
+  else if((G.stage>=2||toGo<=35)&&Math.random()<0.6)crowdSay('chant_def',1-off,0.6,0.4);
+  else if(Math.random()<0.2)crowdSay(Math.random()<0.5?'chant_brains':'chant_def',Math.random()<0.5?off:1-off,0.45,0.5);}
 const sfx={
   ok(){return settings.sound&&AC&&AC.state==='running';},
   tone(type,f1,f2,dur,vol=0.3,delay=0){if(!this.ok())return;try{const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f1,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t+dur);env(g,t,0.01,vol,dur);o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+0.05);}catch(e){}},
@@ -439,7 +476,7 @@ function annNext(){
   if(ANN.buf)dec(ANN.buf.slice(it.e[0],it.e[0]+it.e[1]));
   else fetch('vox.mp3',{headers:{Range:`bytes=${it.e[0]}-${it.e[0]+it.e[1]-1}`}}).then(r=>{if(r.status!==206){try{r.body&&r.body.cancel();}catch(e){}throw 0;}return r.arrayBuffer();}).then(dec).catch(fail);}
 function annTick(){if(ANN.cur&&now_s()>ANN.cur.deadline){annCut();annNext();}}
-function crowdExcite(l){if(!amb)return;try{const t=AC.currentTime,g=amb.g.gain;g.cancelScheduledValues(t);g.setTargetAtTime(0.14+l*0.24,t,0.25);g.setTargetAtTime(0.14,t+2,0.9);}catch(e){}}
+
 function annPick(key,arr){const b=ANN.bags[key]||(ANN.bags[key]=[]);if(!b.length){b.push(...arr.keys());for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}}return arr[b.pop()];}
 function fill(t,o){return t.replace(/\{(\w+)\}/g,(_,k)=>o[k]!=null?o[k]:'');}
 function spotSay(t,x){const y=Math.round(t===0?x-10:110-x);if(y>=100)return 'the end zone';if(y<=0)return 'his own end zone';if(y===50)return 'midfield';return y<50?`his own ${y}`:`the ${100-y}`;}
@@ -553,7 +590,7 @@ function colorAfter(P,type,delay){                 // after the play: the vampir
 function scoreSay(){const [a,b]=G.score;const o={a:Math.max(a,b),b:Math.min(a,b),as:TEAMS[a>=b?0:1].name,bs:TEAMS[a>=b?1:0].name};return o;}
 function annLive(){                                     // running commentary on the ball carrier
   const P=G.play,B=G.ball;if(!P||B.state!=='held'||!B.carrier)return;const c=B.carrier;if(c.team!==P.off)return;
-  const gain=dir(P.off)*(c.x-G.los),toGo=P.off===0?110-c.x:c.x-10;
+  const gain=dir(P.off)*(c.x-G.los),toGo=P.off===0?110-c.x:c.x-10;crowdLive(c,gain,toGo,P);
   if(!P.callLoose&&gain>=12&&(P.thrown?gain>=22:true)){P.callLoose=1;call('loose',{n:c.name},2);crowdExcite(1);}
   if(P.callLoose||gain>=10){for(const [m,k] of [[20,'mark20'],[10,'mark10'],[5,'mark5']])if(toGo<=m&&!(P.callMarks||{})[m]){(P.callMarks=P.callMarks||{})[m]=1;if(gain>=8){call(k,{n:c.name},2);crowdExcite(1);}break;}}}
 
@@ -638,6 +675,7 @@ function djPick(){              // what fits right now
 function djUpdate(){            // start a new cue each time the ball goes dead; the snap silences it (musicLevel = 0)
   if(!G)return;const between=mode==='playcall'||mode==='presnap'||(mode==='dead'&&!(G.res&&G.res.type==='td'));
   if(between&&!dj.gap){dj.gap=true;djPick();}
+  if(mode==='presnap'&&!CROWD.gap){CROWD.gap=true;crowdGap();}if(mode==='live')CROWD.gap=false;
   if(mode==='live'&&dj.gap){dj.gap=false;setTimeout(()=>{if(mode==='live'){djClear();if(music.el)music.el.pause();}},500);}}
 const titleMenu=new Menu($('titleMenu'),[
   {label:'Start Game',act:()=>startGame()},
@@ -812,6 +850,7 @@ function removeLimb(p,k){
   if(k!=='head'&&!p.limbs.la&&!p.limbs.ra&&!p.limbs.ll&&!p.limbs.rl){   // no limbs left: the bats carry him off; he's back after the next change of possession
     setTimeout(()=>{if(G&&!p.out)knockOut(p,'limbless');},350);}
   if(k==='head'&&G.play)G.play.headOff=1;
+  if(G&&G.play)crowdReact('limb',{off:G.play.off,hitter:1-p.team});
   if(k==='head'){p.out=true;
     addDebris({k:'body',x:p.x,y:p.y,z:0,vz:0,vx:p.vx*0.3,vy:p.vy*0.3,rot:p.face,vr:rand(-2,2),team:p.team,idx:p.idx,scale:p.ty.scale});
     for(let i=0;i<5;i++)G.parts.push({k:'fountain',x:p.x,y:p.y,life:0,delay:i*0.18});
@@ -981,7 +1020,7 @@ function knockOut(p,why){
   if(p.out)return;p.out=true;p.ko=true;G.stats.kos=(G.stats.kos||0)+1;
   if(p.blockedBy){p.blockedBy.engaged=null;p.blockedBy=null;}if(p.engaged){p.engaged.blockedBy=null;p.engaged=null;}
   if(G.ctrl===p)G.ctrl=null;
-  announce(pick(why==='limbless'?LINES.limbless:LINES.ko).split('{n}').join(p.name),3);if(G.play)G.play.callKo=1;
+  announce(pick(why==='limbless'?LINES.limbless:LINES.ko).split('{n}').join(p.name),3);crowdReact('ko',{off:G.play?G.play.off:0,hitter:1-p.team});if(G.play)G.play.callKo=1;
   const body={team:p.team,idx:p.idx,type:p.type,ty:p.ty,num:p.num,x:p.x,y:p.y,vx:0,vy:0,face:p.face,phase:0,limbs:Object.assign({},p.limbs),stun:9,dive:0,stiff:0};
   G.abducts.push({body,phase:'wait',t:0,h:0,vamps:[],bats:[],side:p.y<MID?-1:1});
 }
@@ -1015,9 +1054,9 @@ function tryTackle(d,c){
   if(tier===0){const k=limbRoll(c,0.4);if(k)lost.push(k);}
   else if(tier===1){const k=limbRoll(c,1.0+(d.dive>0?0.3:0));if(k)lost.push(k);}
   else if(tier===2){lost.push(removeRandomLimb(c));const k=limbRoll(c,0.5);if(k)lost.push(k);shake(8);sfx.bigHit();
-    big('BIG HIT!',1.3,'#ff9a4a');announce(pick(LINES.bighit).split('{n}').join(c.name),3);sfx.cheerSmall();G.play.callHit=1;}
+    big('BIG HIT!',1.3,'#ff9a4a');announce(pick(LINES.bighit).split('{n}').join(c.name),3);crowdReact('bighit',{off:G.play.off,hitter:d.team});G.play.callHit=1;}
   else{lost.push(removeRandomLimb(c));lost.push(removeRandomLimb(c));shake(13);sfx.bigHit();sfx.bigHit(0.12);
-    big('CRUSHED!',1.5,'#ff5a3a');announce(pick(LINES.crush).split('{n}').join(c.name),3);sfx.cheerSmall();G.play.callHit=1;
+    big('CRUSHED!',1.5,'#ff5a3a');announce(pick(LINES.crush).split('{n}').join(c.name),3);crowdReact('bighit',{off:G.play.off,hitter:d.team});G.play.callHit=1;
     if(!c.out&&Math.random()<0.45)ko=true;}
   if(tier>=2){const ang=Math.atan2(c.y-d.y,c.x-d.x),mx=(c.x+d.x)/2,my=(c.y+d.y)/2;   // hard contact sprays blood, limb or not
     bloodBurst(mx,my,tier===3?34:20,ang,0.9,tier===3?11:8);bloodBurst(mx,my,8,ang+Math.PI,0.7,4);}
@@ -1098,6 +1137,9 @@ function updateLive(dt){
 function endPlay(type,info){
   const P=G.play;if(P.ended)return;P.ended=true;mode='dead';G.timer=1.7;G.res=Object.assign({type},info);
   const gain=Math.round(dir(P.off)*(info.x-G.los));P.callGain=gain;commRecord(P,type,info,gain);
+  {const sk=type==='tackle'&&info.by===P.qb&&gain<0&&!P.thrown&&!P.handed,o={off:P.off};
+   if(type==='td')crowdReact('td',o);else if(type==='turnover')crowdReact('to',o);else if(type==='incomplete')crowdReact('inc',o);
+   else if(sk)crowdReact('sack',o);else if((type==='tackle'||type==='oob')&&gain>=15)crowdReact('big',o);else if(type==='tackle'&&gain<0)crowdReact('loss',o);}
   {const n=info.by?info.by.name:'',d=info.tk?info.tk.name:'the defense',o={n,d,g:yds(gain),spot:spotSay(P.off,info.x),team:TEAMS[P.off].name};
    if(type==='td')call('tdNow',o,4);
    else if(type==='oob')call('oob',o,2);
@@ -1105,14 +1147,13 @@ function endPlay(type,info){
      if(!P.callHit&&!P.callKo)call(sack?'sack':gain<0?'tklLoss':gain===0?'tklZero':gain<4?'tklShort':gain<15?'tklMid':'tklBig',o,sack?3:2);
      else if(gain>=15)call('tklBig',o,1);}
    colorAfter(P,type,type==='td'?2500:undefined);}
-  if(type==='td'){big('TOUCHDOWN!',2.3,'#ffd84a');sfx.whistle('td');sfx.cheer();G.timer=4.2;G.stats.yards[P.off]+=gain;
+  if(type==='td'){big('TOUCHDOWN!',2.3,'#ffd84a');sfx.whistle('td');G.timer=4.2;G.stats.yards[P.off]+=gain;
     const sc=info.by;if(sc&&!sc.out){sc.dance=3.8;sc.danceT=0;sc.routine=makeRoutine();sc.stun=0;setTimeout(()=>sfx.danceTune(),350);setTimeout(()=>{sfx.chomp(0.7);sfx.laugh();},3300);}
     focusCam(info.x,info.y,4.2,SSMAX*1.15);}
   else if(type==='tackle'||type==='oob'||type==='recover'){
     G.stats.yards[P.off]+=gain;
     if(inOwnEZ(P.off,info.x)){big('SAFETY!',2,'#ff6b6b');}
     else{const sack=type==='tackle'&&info.by===P.qb&&gain<0&&!P.thrown&&!P.handed;
-      if(gain>=15)sfx.cheerSmall();
       big(`${type==='oob'?'OUT OF BOUNDS':type==='recover'?'RECOVERED':sack?'SACKED!':'TACKLED'}  ${gain>=0?'+':''}${gain} YDS`,1.6,sack?'#ff9a4a':'#ffffff');}
     sfx.whistle(type==='oob'?'stop':'tackle');}
   else if(type==='incomplete'){big('INCOMPLETE',1.4);sfx.whistle('stop');}
@@ -1123,16 +1164,16 @@ function resolvePlay(){
   const P=G.play,R=G.res,off=P.off,def=P.def;
   if(R.type==='td'){G.score[R.team]+=7;P.tdAdded=1;{leadCall(1);}startPossession(1-R.team,own25(1-R.team));return advance();}
   if(R.type==='turnover'){
-    if(inScoreEZ(R.team,R.x)){G.score[R.team]+=7;P.defTd=1;colorAfter(P,'dtd',2600);announce(`Defensive touchdown, ${TEAMS[R.team].name}!`,4);big('DEFENSIVE TD!',2,'#ffd84a');sfx.cheer();startPossession(1-R.team,own25(1-R.team));G.timer=2;G.after=advance;return;}
+    if(inScoreEZ(R.team,R.x)){G.score[R.team]+=7;P.defTd=1;crowdReact('td',{off:R.team});colorAfter(P,'dtd',2600);announce(`Defensive touchdown, ${TEAMS[R.team].name}!`,4);big('DEFENSIVE TD!',2,'#ffd84a');sfx.cheer();startPossession(1-R.team,own25(1-R.team));G.timer=2;G.after=advance;return;}
     startPossession(R.team,R.x);return advance();}
   if(R.type==='incomplete'){G.clock=Math.max(0,G.clock-3);return brainStep(G.los);}
-  if(inOwnEZ(off,R.x)){G.score[def]+=2;P.safety=1;announce(`Safety! 2 points for the ${TEAMS[def].name}.`,3);startPossession(def,own25(def));return advance();}
+  if(inOwnEZ(off,R.x)){G.score[def]+=2;P.safety=1;crowdReact('safety',{off});announce(`Safety! 2 points for the ${TEAMS[def].name}.`,3);startPossession(def,own25(def));return advance();}
   G.clock=Math.max(0,G.clock-(R.type==='oob'?3:10));
   brainStep(R.x);
 }
 function brainStep(x){
   const P=G.play,off=P.off;
-  if(!G.crossed&&pastMid(off,x)){G.crossed=true;G.stage=0;G.los=clamp(x,11,109);announce(pick(LINES.fresh),3);P.fresh=1;big('FRESH BRAIN!',1.4,'#ff9fb2');sfx.cheerSmall();mode='dead';G.timer=1.3;G.after=advance;return;}
+  if(!G.crossed&&pastMid(off,x)){G.crossed=true;G.stage=0;G.los=clamp(x,11,109);announce(pick(LINES.fresh),3);P.fresh=1;crowdReact('fresh',{off:P.off});big('FRESH BRAIN!',1.4,'#ff9fb2');mode='dead';G.timer=1.3;G.after=advance;return;}
   if(G.stage>=3){burst(x);return;}
   G.stage++;G.los=clamp(x,11,109);
   if(G.stage===3)announce(`The brain is putrid! ${G.crossed?'Score':'Cross midfield'} this play or it bursts!`,3);
@@ -1142,7 +1183,7 @@ function burst(x){
   const P=G.play,B=G.ball,y=B.y||MID;
   for(let i=0;i<26;i++)G.parts.push({k:'gas',x:x+rand(-1,1),y:y+rand(-1,1),vx:rand(-3,3),vy:rand(-3,3),life:rand(1.4,2.4),r:rand(0.8,1.8),c:'#8dff4a'});
   bloodBurst(x,y,30,Math.random()*6.28,3.2,8);for(let i=0;i<6;i++)addSplat(x+rand(-1.5,1.5),y+rand(-1.5,1.5),rand(0.3,0.6),pick(['#c98a95','#a86b74','#7a0c0c']),0.8);sfx.fwump();big('BRAIN BURST!',2.2,'#8dff4a');
-  announce(pick(LINES.burst).split('{t}').join(TEAMS[P.off].name),4);P.burst=1;if(!P.cm)commRecord(P,'burst',{},0);setTimeout(()=>colorAfter(P,'burst',0),2600);
+  announce(pick(LINES.burst).split('{t}').join(TEAMS[P.off].name),4);P.burst=1;crowdReact('burst',{off:P.off});if(!P.cm)commRecord(P,'burst',{},0);setTimeout(()=>colorAfter(P,'burst',0),2600);
   const c=P.lastCarrier||B.carrier;
   if(c&&!c.out&&c.team===P.off&&armsOf(c)>0&&Math.random()<0.6)removeLimb(c,c.limbs.la?'la':'ra');
   for(const p of [...G.teams[0],...G.teams[1]])if(!p.out&&Math.hypot(p.x-x,p.y-y)<5)p.stun=2;
