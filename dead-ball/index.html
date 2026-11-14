@@ -189,7 +189,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.4.1';
+const VERSION='0.4.2';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -266,6 +266,7 @@ function ballOn(t,x){const y=t===0?x-10:110-x;if(Math.round(y)===50)return 'MIDF
 // ===== storage =====
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
 const settings=Object.assign({diff:'Normal',sound:true},store.get('deadball_settings',{}));
+if(settings.annV!==2){settings.ann=true;settings.annV=2;try{store.set('deadball_settings',settings);}catch(e){}}
 const record=Object.assign({w:0,l:0,t:0},store.get('deadball_record',{}));
 const D=()=>DIFFS[settings.diff]||DIFFS.Normal;
 
@@ -399,13 +400,19 @@ addEventListener('blur',()=>{for(const k in keys)keys[k]=false;if(mode==='live'|
 // ===== live announcer: spoken play-by-play + color commentary =====
 // Every call gets a priority. A more important call cuts off a less important one; lines that wait too long are dropped,
 // so the voice is always talking about what is happening now.
-const ANN={ok:true,q:[],cur:null,bags:{},idx:null,buf:null,loading:false};   // pre-recorded ghoul announcer: one pack of clips, sliced and decoded on demand
+const ANN={ok:true,q:[],cur:null,bags:{},idx:null,buf:null,loading:false,status:'loading',pct:0,err:''};   // pre-recorded ghoul announcer: one pack of clips, sliced and decoded on demand
 const now_s=()=>performance.now()/1000;
 const annKey=t=>t.replace(/[!]{2,}/g,'!').replace(/\s+/g,' ').trim();
-function annLoad(){if(ANN.loading||ANN.idx)return;ANN.loading=true;
-  Promise.all([fetch('vox.json').then(r=>r.json()),fetch('vox.mp3').then(r=>r.arrayBuffer())]).then(([i,b])=>{ANN.idx=i;ANN.buf=b;}).catch(()=>{ANN.ok=false;});}
-function annUnlock(){annLoad();}
-function annOn(){return ANN.idx&&settings.sound&&settings.ann!==false&&AC&&AC.state==='running';}
+function annLoad(){if(ANN.loading||ANN.idx)return;ANN.loading=true;ANN.status='loading';ANN.pct=0;
+  const getBin=()=>fetch('vox.mp3').then(r=>{if(!r.ok)throw new Error('vox.mp3 '+r.status);const tot=+r.headers.get('content-length')||0;
+    if(!r.body||!tot)return r.arrayBuffer();const rd=r.body.getReader(),parts=[];let got=0;
+    const pump=()=>rd.read().then(({done,value})=>{if(done){const u=new Uint8Array(got);let o=0;for(const v of parts){u.set(v,o);o+=v.length;}return u.buffer;}
+      parts.push(value);got+=value.length;ANN.pct=Math.round(got/tot*100);return pump();});return pump();});
+  Promise.all([fetch('vox.json').then(r=>{if(!r.ok)throw new Error('vox.json '+r.status);return r.json();}),getBin()])
+    .then(([i,b])=>{ANN.idx=i;ANN.buf=b;ANN.status='ready';ANN.loading=false;refreshMenus();})
+    .catch(e=>{ANN.status='failed';ANN.err=String(e&&e.message||e);ANN.loading=false;});}
+function annUnlock(){if(!ANN.idx&&!ANN.loading)annLoad();}
+function annOn(){if(AC&&AC.state!=='running')try{AC.resume();}catch(e){}return ANN.idx&&settings.sound&&settings.ann!==false&&AC;}
 function annCut(){const c=ANN.cur;ANN.cur=null;if(c&&c.src){try{c.g.gain.setTargetAtTime(0,AC.currentTime,0.02);c.src.stop(AC.currentTime+0.08);}catch(e){}}}
 function annStop(){ANN.q=[];annCut();}
 function annSay(text,pri,voice){
@@ -418,9 +425,11 @@ function annSay(text,pri,voice){
 function annNext(){
   const t=now_s();ANN.q=ANN.q.filter(x=>t-x.born<x.ttl);const it=ANN.q.shift();if(!it){ANN.cur=null;return;}
   it.start=t;it.deadline=t+it.e[2]+1.2;ANN.cur=it;
-  AC.decodeAudioData(ANN.buf.slice(it.e[0],it.e[0]+it.e[1])).then(buf=>{if(ANN.cur!==it)return;
+  const fail=()=>{if(ANN.cur===it){ANN.cur=null;annNext();}};
+  const ok=buf=>{if(ANN.cur!==it)return;
     const src=AC.createBufferSource(),g=AC.createGain();src.buffer=buf;g.gain.value=1.15;src.connect(g);g.connect(master);
-    src.onended=()=>{if(ANN.cur===it){ANN.cur=null;annNext();}};it.src=src;it.g=g;src.start();}).catch(()=>{if(ANN.cur===it){ANN.cur=null;annNext();}});}
+    src.onended=()=>{if(ANN.cur===it){ANN.cur=null;annNext();}};it.src=src;it.g=g;src.start();};
+  try{const pr=AC.decodeAudioData(ANN.buf.slice(it.e[0],it.e[0]+it.e[1]),ok,fail);if(pr&&pr.catch)pr.catch(fail);}catch(e){fail();}}
 function annTick(){if(ANN.cur&&now_s()>ANN.cur.deadline){annCut();annNext();}}
 function crowdExcite(l){if(!amb)return;try{const t=AC.currentTime,g=amb.g.gain;g.cancelScheduledValues(t);g.setTargetAtTime(0.14+l*0.24,t,0.25);g.setTargetAtTime(0.14,t+2,0.9);}catch(e){}}
 function annPick(key,arr){const b=ANN.bags[key]||(ANN.bags[key]=[]);if(!b.length){b.push(...arr.keys());for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}}return arr[b.pop()];}
@@ -553,7 +562,7 @@ class Menu{
   key(c){if(c==='ArrowUp'||c==='KeyW')this.move(-1);else if(c==='ArrowDown'||c==='KeyS')this.move(1);else if(c==='ArrowLeft'||c==='KeyA')this.side(-1);else if(c==='ArrowRight'||c==='KeyD')this.side(1);else if(c==='Enter'||c==='Space'||c==='NumpadEnter')this.activate();}
 }
 function cycleDiff(d){const o=['Easy','Normal','Hard'];settings.diff=o[(o.indexOf(settings.diff)+d+3)%3];store.set('deadball_settings',settings);}
-function toggleAnn(){settings.ann=settings.ann===false;store.set('deadball_settings',settings);if(settings.ann!==false){annUnlock();setTimeout(()=>annSay('Welcome to Dead Ball!',3),100);}else annStop();}
+function toggleAnn(){if(settings.ann!==false&&ANN.status==='failed'){annLoad();refreshMenus();return;}settings.ann=settings.ann===false;store.set('deadball_settings',settings);if(settings.ann!==false){annUnlock();setTimeout(()=>annSay('Welcome to Dead Ball!',3),100);}else annStop();}
 function toggleSound(){settings.sound=!settings.sound;store.set('deadball_settings',settings);if(settings.sound){audioInit();sfx.select();setTimeout(()=>sfx.groan(),150);}}
 const titleMenu=new Menu($('titleMenu'),[
   {label:'Start Game',act:()=>startGame()},
@@ -561,17 +570,20 @@ const titleMenu=new Menu($('titleMenu'),[
   {label:'How to Play',act:()=>showHowTo()},
   {label:()=>`Difficulty: <b>${settings.diff}</b>`,act:()=>cycleDiff(1),side:d=>cycleDiff(d)},
   {label:()=>`Sound: <b>${settings.sound?'On':'Off'}</b>`,act:()=>toggleSound(),side:()=>toggleSound()},
-  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann!==false?'On':'Off'}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
+  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann===false?'Off':ANN.status==='ready'?'On':ANN.status==='failed'?'On (voice failed to load, tap to retry)':`On (loading ${ANN.pct}%)`}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
   {label:'Exit Game',act:()=>exitGame()}]);
 const pauseMenu=new Menu($('pauseMenu'),[
   {label:'Resume',act:()=>resumeGame()},
   {label:'How to Play',act:()=>showHowTo()},
   {label:()=>`Sound: <b>${settings.sound?'On':'Off'}</b>`,act:()=>toggleSound(),side:()=>toggleSound()},
-  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann!==false?'On':'Off'}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
+  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann===false?'Off':ANN.status==='ready'?'On':ANN.status==='failed'?'On (voice failed to load, tap to retry)':`On (loading ${ANN.pct}%)`}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
   {label:'Quit to Title',act:()=>toTitle()}]);
 const halfMenu=new Menu($('halfMenu'),[{label:'Start 2nd Half',act:()=>secondHalf()}]);
 const overMenu=new Menu($('overMenu'),[{label:'Play Again',act:()=>startGame()},{label:'Main Menu',act:()=>toTitle()}]);
 const exitMenu=new Menu($('exitMenu'),[{label:'Back to Title',act:()=>toTitle()}]);
+function refreshMenus(){for(const m of [titleMenu,pauseMenu])if(m.el.isConnected&&m.el.offsetParent!==null)m.render();}
+annLoad();   // start fetching the announcer voice right away; no tap needed
+{const iv=setInterval(()=>{refreshMenus();if(ANN.status!=='loading')clearInterval(iv);},700);}
 $('howBack').onclick=()=>closeHowTo();
 
 let mode='title',prevMode=null,howFrom=null,activeMenu=titleMenu;
