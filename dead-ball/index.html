@@ -191,7 +191,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.4.4';
+const VERSION='0.4.5';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -300,7 +300,7 @@ function audioInit(){annUnlock();
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=0.6;master.connect(AC.destination);decodeAll();}catch(e){AC=null;return;}}
   if(AC.state!=='running')AC.resume().catch(()=>{});
   if(mode==='title'||mode==='half'||(mode==='howto'&&!G))setTimeout(()=>screenSound(mode==='half'?'half':'title'),60);
-  else if(G&&settings.sound&&settings.music!=='off'&&(!music.el||music.el.paused))musicPlay();
+  else if(G&&settings.sound&&settings.music!=='off'&&!music.el)musicPlay();
   if(!unlocked){unlocked=true;
     try{const b=AC.createBuffer(1,1,22050),s=AC.createBufferSource();s.buffer=b;s.connect(AC.destination);s.start(0);}catch(e){}
     try{if(!silentEl){silentEl=document.createElement('audio');silentEl.src=silentWav();silentEl.loop=true;silentEl.setAttribute('playsinline','');silentEl.volume=0.01;}
@@ -579,7 +579,7 @@ if(!settings.music)settings.music='march';
 const music={el:null,g:null,tok:0,duck:false};
 function musicLevel(){if(mode==='live'||mode==='pause')return 0;            // never during a live play
   const base=(mode==='title'||mode==='half'||mode==='over'||(mode==='howto'&&!G))?0.5:0.3;return music.duck?base*0.36:base;}
-function musicUpdate(){if(!music.el||!music.g||!AC||music.el.paused)return;const v=musicLevel();if(v===music.lv)return;
+function musicUpdate(){if(!music.g||!AC)return;const v=musicLevel();if(v===music.lv)return;
   music.lv=v;try{music.g.gain.setTargetAtTime(v,AC.currentTime,v===0?0.12:0.6);}catch(e){}}
 function musicPlay(){if(!AC||!settings.sound||settings.music==='off')return musicStop();
   if(!music.el){music.el=new Audio();music.el.loop=true;music.el.preload='auto';music.el.setAttribute('playsinline','');
@@ -591,9 +591,9 @@ function musicPlay(){if(!AC||!settings.sound||settings.music==='off')return musi
 function musicStop(){if(!music.el)return;const t=++music.tok;music.lv=-1;
   try{if(music.g)music.g.gain.setTargetAtTime(0,AC.currentTime,0.35);}catch(e){}
   setTimeout(()=>{if(music.tok===t&&music.el)music.el.pause();},1400);}
-function musicDuck(on){music.duck=on;if(music.g&&AC)try{const v=music.el&&!music.el.paused?musicLevel():0;music.lv=v;music.g.gain.setTargetAtTime(v,AC.currentTime,0.12);}catch(e){}}
+function musicDuck(on){music.duck=on;if(music.g&&AC)try{const v=musicLevel();music.lv=v;music.g.gain.setTargetAtTime(v,AC.currentTime,0.12);}catch(e){}}
 const screenAud={mode:null,quip:false};
-function screenSound(kind){                 // called on entering the title or halftime screen, and again on the first tap
+function screenSound(kind){if(music.el&&kind&&!music.el.src.endsWith('music/'+settings.music+'.mp3'))music.el.removeAttribute('src');djClear();                 // called on entering the title or halftime screen, and again on the first tap
   if(screenAud.mode!==kind){screenAud.mode=kind;screenAud.quip=false;}
   if(!sfx.ok())return;musicPlay();
   if(!screenAud.quip&&settings.ann!==false){screenAud.quip=true;const k=kind;
@@ -603,6 +603,42 @@ function screenLeave(){screenAud.mode=null;}   // music keeps playing; musicUpda
 function cycleMusic(d){const ids=[...TRACKS.map(t=>t.id),'off'];settings.music=ids[(ids.indexOf(settings.music)+(d||1)+ids.length)%ids.length];
   store.set('deadball_settings',settings);if(settings.music==='off')musicStop();else musicPlay();}
 function musicName(){const t=TRACKS.find(t=>t.id===settings.music);return t?t.name:'Off';}
+
+// ===== stadium DJ: a different cue every time the ball is dead, chosen for the moment; silent once the ball is snapped =====
+const TRACKLEN={march:84,hullabaloo:70,hallow:60,beach:100,metal:98};
+const dj={nodes:[],last:'',lastTrack:'',gap:false};
+function djBus(){return music.g||null;}
+function djClear(){for(const n of dj.nodes)try{n.stop(AC.currentTime+0.05);}catch(e){}dj.nodes=[];}
+function djOsc(type,f,t0,dur,vol,glide){const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t0);if(glide)o.frequency.exponentialRampToValueAtTime(glide,t0+dur);
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol*2,t0+0.02);g.gain.setValueAtTime(vol*2,t0+dur*0.7);g.gain.linearRampToValueAtTime(0,t0+dur);o.connect(g);g.connect(djBus());o.start(t0);o.stop(t0+dur+0.05);dj.nodes.push(o);}
+function djDrum(t0,f,vol){const o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(f,t0);o.frequency.exponentialRampToValueAtTime(f*0.4,t0+0.18);
+  g.gain.setValueAtTime(vol*2,t0);g.gain.exponentialRampToValueAtTime(0.001,t0+0.25);o.connect(g);g.connect(djBus());o.start(t0);o.stop(t0+0.3);dj.nodes.push(o);}
+const DJ_CUES={
+  charge(t){const n=[392,523,659,784,659,784];const d=[.16,.16,.16,.34,.16,.7];let x=t;   // the old bugle "Charge!", on stadium organ
+    n.forEach((f,i)=>{djOsc('square',f,x,d[i],0.10);djOsc('triangle',f*2,x,d[i],0.06);x+=d[i]+0.03;});},
+  tension(t){djOsc('sawtooth',55,t,14,0.07);djOsc('sawtooth',58.3,t,14,0.05);djOsc('sine',110,t,14,0.05);   // low dissonant drone + speeding heartbeat
+    let x=t+0.4,gapT=0.95;for(let i=0;i<22&&x<t+14;i++){djDrum(x,70,0.5);djDrum(x+0.17,62,0.35);x+=gapT;gapT=Math.max(0.45,gapT*0.95);}},
+  march(t){for(let b=0;b<6;b++){const x=t+b*1.6;djDrum(x,90,0.45);djDrum(x+0.4,90,0.45);djDrum(x+0.8,140,0.35);djDrum(x+1.0,140,0.25);djDrum(x+1.2,140,0.35);   // war drums
+    djOsc('square',b%2?233:196,x,0.3,0.05);}},
+  stab(t){for(const f of [146.8,155.6,207.7,311])djOsc('sawtooth',f,t,1.4,0.06);djOsc('square',73.4,t,1.6,0.06);}};
+function djTrack(after){        // a random stretch of a random song, never the same song twice in a row
+  const ids=TRACKS.map(t=>t.id).filter(i=>i!==dj.lastTrack);const id=ids[Math.floor(Math.random()*ids.length)];dj.lastTrack=id;
+  if(!music.el)musicPlay();if(!music.el)return;const want='music/'+id+'.mp3',start=Math.random()*Math.max(1,(TRACKLEN[id]||60)-25);
+  const go=()=>{try{music.el.currentTime=start;}catch(e){}const pr=music.el.play();if(pr&&pr.catch)pr.catch(()=>{});};
+  setTimeout(()=>{if(!music.el)return;if(!music.el.src.endsWith(want)){music.el.src=want;music.el.addEventListener('loadedmetadata',go,{once:true});music.el.load();}else go();},after||0);}
+function djPick(){              // what fits right now
+  if(!G||!AC||!settings.sound||settings.music==='off'||!music.g)return;djClear();
+  const P=G.play,off=G.poss,toGo=off===0?110-G.los:G.los-10,late=G.quarter>=4&&G.clock<90&&Math.abs(G.score[0]-G.score[1])<=8;
+  let cue;if((G.stage>=2||late||toGo<=20)&&(dj.last!=='tension'||Math.random()<0.4))cue=Math.random()<0.75?'tension':'march';
+  else{const r=Math.random();cue=r<0.55?'track':r<0.75?'charge':r<0.88?'march':'stab';if(cue===dj.last&&cue!=='track')cue='track';}
+  dj.last=cue;const t=AC.currentTime+0.05;
+  if(cue==='track'){djTrack(0);return;}
+  if(music.el)music.el.pause();DJ_CUES[cue](t);
+  if(cue==='charge'||cue==='stab')djTrack(cue==='charge'?2300:1700);}
+function djUpdate(){            // start a new cue each time the ball goes dead; the snap silences it (musicLevel = 0)
+  if(!G)return;const between=mode==='playcall'||mode==='presnap'||(mode==='dead'&&!(G.res&&G.res.type==='td'));
+  if(between&&!dj.gap){dj.gap=true;djPick();}
+  if(mode==='live'&&dj.gap){dj.gap=false;setTimeout(()=>{if(mode==='live'){djClear();if(music.el)music.el.pause();}},500);}}
 const titleMenu=new Menu($('titleMenu'),[
   {label:'Start Game',act:()=>startGame()},
   {label:'Load Game',disabled:true,sub:'coming in a future update'},
@@ -660,7 +696,7 @@ function announce(t,pri){if(!G)return;G.ticker.push({t,life:4.5});if(G.ticker.le
 
 function big(t,dur=1.5,col='#ffffff'){if(G)G.big={t,life:dur,max:dur,col};}
 
-function startGame(){screenLeave();
+function startGame(){screenLeave();dj.gap=false;
   G={cm:null,score:[0,0],quarter:1,clock:QLEN,poss:0,los:35,stage:0,crossed:false,userTeam:0,
      teams:[0,1].map(t=>ROSTER.map((r,i)=>makePlayer(t,i))),debris:[],splats:[],parts:[],ticker:[],big:null,
      ctrl:null,play:null,ball:null,timer:0,after:null,hut:false,res:null,stats:{yards:[0,0],limbs:[0,0],bigHits:0,kos:0},abducts:[],shake:0};
@@ -1120,8 +1156,8 @@ function advance(){
   }
   toPlayCall();
 }
-function halftime(){call('half',{},4);setTimeout(()=>{if(G&&mode==='half')leadCall(3);},1600);mode='half';G.halfT=0;half.squads=null;screenSound('half');activeMenu=halfMenu;halfMenu.render();$('halfScore').innerHTML=scoreLine();showOverlay('half');sfx.groan();}
-function secondHalf(){screenLeave();for(const tm of G.teams)for(const p of tm){p.out=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
+function halftime(){dj.gap=true;djClear();call('half',{},4);setTimeout(()=>{if(G&&mode==='half')leadCall(3);},1600);mode='half';G.halfT=0;half.squads=null;screenSound('half');activeMenu=halfMenu;halfMenu.render();$('halfScore').innerHTML=scoreLine();showOverlay('half');sfx.groan();}
+function secondHalf(){screenLeave();dj.gap=false;for(const tm of G.teams)for(const p of tm){p.out=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
   G.quarter=3;G.clock=QLEN;showOverlay(null);announce('Second half! Everyone is stitched up. The spare parts stay where they fell.');startPossession(1,85);toPlayCall();}
 function scoreLine(){return `<span style="color:${TEAMS[0].trim}">${TEAMS[0].name.toUpperCase()} ${G.score[0]}</span> &nbsp;—&nbsp; <span style="color:#ff9a6a">${G.score[1]} ${TEAMS[1].name.toUpperCase()}</span>`;}
 function gameOver(){
@@ -1523,7 +1559,7 @@ function updateTouchUI(){
 // ===== loop =====
 let last=performance.now();
 function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
-  try{update(dt);draw();updateTouchUI();ambUpdate();musicUpdate();}catch(e){console.error(e);}
+  try{update(dt);draw();updateTouchUI();ambUpdate();musicUpdate();djUpdate();}catch(e){console.error(e);}
   for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
