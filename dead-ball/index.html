@@ -191,7 +191,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.4.3';
+const VERSION='0.4.4';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -300,6 +300,7 @@ function audioInit(){annUnlock();
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=0.6;master.connect(AC.destination);decodeAll();}catch(e){AC=null;return;}}
   if(AC.state!=='running')AC.resume().catch(()=>{});
   if(mode==='title'||mode==='half'||(mode==='howto'&&!G))setTimeout(()=>screenSound(mode==='half'?'half':'title'),60);
+  else if(G&&settings.sound&&settings.music!=='off'&&(!music.el||music.el.paused))musicPlay();
   if(!unlocked){unlocked=true;
     try{const b=AC.createBuffer(1,1,22050),s=AC.createBufferSource();s.buffer=b;s.connect(AC.destination);s.start(0);}catch(e){}
     try{if(!silentEl){silentEl=document.createElement('audio');silentEl.src=silentWav();silentEl.loop=true;silentEl.setAttribute('playsinline','');silentEl.volume=0.01;}
@@ -576,18 +577,21 @@ function toggleSound(){settings.sound=!settings.sound;if(!settings.sound)musicSt
 const TRACKS=[{id:'march',name:"Zombies' March"},{id:'hullabaloo',name:'Halloween Hullabaloo'},{id:'hallow',name:'Hallow Quest'},{id:'beach',name:'Haunted Beach'},{id:'metal',name:'Metal Mayhem'}];
 if(!settings.music)settings.music='march';
 const music={el:null,g:null,tok:0,duck:false};
-function musicLevel(){return music.duck?0.18:0.5;}
+function musicLevel(){if(mode==='live'||mode==='pause')return 0;            // never during a live play
+  const base=(mode==='title'||mode==='half'||mode==='over'||(mode==='howto'&&!G))?0.5:0.3;return music.duck?base*0.36:base;}
+function musicUpdate(){if(!music.el||!music.g||!AC||music.el.paused)return;const v=musicLevel();if(v===music.lv)return;
+  music.lv=v;try{music.g.gain.setTargetAtTime(v,AC.currentTime,v===0?0.12:0.6);}catch(e){}}
 function musicPlay(){if(!AC||!settings.sound||settings.music==='off')return musicStop();
   if(!music.el){music.el=new Audio();music.el.loop=true;music.el.preload='auto';music.el.setAttribute('playsinline','');
     try{const src=AC.createMediaElementSource(music.el);music.g=AC.createGain();music.g.gain.value=0;src.connect(music.g);music.g.connect(master);}catch(e){music.g=null;}}
   const want='music/'+settings.music+'.mp3';music.tok++;
   if(!music.el.src.endsWith(want)){music.el.src=want;}
-  try{if(music.g){music.g.gain.cancelScheduledValues(AC.currentTime);music.g.gain.setTargetAtTime(musicLevel(),AC.currentTime,0.4);}else music.el.volume=0.5;}catch(e){}
+  music.lv=-1;try{if(music.g)music.g.gain.cancelScheduledValues(AC.currentTime);else music.el.volume=0.5;}catch(e){}
   const pr=music.el.play();if(pr&&pr.catch)pr.catch(()=>{});}
-function musicStop(){if(!music.el)return;const t=++music.tok;
+function musicStop(){if(!music.el)return;const t=++music.tok;music.lv=-1;
   try{if(music.g)music.g.gain.setTargetAtTime(0,AC.currentTime,0.35);}catch(e){}
   setTimeout(()=>{if(music.tok===t&&music.el)music.el.pause();},1400);}
-function musicDuck(on){music.duck=on;if(music.g&&AC)try{music.g.gain.setTargetAtTime(music.el&&!music.el.paused?musicLevel():0,AC.currentTime,0.12);}catch(e){}}
+function musicDuck(on){music.duck=on;if(music.g&&AC)try{const v=music.el&&!music.el.paused?musicLevel():0;music.lv=v;music.g.gain.setTargetAtTime(v,AC.currentTime,0.12);}catch(e){}}
 const screenAud={mode:null,quip:false};
 function screenSound(kind){                 // called on entering the title or halftime screen, and again on the first tap
   if(screenAud.mode!==kind){screenAud.mode=kind;screenAud.quip=false;}
@@ -595,7 +599,7 @@ function screenSound(kind){                 // called on entering the title or h
   if(!screenAud.quip&&settings.ann!==false){screenAud.quip=true;const k=kind;
     setTimeout(()=>{if(screenAud.mode!==k||!sfx.ok())return;const src=playS(k==='half'?'halfq':'quip',1.25);
       if(src&&src.buffer){musicDuck(true);setTimeout(()=>musicDuck(false),src.buffer.duration*1000+150);}},k==='half'?3800:1200);}}
-function screenLeave(){screenAud.mode=null;musicStop();}
+function screenLeave(){screenAud.mode=null;}   // music keeps playing; musicUpdate silences it during live plays
 function cycleMusic(d){const ids=[...TRACKS.map(t=>t.id),'off'];settings.music=ids[(ids.indexOf(settings.music)+(d||1)+ids.length)%ids.length];
   store.set('deadball_settings',settings);if(settings.music==='off')musicStop();else musicPlay();}
 function musicName(){const t=TRACKS.find(t=>t.id===settings.music);return t?t.name:'Off';}
@@ -1519,7 +1523,7 @@ function updateTouchUI(){
 // ===== loop =====
 let last=performance.now();
 function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
-  try{update(dt);draw();updateTouchUI();ambUpdate();}catch(e){console.error(e);}
+  try{update(dt);draw();updateTouchUI();ambUpdate();musicUpdate();}catch(e){console.error(e);}
   for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
