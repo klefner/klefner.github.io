@@ -21,7 +21,7 @@ html,body{margin:0;height:100%;background:#070a06;overflow:hidden;font-family:'R
 .tbtn.hide{display:none}
 #btnAct{width:170px;height:170px;font-size:30px;right:30px;bottom:40px;border-color:#ffe14a}
 #btnBurst{right:220px;bottom:30px;width:116px;height:116px}
-#btnSwitch{right:46px;bottom:236px;width:116px;height:116px}
+#btnSwitch{right:40px;bottom:380px;width:116px;height:116px;font-size:20px}
 #btnPause{width:72px;height:72px;font-size:24px;left:12px;top:132px;border-radius:14px}
 .thr{width:104px;height:104px;font-size:40px;background:rgba(60,50,8,.55);border-color:#ffe14a;color:#ffe14a}
 #thr1{right:300px;bottom:190px}#thr2{right:40px;bottom:236px}#thr3{right:170px;bottom:262px}
@@ -132,19 +132,19 @@ canvas{display:block;width:720px;height:1280px;background:#000}
    <tr><td><span class="kbd">Q</span> <span class="kbd">E</span> <span class="kbd">V</span></td><td>Quarterback throws to that receiver (the letter floats over him): Q = left receiver, E = right receiver, V = running back</td><td>—</td></tr>
    <tr><td><span class="kbd">Space</span></td><td>Stiff-arm (ball carrier)</td><td>Dive tackle</td></tr>
    <tr><td><span class="kbd">Shift</span></td><td>Adrenaline Twitch: a speed burst, once per play</td><td>Same</td></tr>
-   <tr><td><span class="kbd">Tab</span></td><td>—</td><td>Switch to the defender nearest the ball</td></tr>
+   <tr><td><span class="kbd">Tab</span></td><td>Take over the ball carrier (or the receiver while the ball is in the air)</td><td>Switch to the defender nearest the ball</td></tr>
    <tr><td><span class="kbd">Esc</span></td><td colspan="2">Pause</td></tr>
   </table>
   <h2>Sound credits</h2>
-  <p style="font-size:14px">Crowd cheering: "Free Crowd Cheering Sounds" by Gregor Quendel (opengameart.org), licensed CC-BY 4.0, trimmed and compressed. All other recorded sounds are public domain (CC0) from OpenGameArt: "Zombies Sound Pack" by artisticdude, "Monster Sound Effects Pack" by Ogrebane, "37 hits/punches" and "8 wet squish, slurp impacts" by Independent.nu, "Squish Sound Effects" by EZduzziteh, "Deep Bone Crack/Break SFX" by Zane Little Music, and "Applause in a large hall or church" by eXpl0it3r. The referee whistle is synthesized.</p>
+  <p style="font-size:14px">Crowd cheering: "Free Crowd Cheering Sounds" by Gregor Quendel (opengameart.org), licensed CC-BY 4.0, trimmed and compressed. Zombie voice, eating, lunge, laugh and growl sounds: "ZombiePackSFX 2" and "ZombiePackSFX 3" by colodical (opengameart.org), licensed CC-BY 3.0, trimmed and compressed. All other recorded sounds are public domain (CC0) from OpenGameArt: "Zombies Sound Pack" by artisticdude, "Monster Sound Effects Pack" by Ogrebane, "37 hits/punches" and "8 wet squish, slurp impacts" by Independent.nu, "Squish Sound Effects" by EZduzziteh, "Deep Bone Crack/Break SFX" by Zane Little Music, "7 Eating Crunches" by starninjas, "5 break, crunch impacts" by Independent.nu, and "Applause in a large hall or church" by eXpl0it3r. The referee whistle is synthesized.</p>
   <h2>Touch controls (iPhone)</h2>
   <table>
    <tr><td>Lower-left of screen</td><td>Put your thumb down anywhere and slide to run. The farther you slide, the faster you go.</td></tr>
    <tr><td>Yellow Q · E · V</td><td>Throw to that receiver (only shown while your quarterback can pass)</td></tr>
    <tr><td>Big yellow button</td><td>Stiff-arm when you carry the ball, dive tackle on defense</td></tr>
-   <tr><td>BURST · SWITCH · II</td><td>Speed burst once per play · switch defender · pause</td></tr>
+   <tr><td>BURST · SWITCH / TAKE OVER · II</td><td>Speed burst once per play · switch defender, or take over your ball carrier · pause</td></tr>
   </table>
-  <p>The player you control has a <b style="color:#ffe14a">yellow ring</b>. When your quarterback's ring <b style="color:#ff3b3b">flashes red</b>, a rusher is about to hit him: throw now. On a pass, control jumps to the receiver: steer him to the <b>X</b> where the brain will land, or let go of the keys and he'll run there himself.</p>
+  <p>The player you control has a <b style="color:#ffe14a">yellow ring</b>. When your quarterback's ring <b style="color:#ff3b3b">flashes red</b>, a rusher is about to hit him: throw now. After you throw, your receiver plays himself: he runs to the <b>X</b> where the brain will land, hustles if the throw is ahead of him, and dives if he's just short. After the catch he keeps running on his own; press <b>Tab</b> (iPhone: TAKE OVER) whenever you want to steer him.</p>
   <div class="btnrow"><div class="btn" id="howBack">Back</div></div>
  </div>
 </div>
@@ -296,15 +296,26 @@ function audioInit(){
 function noiseBuf(dur){const n=Math.max(1,Math.floor(AC.sampleRate*dur)),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;return b;}
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec);}
 // ===== recorded sound clips (sounds/*.mp3); synthesized sounds are the fallback =====
-const SND={groups:{hit:6,splat:6,burst:2,bone:4,groan:6,grunt:5,snarl:3,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0},raw:{},buf:{}};
+const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,brains:1,laugh:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0},raw:{},buf:{},bags:{},last:{}};
 function sndNames(){const L=[];for(const k in SND.groups){const n=SND.groups[k];if(n)for(let i=1;i<=n;i++)L.push(k+i);else L.push(k);}return L;}
 for(const n of sndNames())fetch('sounds/'+n+'.mp3').then(r=>r.ok?r.arrayBuffer():null).then(b=>{if(b){SND.raw[n]=b;decodeSnd(n);}}).catch(()=>{});
 function decodeSnd(n){if(!AC||!SND.raw[n]||SND.buf[n])return;const b=SND.raw[n];SND.raw[n]=null;
   try{AC.decodeAudioData(b,x=>{SND.buf[n]=x;},()=>{});}catch(e){}}
 function decodeAll(){for(const n in SND.raw)decodeSnd(n);}
-function playS(group,vol=1,rate=null,delay=0){
-  if(!sfx.ok())return null;const n=SND.groups[group];const b=SND.buf[n?group+(1+Math.floor(Math.random()*n)):group];if(!b)return null;
-  try{const s=AC.createBufferSource();s.buffer=b;s.playbackRate.value=rate==null?0.86+Math.random()*0.28:rate;const g=AC.createGain();g.gain.value=vol;s.connect(g);g.connect(master);s.start(AC.currentTime+delay);return s;}catch(e){return null;}}
+// shuffle bag: every clip in a pool plays once before any repeats, and never the same one twice in a row
+function bagPick(key,n){let bag=SND.bags[key];
+  if(!bag||!bag.length){bag=[...Array(n).keys()];for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]];}
+    if(n>1&&bag[bag.length-1]===SND.last[key]){[bag[0],bag[bag.length-1]]=[bag[bag.length-1],bag[0]];}SND.bags[key]=bag;}
+  const v=bag.pop();SND.last[key]=v;return v;}
+function playS(group,vol=1,rate=null,delay=0,fx=null){
+  if(!sfx.ok())return null;const n=SND.groups[group];let b=null;
+  if(n){for(let tries=0;tries<n&&!b;tries++)b=SND.buf[group+(1+bagPick(group,n))];}else b=SND.buf[group];
+  if(!b)return null;
+  try{const s=AC.createBufferSource();s.buffer=b;s.playbackRate.value=rate==null?0.86+Math.random()*0.28:rate;const g=AC.createGain();g.gain.value=vol;
+    let out=s;
+    if(fx&&fx.filter){const f=AC.createBiquadFilter();f.type=fx.filter;f.frequency.value=fx.freq;f.Q.value=fx.q||0.8;out.connect(f);out=f;}
+    if(fx&&fx.trem){const tg=AC.createGain(),l=AC.createOscillator(),lg=AC.createGain();l.frequency.value=fx.trem;lg.gain.value=0.45;tg.gain.value=0.55;l.connect(lg);lg.connect(tg.gain);out.connect(tg);out=tg;l.start(AC.currentTime+delay);l.stop(AC.currentTime+delay+b.duration/s.playbackRate.value+0.1);}
+    out.connect(g);g.connect(master);s.start(AC.currentTime+delay);return s;}catch(e){return null;}}
 let amb=null;
 function ambUpdate(){const want=!!G&&['playcall','presnap','live','dead'].includes(mode)&&sfx.ok();
   if(want&&!amb&&SND.buf.crowd_amb){try{const s=AC.createBufferSource();s.buffer=SND.buf.crowd_amb;s.loop=true;const g=AC.createGain();g.gain.value=0.14;s.connect(g);g.connect(master);s.start();amb={s,g};}catch(e){}}
@@ -327,10 +338,37 @@ const sfx={
   cheerSmall(){playS('cheer_small',0.5);},
   applause(){playS('applause',0.6,1);},
   // referee whistle: a pea whistle is a ~2.8 kHz tone with a fast warble from the rattling pea
-  whistle(){if(!this.ok())return;try{const t=AC.currentTime;for(const [st,len] of [[0,0.16],[0.2,0.3]]){const o=AC.createOscillator(),l=AC.createOscillator(),lg=AC.createGain(),g=AC.createGain(),f=AC.createBiquadFilter();
-    o.type='triangle';o.frequency.setValueAtTime(2750,t+st);l.frequency.value=38;lg.gain.value=170;l.connect(lg);lg.connect(o.frequency);f.type='bandpass';f.frequency.value=2800;f.Q.value=2;
-    g.gain.setValueAtTime(0.0001,t+st);g.gain.exponentialRampToValueAtTime(0.22,t+st+0.015);g.gain.setValueAtTime(0.22,t+st+len-0.04);g.gain.exponentialRampToValueAtTime(0.0001,t+st+len);
-    o.connect(f);f.connect(g);g.connect(master);o.start(t+st);l.start(t+st);o.stop(t+st+len+0.02);l.stop(t+st+len+0.02);}}catch(e){}},
+  // referee whistle: each blast differs in pitch, length, pea-rattle speed and strength, with a breathy edge.
+  // kind: 'tackle' one firm blast | 'stop' two short (incomplete/out) | 'turnover' three short | 'td' one long
+  whistle(kind='tackle'){if(!this.ok())return;
+    const pat={tackle:[[0,rand(0.28,0.5)]],stop:[[0,rand(0.14,0.2)],[rand(0.24,0.3),rand(0.16,0.24)]],
+      turnover:[[0,0.13],[0.2,0.13],[0.4,rand(0.25,0.35)]],td:[[0,rand(0.8,1.1)]]}[kind]||[[0,0.3]];
+    const base=rand(2550,3050),vol=rand(0.15,0.24);
+    try{const t=AC.currentTime;for(const [st,len] of pat){const o=AC.createOscillator(),l=AC.createOscillator(),lg=AC.createGain(),g=AC.createGain(),f=AC.createBiquadFilter();
+      const fq=base*rand(0.985,1.015);o.type='triangle';o.frequency.setValueAtTime(fq*0.97,t+st);o.frequency.linearRampToValueAtTime(fq,t+st+0.03);o.frequency.setValueAtTime(fq,t+st+len*0.8);o.frequency.linearRampToValueAtTime(fq*rand(0.95,0.98),t+st+len);
+      l.frequency.value=rand(26,48);lg.gain.value=rand(110,260);l.connect(lg);lg.connect(o.frequency);f.type='bandpass';f.frequency.value=fq;f.Q.value=rand(1.5,3);
+      g.gain.setValueAtTime(0.0001,t+st);g.gain.exponentialRampToValueAtTime(vol,t+st+rand(0.01,0.03));g.gain.setValueAtTime(vol*rand(0.8,1),t+st+len-0.05);g.gain.exponentialRampToValueAtTime(0.0001,t+st+len);
+      o.connect(f);f.connect(g);g.connect(master);o.start(t+st);l.start(t+st);o.stop(t+st+len+0.03);l.stop(t+st+len+0.03);
+      this.noise(len,'bandpass',fq*1.3,vol*0.18,1.2,st);}}catch(e){}},
+  // "Braaains!" in five styles, chosen from a shuffle bag so the same style never plays twice in a row
+  brains(){const st=['normal','groan','shriek','whisper','gurgle'][bagPick('brainStyle',5)];
+    const o={normal:[0.55,rand(0.95,1.05),null],groan:[0.6,rand(0.68,0.8),null],shriek:[0.45,rand(1.25,1.4),null],
+      whisper:[0.5,rand(0.95,1.1),{filter:'highpass',freq:1400}],gurgle:[0.55,rand(0.85,0.95),{trem:rand(14,22)}]}[st];
+    playS('brains',o[0],o[1],0,o[2]);return st;},
+  chomp(vol=0.55){playS('chomp',vol);},
+  laugh(){playS('laugh',0.6,rand(0.9,1.1));},
+  // original 3.5 s touchdown tune: cheesy spooky-funk in A minor (bass, wobbly "theremin" lead, snare on 2 and 4)
+  danceTune(){if(!this.ok())return;try{const t0=AC.currentTime+0.05,b=0.25;
+    const bass=[45,45,52,45,48,48,55,48,50,50,57,50,52,51,50,49];
+    const lead=[[0,76,1],[1,74,1],[2,72,1],[3,71,1],[4,72,2],[6,69,2],[8,69,1],[9,72,1],[10,76,1],[11,79,1],[12,78,1],[13,77,1],[14,76,2]];
+    const hz=m=>440*Math.pow(2,(m-69)/12);
+    bass.forEach((m,i)=>{const o=AC.createOscillator(),g=AC.createGain(),f=AC.createBiquadFilter();o.type='square';o.frequency.value=hz(m);f.type='lowpass';f.frequency.value=700;
+      const t=t0+i*b;env(g,t,0.01,0.12,b*0.85);o.connect(f);f.connect(g);g.connect(master);o.start(t);o.stop(t+b);});
+    lead.forEach(([st,m,d])=>{const o=AC.createOscillator(),l=AC.createOscillator(),lg=AC.createGain(),g=AC.createGain();o.type='sine';const t=t0+st*b;
+      o.frequency.setValueAtTime(hz(m)*0.97,t);o.frequency.linearRampToValueAtTime(hz(m),t+0.06);l.frequency.value=6;lg.gain.value=hz(m)*0.025;l.connect(lg);lg.connect(o.frequency);
+      env(g,t,0.03,0.16,d*b);o.connect(g);g.connect(master);o.start(t);l.start(t);o.stop(t+d*b+0.05);l.stop(t+d*b+0.05);});
+    for(let i=1;i<16;i+=2)this.noise(0.09,'highpass',1800,0.12,0.7,0.05+i*b);
+    for(let i=0;i<16;i+=4)this.tone('sine',120,45,0.14,0.3,0.05+i*b);}catch(e){}},
   throw(){this.noise(0.35,'bandpass',600,0.25,3,0,2400);},
   catch(){this.tone('triangle',300,600,0.1,0.2);},
   groan(){if(playS('groan',0.5))return;if(!this.ok())return;try{const t=AC.currentTime,o=AC.createOscillator(),l=AC.createOscillator(),lg=AC.createGain(),f=AC.createBiquadFilter(),g=AC.createGain();o.type='sawtooth';o.frequency.setValueAtTime(105+Math.random()*35,t);o.frequency.linearRampToValueAtTime(68,t+0.9);l.frequency.value=6;lg.gain.value=7;l.connect(lg);lg.connect(o.frequency);f.type='lowpass';f.frequency.value=650;env(g,t,0.15,0.2,0.85);o.connect(f);f.connect(g);g.connect(master);o.start(t);l.start(t);o.stop(t+1.1);l.stop(t+1.1);}catch(e){}},
@@ -410,7 +448,7 @@ let G=null,demo=[],demoT=0,pcCards=[],pcSel=0,pcTimer=10,time=0;
 function makePlayer(t,i){const r=ROSTER[i],info=TEAMS[t].players[i];
   const p={team:t,idx:i,type:r.type,ty:TYPES[r.type],name:info[0],num:info[1],x:0,y:0,vx:0,vy:0,face:0,phase:Math.random()*6,
     limbs:{la:1,ra:1,ll:1,rl:1,head:1},out:false,role:r.off,spd:rand(0.86,1.14)};resetPlay(p);return p;}
-function resetPlay(p){Object.assign(p,{stun:0,blockedBy:null,blockTimer:0,engaged:null,shedCd:0,burst:0,burstUsed:false,stiff:0,stiffCd:0,dive:0,route:null,ri:0,after:null,ai:'idle',mark:null,zone:null,delay:0,vx:0,vy:0,tumble:0,stumble:0,rt:0,tgt:null});}
+function resetPlay(p){Object.assign(p,{stun:0,blockedBy:null,blockTimer:0,engaged:null,shedCd:0,burst:0,burstUsed:false,stiff:0,stiffCd:0,dive:0,route:null,ri:0,after:null,ai:'idle',mark:null,zone:null,delay:0,vx:0,vy:0,tumble:0,stumble:0,rt:0,tgt:null,hustle:false,catchDive:0});}
 function announce(t){if(!G)return;G.ticker.push({t,life:4.5});if(G.ticker.length>3)G.ticker.shift();}
 function big(t,dur=1.5,col='#ffffff'){if(G)G.big={t,life:dur,max:dur,col};}
 
@@ -489,7 +527,7 @@ function assignPlay(){
 }
 
 // ===== physics helpers =====
-function speedOf(p){let s=p.ty.speed*(p.spd||1)*[0.25,0.6,1][legsOf(p)];if(G&&p.team!==G.userTeam)s*=D().cpuSpd;if(G&&p===G.ctrl)s*=1.08;if(p.stumble>0)s*=0.35;
+function speedOf(p){let s=p.ty.speed*(p.spd||1)*[0.25,0.6,1][legsOf(p)];if(G&&p.team!==G.userTeam)s*=D().cpuSpd;if(G&&p===G.ctrl)s*=1.08;if(p.hustle)s*=1.08;if(p.stumble>0)s*=0.35;
   if(p.burst>0)s*=1.5;if(p.blockedBy)s*=0.12;if(p.engaged)s*=0.3;if(G&&G.ball&&G.ball.carrier===p)s*=0.95;return s;}
 function steer(p,tvx,tvy,dt){const a=(p.type==='shambler'?5:8)*dt;const k=Math.min(1,a);p.vx+=(tvx-p.vx)*k;p.vy+=(tvy-p.vy)*k;}
 function startDive(p,ang){p.dive=0.3;if(Math.random()<0.45)sfx.snarl();const sp=Math.max(8,speedOf(p)*2);p.vx=Math.cos(ang)*sp;p.vy=Math.sin(ang)*sp;p.face=ang;}
@@ -570,7 +608,11 @@ function blockAI(b){
 function offAI(p){
   const P=G.play,B=G.ball,f=dir(P.off);
   if(B.state==='held'&&B.carrier===p){if(p===P.qb&&!P.run)return {x:G.los-f*P.drop,y:MID,arrive:true};return carrierAI(p);}
-  if(B.state==='air'&&p===B.target)return {x:B.tx,y:B.ty,arrive:true};
+  if(B.state==='air'&&p===B.target){const rem=Math.max(0.01,B.dur-B.t),d=Math.hypot(B.tx-p.x,B.ty-p.y);
+    p.hustle=d/rem>speedOf(p)*0.9;   // he can see he'll be late: extra effort
+    if(rem<0.3&&d>1.6&&d<3.2&&p.dive<=0&&p.stun<=0&&armsOf(p)>0&&d/rem>speedOf(p)*1.05){   // dive sized to land right on the spot
+      const ang=Math.atan2(B.ty-p.y,B.tx-p.x),sp=Math.min(12,(d-0.4)/rem);p.dive=rem+0.05;p.vx=Math.cos(ang)*sp;p.vy=Math.sin(ang)*sp;p.face=ang;p.catchDive=1;if(Math.random()<0.5)sfx.grunt();}
+    return {x:B.tx,y:B.ty,arrive:!p.hustle};}
   if(p.ai==='qb')return {x:G.los-f*P.drop,y:MID,arrive:true};
   if(p.ai==='idle')return {x:p.x-f,y:p.y,arrive:true};
   if(p.ai==='route'){
@@ -638,7 +680,11 @@ function handleUser(dt){
     for(const k of ['KeyQ','KeyE','KeyV']){if(wasPressed(k)){const r=P.recv[k];
       if(r&&!r.out){if(armsOf(c)===0)announce(`${c.name} has no arms to throw with. Run it!`);else throwTo(c,r);}break;}}
   }
-  if(wasPressed('Tab')&&c.team!==P.off){const n=nearestTo(G.userTeam,ballPt(),c);if(n){G.ctrl=n;sfx.blip();}}
+  if(wasPressed('Tab')){let n;
+    if(c.team!==P.off)n=nearestTo(G.userTeam,ballPt(),c);
+    else{const car=B.state==='held'&&B.carrier&&B.carrier.team===G.userTeam&&!B.carrier.out?B.carrier:null;
+      n=car&&car!==c?car:(B.state==='air'&&B.target&&B.target!==c&&!B.target.out?B.target:nearestTo(G.userTeam,ballPt(),c));}
+    if(n&&n!==c){G.ctrl=n;sfx.blip();}}
 }
 
 // ===== passing =====
@@ -652,7 +698,6 @@ function throwTo(qb,r){
   Object.assign(B,{state:'air',carrier:null,fx:qb.x,fy:qb.y,tx,ty,t:0,dur:Math.max(0.3,fl),peak:0.6+d*0.05,target:r});
   P.carrier=null;P.canPass=false;P.thrown=true;sfx.throw();
   for(const d of G.teams[P.def])if(!d.out)d.rt=(dist(d,{x:tx,y:ty})>4?rand(0.3,0.55):rand(0.05,0.15))*(d.team===G.userTeam?1:D().lag);
-  if(P.off===G.userTeam)G.ctrl=r;
 }
 function cpuQB(dt){
   const P=G.play,qb=P.qb,f=dir(P.off),press=pressureOn(qb);
@@ -667,19 +712,18 @@ function cpuQB(dt){
 function resolveCatch(){
   const P=G.play,B=G.ball,L={x:B.tx,y:B.ty};
   let rec=null,rd=1e9,dfn=null,dd=1e9;
-  for(const p of G.teams[P.off]){if(p.out||p.stun>0)continue;const d=dist(p,L);if(d<rd){rd=d;rec=p;}}
+  for(const p of G.teams[P.off]){if(p.out||(p.stun>0&&!p.catchDive))continue;const d=dist(p,L)-(p.catchDive?0.5:0);if(d<rd){rd=d;rec=p;}}
   for(const p of G.teams[P.def]){if(p.out||p.stun>0)continue;const d=dist(p,L);if(d<dd){dd=d;dfn=p;}}
   const recOK=rec&&rd<1.9&&armsOf(rec)>0,defOK=dfn&&dd<1.4&&armsOf(dfn)>0;
-  const catchP=recOK?rec.ty.catch*[0,0.6,1][armsOf(rec)]*(rd<1.2?1:0.8)*(defOK&&dd<1?0.85:1):0;
+  const catchP=recOK?(rec.catchDive?0.65:1)*rec.ty.catch*[0,0.6,1][armsOf(rec)]*(rd<1.2?1:0.8)*(defOK&&dd<1?0.85:1):0;
   const intP=defOK?(dfn.team===G.userTeam?0.3:D().intc)*[0,0.6,1][armsOf(dfn)]*(dd<0.8?1:0.7):0;
   let res='inc';
   if(defOK&&(!recOK||dd<rd-0.15)){if(Math.random()<intP)res='int';else if(Math.random()<catchP*0.8)res='catch';}
   else{if(Math.random()<catchP)res='catch';else if(defOK&&Math.random()<intP*0.4)res='int';}
   if(res==='catch'){B.state='held';B.carrier=rec;P.carrier=rec;P.run=true;P.canPass=false;sfx.catch();
     announce(`Caught by ${rec.name}!`);
-    if(P.off===G.userTeam)G.ctrl=rec;
-    else if(G.ctrl&&dist(G.ctrl,rec)>8)G.ctrl=nearestTo(G.userTeam,rec)||G.ctrl;}
-  else if(res==='int'){B.state='held';B.carrier=dfn;sfx.groan();announce(`INTERCEPTED by ${dfn.name}!`);endPlay('turnover',{team:P.def,x:dfn.x,y:dfn.y,why:'int',by:dfn});}
+    if(P.off!==G.userTeam&&G.ctrl&&dist(G.ctrl,rec)>8)G.ctrl=nearestTo(G.userTeam,rec)||G.ctrl;}
+  else if(res==='int'){B.state='held';B.carrier=dfn;sfx.groan();sfx.chomp(0.4);announce(`INTERCEPTED by ${dfn.name}!`);endPlay('turnover',{team:P.def,x:dfn.x,y:dfn.y,why:'int',by:dfn});}
   else{B.state='dead';B.x=L.x;B.y=L.y;spawnGoo(L.x,L.y,5,'#d88a9a');announce(pick(LINES.inc));endPlay('incomplete',{team:P.off,x:G.los,y:L.y});}
 }
 
@@ -733,6 +777,7 @@ function tryTackle(d,c){
   if(!ko&&!c.out&&lost.some(k=>k==='la'||k==='ra')&&Math.random()<0.25){fumble(c);d.stun=0.6;d.dive=0;return true;}
   c.tumble=1;d.stun=Math.max(d.stun,0.6);c.stun=tier>=2?1.6:1;
   const spot={team:c.team,x:c.x,y:c.y,by:c};
+  if(tier>=2)focusCam(c.x,c.y,ko?4.5:1.8,SSMAX*(tier===3?1.15:1.05));
   if(ko)knockOut(c);
   endPlay('tackle',spot);return true;
 }
@@ -758,7 +803,7 @@ function ballStep(dt){
     B.x+=B.vx*dt;B.y+=B.vy*dt;const fr=Math.pow(0.15,dt);B.vx*=fr;B.vy*=fr;B.h=Math.abs(Math.sin(P.time*12))*0.08*Math.hypot(B.vx,B.vy);
     if(B.y<0||B.y>FW||B.x<0||B.x>120){endPlay('oob',{team:P.off,x:clamp(B.x,0.5,119.5),y:clamp(B.y,0,FW)});return;}
     for(const p of [...G.teams[0],...G.teams[1]]){if(p.out||p.stun>0)continue;if(Math.hypot(p.x-B.x,p.y-B.y)<0.9){
-      B.state='held';B.carrier=p;
+      B.state='held';B.carrier=p;sfx.chomp(0.45);
       if(p.team===P.off){announce(`${p.name} falls on the loose brain.`);endPlay('recover',{team:p.team,x:p.x,y:p.y,by:p});}
       else{announce(`${p.name} scoops up the loose brain!`);endPlay('turnover',{team:p.team,x:p.x,y:p.y,why:'fumble',by:p});}
       return;}}
@@ -773,7 +818,7 @@ function updateLive(dt){
   const P=G.play,B=G.ball,off=P.off,f=dir(off);
   P.time+=dt;G.clock=Math.max(0,G.clock-dt);
   const all=[...G.teams[0],...G.teams[1]].filter(p=>!p.out);
-  for(const p of all){p.stun=Math.max(0,p.stun-dt);p.burst=Math.max(0,p.burst-dt);p.stiff=Math.max(0,p.stiff-dt);p.stiffCd=Math.max(0,p.stiffCd-dt);p.shedCd=Math.max(0,p.shedCd-dt);p.delay=Math.max(0,p.delay-dt);p.stumble=Math.max(0,p.stumble-dt);
+  for(const p of all){p.stun=Math.max(0,p.stun-dt);p.burst=Math.max(0,p.burst-dt);p.stiff=Math.max(0,p.stiff-dt);p.stiffCd=Math.max(0,p.stiffCd-dt);p.shedCd=Math.max(0,p.shedCd-dt);p.delay=Math.max(0,p.delay-dt);p.stumble=Math.max(0,p.stumble-dt);p.hustle=false;
     if(p!==G.ctrl&&p.stumble<=0&&Math.hypot(p.vx,p.vy)>2&&Math.random()<dt*(0.035+(2-legsOf(p))*0.05))p.stumble=rand(0.25,0.55);
     if(p.dive>0){p.dive-=dt;if(p.dive<=0){p.dive=0;p.stun=Math.max(p.stun,0.5);}}}
   if(P.offCall==='dive'&&!P.handed&&P.time>=0.32&&B.state==='held'&&B.carrier===P.qb){
@@ -792,20 +837,30 @@ function updateLive(dt){
   blocks(dt);
   tackles();if(P.ended)return;
   checkBounds();
+  // "Braaains!": now and then a zombie chasing the ball carrier wails at him
+  G.moanCd=(G.moanCd==null?3:G.moanCd)-dt;
+  const carr=B.state==='held'?B.carrier:null;
+  if(carr&&!carr.out&&P.run&&G.moanCd<=0&&Math.random()<dt*1.2){
+    const ch=G.teams[1-carr.team].filter(d=>!d.out&&d.stun<=0&&dist(d,carr)<7&&((carr.x-d.x)*d.vx+(carr.y-d.y)*d.vy)>0);
+    if(ch.length){const z=pick(ch),st=sfx.brains();
+      z.bubble={t:1.5,text:{normal:'Braaains!',groan:'Brrraaaiiinsss...',shriek:'BRAAAAAINS!!',whisper:'brains...',gurgle:'Brglbrrains!'}[st]};
+      G.moanCd=rand(4,8);}}
 }
 function endPlay(type,info){
   const P=G.play;if(P.ended)return;P.ended=true;mode='dead';G.timer=1.7;G.res=Object.assign({type},info);
   const gain=Math.round(dir(P.off)*(info.x-G.los));
-  if(type==='td'){big('TOUCHDOWN!',2.3,'#ffd84a');sfx.cheer();G.timer=2.4;G.stats.yards[P.off]+=gain;}
+  if(type==='td'){big('TOUCHDOWN!',2.3,'#ffd84a');sfx.whistle('td');sfx.cheer();G.timer=4.2;G.stats.yards[P.off]+=gain;
+    const sc=info.by;if(sc&&!sc.out){sc.dance=3.8;sc.danceT=0;sc.stun=0;setTimeout(()=>sfx.danceTune(),350);setTimeout(()=>{sfx.chomp(0.7);sfx.laugh();},3300);}
+    focusCam(info.x,info.y,4.2,SSMAX*1.15);}
   else if(type==='tackle'||type==='oob'||type==='recover'){
     G.stats.yards[P.off]+=gain;
     if(inOwnEZ(P.off,info.x)){big('SAFETY!',2,'#ff6b6b');}
     else{const sack=type==='tackle'&&info.by===P.qb&&gain<0&&!P.thrown&&!P.handed;
       if(gain>=15)sfx.cheerSmall();
       big(`${type==='oob'?'OUT OF BOUNDS':type==='recover'?'RECOVERED':sack?'SACKED!':'TACKLED'}  ${gain>=0?'+':''}${gain} YDS`,1.6,sack?'#ff9a4a':'#ffffff');}
-    sfx.whistle();}
-  else if(type==='incomplete'){big('INCOMPLETE',1.4);sfx.whistle();}
-  else if(type==='turnover'){big(info.why==='int'?'INTERCEPTED!':'FUMBLE LOST!',2,'#ff9a4a');sfx.whistle();G.timer=2.0;}
+    sfx.whistle(type==='oob'?'stop':'tackle');}
+  else if(type==='incomplete'){big('INCOMPLETE',1.4);sfx.whistle('stop');}
+  else if(type==='turnover'){big(info.why==='int'?'INTERCEPTED!':'FUMBLE LOST!',2,'#ff9a4a');sfx.whistle('turnover');G.timer=2.0;}
   G.after=resolvePlay;
 }
 function resolvePlay(){
@@ -879,6 +934,7 @@ function update(dt){
   else if(mode==='live'){updateLive(dt);const B=G.ball;if(B.state==='held'&&B.carrier)G.play.lastCarrier=B.carrier;}
   else if(mode==='dead'){
     for(const p of [...G.teams[0],...G.teams[1]]){p.vx*=Math.pow(0.05,dt);p.vy*=Math.pow(0.05,dt);p.x+=p.vx*dt;p.y+=p.vy*dt;p.stun=Math.max(0,p.stun-dt);}
+    for(const p of [...G.teams[0],...G.teams[1]])if(p.dance>0){p.dance-=dt;p.danceT+=dt;p.phase+=dt*10;if(p.dance<=0)p.dance=0;}
     G.timer-=dt;if(G.abducts.length&&G.timer<0.4)G.timer=0.4;if(G.timer<=0&&G.after){const fn=G.after;G.after=null;fn();}}
   // particles
   const born=[];
@@ -902,17 +958,23 @@ function update(dt){
       G.parts.push({k:'blood',x:p.x+Math.cos(base)*0.35,y:p.y+Math.sin(base)*0.35,vx:Math.cos(a)*sp+p.vx,vy:Math.sin(a)*sp+p.vy,z:0.8,vz:rand(2,4),life:rand(0.4,0.8),r:rand(0.07,0.14),c:pick(BLOOD)});}}
   updateAbducts(dt);
   G.shake=Math.max(0,(G.shake||0)-dt*30);
+  for(const p of [...G.teams[0],...G.teams[1]])if(p.bubble){p.bubble.t-=dt;if(p.bubble.t<=0)p.bubble=null;}
   for(const t of G.ticker)t.life-=dt;G.ticker=G.ticker.filter(t=>t.life>0);
   if(G.big){G.big.life-=dt;if(G.big.life<=0)G.big=null;}
   // camera
   const tgt=camDirector();
-  SS+=(tgt.ss-SS)*Math.min(1,dt*(tgt.ss<SS?2.2:1.3));
+  SS+=(tgt.ss-SS)*Math.min(1,dt*(tgt.fast?4:(tgt.ss<SS?2.2:1.3)));
   camCX+=(tgt.x-camCX)*Math.min(1,dt*4);camCY+=(tgt.y-camCY)*Math.min(1,dt*4);
   applyView();
 }
 function applyView(){const vl=FH/SS,vw=W/SS;viewCX=clamp(camCX,vl/2-3,123-vl/2);viewCY=vw>=FW?MID:clamp(camCY,vw/2,FW-vw/2);}
 // Automatic camera: frames the action. Tight scrum -> zoom in; long pass or spread-out play -> zoom out.
+function focusCam(x,y,dur,ss){if(G)G.focus={x,y,until:time+dur,ss};}
 function camDirector(){
+  if(G.focus&&time<G.focus.until&&(mode==='dead'||mode==='live')){const F=G.focus;const A=G.abducts[0];
+    if(A&&A.h>0.5)return {x:A.body.x,y:A.body.y,ss:F.ss*0.85,fast:true};
+    const dn=[...G.teams[0],...G.teams[1]].find(p=>p.dance>0);if(dn)return {x:dn.x,y:dn.y,ss:F.ss,fast:true};
+    return {x:F.x,y:F.y,ss:F.ss,fast:true};}
   const P=G.play,B=G.ball,f=P?dir(P.off):1,pts=[];let lead=0,padX=10,padY=5;
   const act=[...G.teams[0],...G.teams[1]].filter(p=>!p.out);
   if(!B||mode==='playcall'||mode==='presnap'){for(const p of act)pts.push(p);}
@@ -973,7 +1035,14 @@ function drawPlayer(p){
   ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(2,3,u*0.55,u*0.45,0,0,7);ctx.fill();
   if(G&&G.ctrl===p&&mode!=='title'){const hot=mode==='live'&&G.play&&p===G.play.qb&&G.ball.carrier===p&&G.play.canPass&&pressureOn(p)<3.2;ctx.strokeStyle=hot?(Math.sin(time*25)>0?'#ff3b3b':'#ff9a4a'):'#ffe14a';ctx.lineWidth=2.5;ctx.beginPath();ctx.ellipse(0,0,u*0.75,u*0.75,0,0,7);ctx.stroke();}
   const down=(p.stun>0&&mode!=='title')||p.dive>0;
-  ctx.rotate(SA(p.face));
+  let fa=p.face;
+  if(p.dance>0){const t=p.danceT,bt=t*4;          // dance: claw-shuffle, spin, bounce, then hold the brain up and chomp it
+    fa=p.team===0?0:Math.PI;                       // face the camera's "up" for the crowd
+    if(t<1.2){ctx.translate(Math.sin(bt*Math.PI)*u*0.35,0);}
+    else if(t<2.1){ctx.rotate((t-1.2)*Math.PI*4);}
+    else if(t<3.0){const j=Math.abs(Math.sin(bt*Math.PI));ctx.translate(0,-j*u*0.5);ctx.scale(1+j*0.15,1+j*0.15);}
+    else{ctx.rotate(Math.sin(t*30)*0.15);}}
+  ctx.rotate(SA(fa));
   if(p.dive>0)ctx.scale(1.35,0.85);else if(down)ctx.scale(1.15,0.9);
   const sw=moving&&!down?Math.sin(p.phase)*0.2*u:0;
   const legY=0.2*u;
@@ -983,7 +1052,7 @@ function drawPlayer(p){
   ctx.fillStyle=T.jersey;ctx.strokeStyle=T.trim;ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(-0.02*u,0,u*0.3,u*0.48,0,0,7);ctx.fill();ctx.stroke();
   ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-0.15*u,-0.3*u);ctx.lineTo(0.1*u,-0.1*u);ctx.stroke();
   for(const [k,s] of [['la',-1],['ra',1]]){
-    if(p.limbs[k]){const reach=(p.stiff>0&&s>0)?1.05:0.72+Math.sin(p.phase*0.5+s)*0.05;
+    if(p.limbs[k]){const reach=p.dance>0?0.95+Math.sin(p.danceT*16+s*2)*0.25:(p.stiff>0&&s>0)?1.05:0.72+Math.sin(p.phase*0.5+s)*0.05;
       ctx.strokeStyle=T.skin;ctx.lineWidth=0.15*u;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(0.02*u,s*0.4*u);ctx.lineTo(reach*u,s*0.3*u);ctx.stroke();
       ctx.fillStyle=T.skin;ctx.beginPath();ctx.arc(reach*u,s*0.3*u,0.1*u,0,7);ctx.fill();
       ctx.strokeStyle=T.jersey;ctx.lineWidth=0.18*u;ctx.beginPath();ctx.moveTo(0.02*u,s*0.4*u);ctx.lineTo(0.22*u,s*0.38*u);ctx.stroke();}
@@ -996,6 +1065,10 @@ function drawPlayer(p){
     ctx.fillStyle='#111';ctx.beginPath();ctx.arc(0.23*u+wob,-0.1*u,0.035*u,0,7);ctx.fill();ctx.beginPath();ctx.arc(0.22*u,0.1*u-wob,0.028*u,0,7);ctx.fill();}
   ctx.restore();
   if(G&&mode!=='title'){ctx.fillStyle='rgba(255,255,255,0.85)';ctx.font='bold 13px Roboto Condensed, Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(p.num,x+u*0.7,y-u*0.7);
+    if(p.bubble&&!p.out){const b=p.bubble;ctx.save();ctx.globalAlpha=Math.min(1,b.t*3);ctx.font='bold 15px Bangers, Arial';const tw=ctx.measureText(b.text).width+16,bx=x-tw/2,by=y-u*1.6-26;
+      ctx.fillStyle='rgba(245,240,225,0.95)';ctx.strokeStyle='#3a2a1a';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect?ctx.roundRect(bx,by,tw,24,10):ctx.rect(bx,by,tw,24);ctx.fill();ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x-6,by+24);ctx.lineTo(x,by+32);ctx.lineTo(x+6,by+24);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#5a0f0f';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(b.text,x,by+13);ctx.restore();}
     if(p.stun>0&&p.dive<=0){for(let i=0;i<3;i++){const a=time*6+i*2.1;ctx.fillStyle='#ffe14a';ctx.fillRect(x+Math.cos(a)*u*0.5-1.5,y-u*0.6+Math.sin(a)*u*0.2-1.5,3,3);}}}
 }
 function drawDebris(d){
@@ -1056,7 +1129,7 @@ function drawTicker(){
 }
 function drawHint(){
   if(touchOn||(mode!=='live'&&mode!=='presnap'))return;const P=G.play;
-  const t=P.off===G.userTeam?'Arrows/WASD move · Q / E / V throw · Space stiff-arm · Shift burst · Esc pause':'Arrows/WASD move · Space dive · Tab switch · Shift burst · Esc pause';
+  const t=P.off===G.userTeam?'Arrows/WASD move · Q / E / V throw · Tab take over · Space stiff-arm · Shift burst · Esc pause':'Arrows/WASD move · Space dive · Tab switch · Shift burst · Esc pause';
   ctx.font='13px Roboto Condensed, Arial';const w=ctx.measureText(t).width+16;ctx.fillStyle='rgba(8,12,6,0.6)';ctx.fillRect(W-w-10,H-74,w,22);ctx.fillStyle='#c4d1b6';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,W-w-2,H-63);
 }
 function drawBig(){
@@ -1150,7 +1223,7 @@ function updateTouchUI(){
   touchEl.classList.toggle('on',show);if(!show){endJoy();return;}
   const act=$('btnAct');act.textContent=off?'STIFF ARM':'DIVE';act.classList.toggle('used',off&&!isCar);
   $('btnBurst').classList.toggle('used',burstUsed);
-  $('btnSwitch').classList.toggle('hide',off);
+  $('btnSwitch').textContent=off?'TAKE OVER':'SWITCH';
   ['thr1','thr2','thr3'].forEach((id,i)=>$(id).classList.toggle('hide',!(canThrow&&rv[i])));
 }
 // ===== loop =====
