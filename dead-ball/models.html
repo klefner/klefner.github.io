@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dead Ball – Zombie Model Sheet (draft)</title>
+<style>
+body{margin:0;background:#16200f;color:#e8f0dc;font-family:Arial,sans-serif}
+h1{font-family:Impact,Arial Black,sans-serif;color:#9dff57;letter-spacing:2px;margin:14px 16px 2px;font-size:28px}
+p{margin:2px 16px 10px;color:#a9b89a;font-size:14px}
+canvas{display:block;width:100%;max-width:1200px;margin:0 auto}
+.ctl{margin:6px 16px 12px;font-size:14px}.ctl label{margin-right:14px}
+</style></head><body>
+<h1>DEAD BALL · ZOMBIE MODEL SHEET</h1>
+<p>Draft for review. Everything animates. Rows: body type per role for each team (front = running at you, back = running away, side = across the field), then poses and limb loss.</p>
+<div class="ctl"><label><input type="checkbox" id="field" checked> field background</label><label><input type="checkbox" id="small"> show at in-game size too</label></div>
+<canvas id="cv"></canvas>
+<script src="models.js"></script>
+<script>
+const cv=document.getElementById('cv'),c=cv.getContext('2d');
+const W=1200,H=1500,DPR=Math.min(2,window.devicePixelRatio||1);cv.width=W*DPR;cv.height=H*DPR;c.scale(DPR,DPR);
+const bodies=[['line','LINEMAN'],['rb','RUNNING BACK'],['qb','QUARTERBACK'],['wr','RECEIVER']];
+const teams=[['zombie','GRAVEYARD SHIFT · classic zombies'],['mummy','MOLDY MUMMIES · mummies']];
+const nums={zombie:{line:66,rb:22,qb:7,wr:81},mummy:{line:60,rb:33,qb:12,wr:80}};
+function label(t,x,y,sz,col){c.font=`bold ${sz||13}px Arial`;c.fillStyle=col||'#cfe0bb';c.textAlign='center';c.fillText(t,x,y);}
+function frame(now){const t=now/1000;
+  c.fillStyle='#16200f';c.fillRect(0,0,W,H);
+  if(document.getElementById('field').checked){c.fillStyle='#2f5a24';c.fillRect(0,0,W,H);c.strokeStyle='rgba(255,255,255,0.25)';c.lineWidth=2;for(let y=40;y<H;y+=90){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke();}}
+  const small=document.getElementById('small').checked;
+  let y0=20;
+  for(const [sp,tn] of teams){label(tn,W/2,y0+18,20,'#fff');
+    bodies.forEach(([b,bn],i)=>{const cx=150+i*300;label(bn,cx,y0+44,14);
+      const views=[['front',0],['back',0],['side',0]];
+      views.forEach(([v],j)=>{const x=cx-90+j*90,y=y0+230;
+        drawZombie(c,x,y,small?48:150,{team:ZSTYLE[sp],body:b,view:v,phase:t*9+i+j,speed:1,num:nums[sp][b],t,seed:i*3+j,pose:'run'});
+        label(v,x,y+22,11,'#a9b89a');});});
+    y0+=270;}
+  // poses row
+  label('POSES',W/2,y0+18,20,'#fff');
+  const poses=[['stand','standing'],['zombie','zombie reach (defense)'],['carry','carrying the brain'],['block','blocking'],['dive','diving'],['down','tackled']];
+  poses.forEach(([p,n],i)=>{const x=110+i*196,y=y0+220;const sp=i%2?'mummy':'zombie',b=['qb','line','rb','line','wr','rb'][i];
+    drawZombie(c,x,y,small?48:140,{team:ZSTYLE[sp],body:b,view:p==='carry'||p==='zombie'?'side':'front',phase:t*9,speed:p==='stand'?0:1,num:nums[sp][b],t,seed:i,pose:p});label(n,x,y+30,12);});
+  y0+=270;
+  label('LIMB LOSS',W/2,y0+18,20,'#fff');
+  const losses=[[{la:0,ra:1,ll:1,rl:1,head:1},'no left arm'],[{la:1,ra:1,ll:0,rl:1,head:1},'no left leg'],[{la:0,ra:0,ll:1,rl:1,head:1},'no arms'],[{la:1,ra:1,ll:1,rl:1,head:0},'headless'],[{la:0,ra:1,ll:1,rl:0,head:1},'arm + leg gone'],[{la:1,ra:0,ll:1,rl:1,head:1},'no right arm, side']];
+  losses.forEach(([L,n],i)=>{const x=110+i*196,y=y0+220;const sp=i%2?'mummy':'zombie',b=['rb','wr','line','qb','rb','qb'][i];
+    drawZombie(c,x,y,small?48:140,{team:ZSTYLE[sp],body:b,view:i===5?'side':'front',phase:t*7,speed:0.6,num:nums[sp][b],t,seed:i,pose:'run',limbs:L});label(n,x,y+30,12);});
+  y0+=270;
+  label('A PLAY IN PROGRESS (in-game size)',W/2,y0+18,20,'#fff');
+  const crowd=[];for(let i=0;i<7;i++){crowd.push({sp:'zombie',b:['qb','rb','wr','wr','line','line','line'][i],x:200+i*110,y:y0+250+Math.sin(i)*20,view:'back'});}
+  for(let i=0;i<7;i++){crowd.push({sp:'mummy',b:['line','line','line','rb','wr','wr','qb'][i],x:240+i*110,y:y0+150+Math.cos(i)*20,view:'front'});}
+  crowd.sort((a,b)=>a.y-b.y).forEach((p,i)=>drawZombie(c,p.x,p.y,56,{team:ZSTYLE[p.sp],body:p.b,view:p.view,phase:t*10+i,speed:1,num:nums[p.sp][p.b],t,seed:i,pose:p.sp==='mummy'&&p.b!=='line'?'zombie':(p.b==='line'?'block':'run')}));
+  requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+</script></body></html>
