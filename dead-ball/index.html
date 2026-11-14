@@ -189,7 +189,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.4.0';
+const VERSION='0.4.1';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -235,17 +235,16 @@ const DEF_PLAYS=[
 const SVG_DEFS='<defs><marker id="a" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6z" fill="#9dff57"/></marker><marker id="b" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6z" fill="#ff7a5a"/></marker></defs>';
 const LINES={
   arm:['{n} is now short one arm.','That arm just landed in the third row!',"{n} won't be waving to the crowd anymore.",'Arm off! {n} keeps going anyway.'],
-  leg:['{n} is hopping mad. Literally.','Leg off! {n} keeps shambling.',"That's gonna slow {n} down.",'{n} left a leg at the 40.'],
+  leg:['{n} is hopping mad. Literally.','Leg off! {n} keeps shambling.',"That's gonna slow {n} down.",'There goes a leg!'],
   head:["HEADS UP! {n}'s head is off the field!","{n} has lost his head. He's done for the drive.",'{n} is headless. The trainer is chasing the head.'],
-  td:['TOUCHDOWN {t}! The crowd groans with delight!','Brains on the board! Touchdown {t}!','{t} SCORE! Somebody check that end zone for body parts.'],
-  burst:['THE BRAIN BURST! {t} cough up the ball in a cloud of stink!','SPLAT! The brain went bad on {t}. Turnover!','Putrid brain explodes! {t} are wiping goo out of their eyes.'],
+  burst:['THE BRAIN BURST! {t} cough up the ball in a cloud of stink!','SPLAT! The brain went bad on the {t}. Turnover!','Putrid brain explodes! The {t} are wiping goo out of their eyes.'],
   fresh:['Midfield! A fresh brain from the cooler!','Crossed midfield! Out comes a nice fresh brain!','Fresh brain! Four plays to find the end zone!'],
   inc:['Incomplete. Not enough fingers on that one.','Dropped! The brain hits the turf with a squelch.','Incomplete. Nobody home.'],
-  bighit:['BIG HIT! {d} flattens {n}!','{d} just rearranged {n}\'s skeleton!','Ooooh! {n} felt that one in his marrow!'],
-  crush:['CRUSHED! {d} hit {n} like a hearse!','{n} has been EXHUMED and RE-BURIED by {d}!','That hit registered on the cemetery seismograph!'],
+  bighit:['BIG HIT on {n}!',"Somebody just rearranged {n}'s skeleton!",'Ooooh! {n} felt that one in his marrow!'],
+  crush:['CRUSHED! {n} got hit like a hearse!','{n} has been exhumed and re-buried!','That hit registered on the cemetery seismograph!'],
   limbless:['{n} has no arms and no legs left! The bats will take it from here.','{n} is just a torso now. Somebody call the bats!',"Nothing left of {n} but a jersey and a bad attitude. Here come the vampires!"],
   ko:['{n} is OUT COLD! Here come the vampires!','Lights out for {n}! Somebody call the bats!','{n} is down for the count. The night shift is coming to collect him.'],
-  stiff:['{n} stiff-arms {d} into next week!','{n} shoves {d} right off his feet!','{d} bounces off {n}!']
+  stiff:['{n} with the stiff arm!','{n} shoves him right off his feet!','He bounces right off {n}!']
 };
 
 // ===== helpers =====
@@ -400,78 +399,146 @@ addEventListener('blur',()=>{for(const k in keys)keys[k]=false;if(mode==='live'|
 // ===== live announcer: spoken play-by-play + color commentary =====
 // Every call gets a priority. A more important call cuts off a less important one; lines that wait too long are dropped,
 // so the voice is always talking about what is happening now.
-const ANN={ok:'speechSynthesis' in window,q:[],cur:null,pbp:null,col:null,unlocked:false,bags:{}};
+const ANN={ok:true,q:[],cur:null,bags:{},idx:null,buf:null,loading:false};   // pre-recorded ghoul announcer: one pack of clips, sliced and decoded on demand
 const now_s=()=>performance.now()/1000;
-function annVoices(){if(!ANN.ok)return;const vs=speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang));if(!vs.length)return;
-  const pref=list=>{for(const n of list){const v=vs.find(v=>v.name.includes(n));if(v)return v;}return null;};
-  ANN.pbp=pref(['Samantha','Google US English','Microsoft Guy','Microsoft Aria','Microsoft Jenny','Alex','Microsoft David','Aaron'])||vs.find(v=>/US/i.test(v.lang))||vs[0];
-  ANN.col=pref(['Daniel','Google UK English Male','Microsoft Ryan','Microsoft George','Arthur','Oliver','Fred','Microsoft Mark'])||vs.find(v=>v!==ANN.pbp&&/GB|AU|IE/i.test(v.lang))||vs.find(v=>v!==ANN.pbp)||ANN.pbp;}
-if(ANN.ok){annVoices();speechSynthesis.onvoiceschanged=annVoices;}
-function annUnlock(){if(!ANN.ok||ANN.unlocked)return;try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);ANN.unlocked=true;annVoices();}catch(e){}}
-function annOn(){return ANN.ok&&settings.sound&&settings.ann===true;}
-function annStop(){ANN.q=[];ANN.cur=null;if(ANN.ok)try{speechSynthesis.cancel();}catch(e){}}
+const annKey=t=>t.replace(/[!]{2,}/g,'!').replace(/\s+/g,' ').trim();
+function annLoad(){if(ANN.loading||ANN.idx)return;ANN.loading=true;
+  Promise.all([fetch('vox.json').then(r=>r.json()),fetch('vox.mp3').then(r=>r.arrayBuffer())]).then(([i,b])=>{ANN.idx=i;ANN.buf=b;}).catch(()=>{ANN.ok=false;});}
+function annUnlock(){annLoad();}
+function annOn(){return ANN.idx&&settings.sound&&settings.ann!==false&&AC&&AC.state==='running';}
+function annCut(){const c=ANN.cur;ANN.cur=null;if(c&&c.src){try{c.g.gain.setTargetAtTime(0,AC.currentTime,0.02);c.src.stop(AC.currentTime+0.08);}catch(e){}}}
+function annStop(){ANN.q=[];annCut();}
 function annSay(text,pri,voice){
-  if(!annOn())return;pri=pri||2;voice=voice||'pbp';
-  const it={text:text.replace(/[!]{2,}/g,'!').replace(/\s+/g,' ').trim(),pri,voice,born:now_s(),ttl:voice==='color'?4.5:[0,1.3,1.8,2.8,6][Math.min(4,pri)]};
+  if(!annOn())return;pri=pri||2;voice=voice||'pbp';const e=ANN.idx[annKey(text)];if(!e)return;
+  const it={e,pri,voice,born:now_s(),ttl:voice==='color'?4.5:[0,1.3,1.8,2.8,6][Math.min(4,pri)]};
   const t=now_s(),stale=ANN.cur&&voice==='pbp'&&pri>=2&&pri===ANN.cur.pri&&t-ANN.cur.start>0.9;   // the play moved on: cut the old call
-  if(ANN.cur&&(pri>ANN.cur.pri||stale||(ANN.cur.voice==='color'&&voice==='pbp'&&pri>=2))){ANN.q=ANN.q.filter(x=>x.pri>=pri);ANN.q.unshift(it);ANN.cur=null;try{speechSynthesis.cancel();}catch(e){}annNext();return;}
+  if(ANN.cur&&(pri>ANN.cur.pri||stale||(ANN.cur.voice==='color'&&voice==='pbp'&&pri>=2))){ANN.q=ANN.q.filter(x=>x.pri>=pri);ANN.q.unshift(it);annCut();annNext();return;}
   ANN.q.push(it);ANN.q.sort((a,b)=>b.pri-a.pri);if(ANN.q.length>3)ANN.q.length=3;
   if(!ANN.cur)annNext();}
 function annNext(){
   const t=now_s();ANN.q=ANN.q.filter(x=>t-x.born<x.ttl);const it=ANN.q.shift();if(!it){ANN.cur=null;return;}
-  const u=new SpeechSynthesisUtterance(it.text),col=it.voice==='color';
-  if(col?ANN.col:ANN.pbp)u.voice=col?ANN.col:ANN.pbp;
-  u.rate=col?1.02:(it.pri>=3?1.22:1.15);u.pitch=col?0.82:(it.pri>=3?1.15:1.05);u.volume=1;
-  it.deadline=t+1.5+it.text.split(' ').length*0.42;
-  u.onend=u.onerror=()=>{if(ANN.cur===it){ANN.cur=null;annNext();}};
-  it.start=t;ANN.cur=it;try{speechSynthesis.speak(u);}catch(e){ANN.cur=null;}}
-function annTick(){if(ANN.cur&&now_s()>ANN.cur.deadline){ANN.cur=null;try{speechSynthesis.cancel();}catch(e){}annNext();}}
+  it.start=t;it.deadline=t+it.e[2]+1.2;ANN.cur=it;
+  AC.decodeAudioData(ANN.buf.slice(it.e[0],it.e[0]+it.e[1])).then(buf=>{if(ANN.cur!==it)return;
+    const src=AC.createBufferSource(),g=AC.createGain();src.buffer=buf;g.gain.value=1.15;src.connect(g);g.connect(master);
+    src.onended=()=>{if(ANN.cur===it){ANN.cur=null;annNext();}};it.src=src;it.g=g;src.start();}).catch(()=>{if(ANN.cur===it){ANN.cur=null;annNext();}});}
+function annTick(){if(ANN.cur&&now_s()>ANN.cur.deadline){annCut();annNext();}}
+function crowdExcite(l){if(!amb)return;try{const t=AC.currentTime,g=amb.g.gain;g.cancelScheduledValues(t);g.setTargetAtTime(0.14+l*0.24,t,0.25);g.setTargetAtTime(0.14,t+2,0.9);}catch(e){}}
 function annPick(key,arr){const b=ANN.bags[key]||(ANN.bags[key]=[]);if(!b.length){b.push(...arr.keys());for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}}return arr[b.pop()];}
 function fill(t,o){return t.replace(/\{(\w+)\}/g,(_,k)=>o[k]!=null?o[k]:'');}
 function spotSay(t,x){const y=Math.round(t===0?x-10:110-x);if(y>=100)return 'the end zone';if(y<=0)return 'his own end zone';if(y===50)return 'midfield';return y<50?`his own ${y}`:`the ${100-y}`;}
 function yds(n){n=Math.abs(n);return n===1?'one yard':n+' yards';}
 const CALLS={
-  setup:['{team} ball on {spot}.','{team}, first look from {spot}.','{team} line up at {spot}.'],
+  setup:['{team} on offense.','Here come the {team}.','{team} line up.'],
   stage:{1:['The brain is getting funky.','That brain is starting to turn.'],2:["The brain's gone rancid. Two plays left.",'Rancid brain. Clock is ticking on this one.']},
   hand:['Handoff to {n}!','{n} takes the handoff!','Give to {n}!'],
   throwS:['{qb} throws for {n}!','{qb} fires to {n}!','Quick toss to {n}!'],
   throwD:['{qb} lets it fly, deep for {n}!','{qb} goes long! {n} is under it!','Bomb! {qb} looking for {n}!'],
-  catch:['Caught by {n} at {spot}!','{n} hauls it in!','{n} with the grab at {spot}!'],
+  catch:['Caught by {n}!','{n} hauls it in!','{n} with the grab!'],
   loose:["He's loose!",'{n} breaks into the open!','Daylight for {n}!','{n} is gone!'],
-  mark20:['To the 20!','The 20!'],mark10:['The 10!','Inside the 10!'],mark5:['The 5!','He could... go... all... the... way!'],
+  mark20:['To the 20!','The 20!'],mark10:['The 10!','Inside the 10!'],mark5:['The 5!','He could go all the way!','He is going all the way!'],
   jets:['{n} hits the jets!','{n} finds another gear!'],
-  tklLoss:['{n} dropped for a loss of {g}.','{d} stuffs {n} behind the line!','Nowhere to go! Loss of {g}.'],
-  tklZero:['{n} stopped for no gain.','{d} meets {n} right at the line.'],
-  tklShort:['{n} picks up {g}.','Short gain, {g} for {n}.','{d} brings down {n} after {g}.'],
-  tklMid:['{n} gains {g}, down at {spot}.','Nice pickup, {g} for {n}.','{d} drags down {n} after a gain of {g}.'],
-  tklBig:['Big gain! {g} for {n}, down at {spot}!','{n} rumbles {g} before {d} finally gets him!'],
-  sack:['SACKED! {d} buries {n} for a loss of {g}!','{n} is SACKED! {d} with the hit!'],
-  oob:['{n} steps out at {spot}.','{n} goes out of bounds after {g}.'],
-  tdNow:['TOUCHDOWN! {n}!','{n} is IN! TOUCHDOWN {team}!','He scores! TOUCHDOWN {team}!'],
-  score:['{a} {as}, {b} {bs}.','That makes it {a} {as}, {b} {bs}.'],
-  half:["That's halftime! {score}"],final:['And that is the final whistle! {score}'],
-  col_limb:["Somebody grab that arm. He'll want it at halftime.","That's going straight to the lost and found.","You don't see that in the regular league, Jim. Well, you do. Constantly.","He came into this game with a lot more parts."],
-  col_hit:['I felt that one in my coffin.',"You can't teach that kind of violence.",'That hit knocked the moss right off him.','Somebody is going to be finding teeth out there for weeks.'],
-  col_inc:['He had it in his hands. Well. Hand.','Fingers. You need fingers for that one.','The receiver ran a great route. Then remembered he has no grip strength.'],
-  col_big:['Look at him go! Rigor mortis has not set in yet.','Fastest corpse in the cemetery, Jim.','Somebody check the tape. I think that man was jogging.'],
-  col_loss:['That quarterback will be picking turf out of his teeth. Both of them.','Ugly. Even by zombie standards.'],
-  col_td:['And there is the dance. Poetry in decomposition.','Get that man a fresh brain. He earned it.','The crowd is moaning. In a good way.'],
-  col_to:['You hate to see it. Well. I love to see it.','Butterfingers. Rotting, butterfingers.'],
-  col_any:['You can smell this game from the press box.',"My producer says I can't eat the brain. Again.",'Beautiful night for it. Fog, moon, a light drizzle of blood.']};
+  tklLoss:['{n} dropped for a loss.','Stuffed behind the line!','Nowhere to go!'],
+  tklZero:['{n} stopped cold.','No gain on the play.'],
+  tklShort:['{n} picks up a couple.','Short gain.','{n} dragged down quickly.'],
+  tklMid:['Nice pickup by {n}.','{n} with a solid gain.','Good run. {n} finally goes down.'],
+  tklBig:['Big gain for {n}!','{n} rumbles deep into enemy territory!'],
+  sack:['SACKED! {n} is buried!','{n} is SACKED!'],
+  oob:['{n} steps out of bounds.','Out of bounds.'],
+  tdNow:['TOUCHDOWN! {n}!','{n} is IN! TOUCHDOWN!','He scores! TOUCHDOWN {team}!'],
+  lead:['{team} out in front.','The {team} have the lead.'],tied:["We're all tied up!",'Tie game!'],
+  half:["That's halftime!"],final:['And that is the final whistle!'],};
+function leadCall(pri){const [a,b]=G.score;if(a===b)call('tied',{},pri);else call('lead',{team:TEAMS[a>b?0:1].name},pri);}
 function call(key,o,pri,voice){const arr=key.split('.').reduce((a,k)=>a&&a[k],CALLS);if(!arr)return;const t=fill(annPick(key,arr),o||{});tick(t,voice==='color');annSay(t,pri,voice);}
 function tick(t,col){if(!G)return;G.ticker.push({t,life:4.5,col});if(G.ticker.length>3)G.ticker.shift();}
-function colorAfter(P,type,delay){                           // a joke from the second voice once the play is over
-  let k=null;
-  if(type==='td')k='col_td';else if(type==='turnover')k='col_to';else if(P.callKo||P.callHit)k='col_hit';else if(P.callLimbs)k='col_limb';
-  else if(type==='incomplete')k='col_inc';else if(P.callGain>=15)k='col_big';else if(P.callGain<0)k='col_loss';else if(Math.random()<0.25)k='col_any';
-  if(!k||Math.random()>(type==='td'?0.9:0.6))return;
-  setTimeout(()=>{if(G&&(G.play===P||type==='td')&&(mode==='dead'||mode==='playcall'||mode==='presnap'))call(k,{},2,'color');},delay!=null?delay:1100);}
+// ===== between-play commentary: situation-aware lines, the most specific one that fits wins =====
+// c = what just happened (see commCtx). pri: higher = more specific. tone: how it is recorded. Lines never repeat in a game.
+const COMM=[
+ {id:'td_lead',pri:9,tone:'hyped',w:c=>c.td&&c.leadChange,l:['And just like that, the {team} take the lead!','Lead change! The whole crypt is shaking!']},
+ {id:'td_2nd',pri:9,tone:'hyped',w:c=>c.td&&c.pl&&c.pl.td===2,l:['{n} with his second touchdown! Somebody bury that man!']},
+ {id:'td_3rd',pri:10,tone:'hyped',w:c=>c.td&&c.pl&&c.pl.td>=3,l:['{n} again! Three touchdowns! I need to lie down in my coffin!']},
+ {id:'td_long',pri:8,tone:'hyped',w:c=>c.td&&c.gain>=40,l:['From one end to the other! I need to lie down in my coffin!','Did you see that? Of course you did. Everyone saw that.','That defense just took the longest walk of shame in the cemetery.']},
+ {id:'td_blow',pri:8,tone:'mocking',w:c=>c.td&&c.margin>=21,l:['This is no longer a game. It is a burial.',"Somebody stop this. Actually, don't. I'm enjoying it."]},
+ {id:'td_comeback',pri:8,tone:'hyped',w:c=>c.td&&c.comeback,l:['The comeback is alive! Well. Undead.',"Don't count them out! Counting them is hard anyway, they keep losing pieces."]},
+ {id:'td',pri:3,tone:'gleeful',w:c=>c.td,l:['Get that man a fresh brain. He earned it.','And there is the dance. Poetry in decomposition.','The crowd is moaning. In a good way.',"Touchdown! I'd stand up, but I've been sitting here since seventeen forty three."]},
+ {id:'dtd',pri:9,tone:'hyped',w:c=>c.defTd,l:['The defense scores! The offense would like a word with itself.','Defensive touchdown! Nobody saw that coming. Least of all the quarterback.']},
+ {id:'int_2',pri:8,tone:'deadpan',w:c=>c.int&&c.toCount>=2,l:["Another interception. That quarterback is now playing for both teams.","That's two picks. Somebody check the quarterback for a pulse. Oh, wait."]},
+ {id:'int',pri:6,tone:'mocking',w:c=>c.int,l:['He threw it right to him. Like a little gift.','Wrong team, friend. Wrong team.','That quarterback will be hearing about that one in the afterlife.']},
+ {id:'fum_again',pri:9,tone:'mocking',w:c=>c.fum&&c.fpl&&c.fpl.fum>=2,l:['{f} again! Somebody staple the brain to his hand.',"{f} has fumbled twice. He's sleeping in the bad crypt tonight."]},
+ {id:'fum',pri:5,tone:'mocking',w:c=>c.fum,l:['Butterfingers. Rotting butterfingers.',"You hate to see it. Well. I love to see it.",'Ball security is hard when your fingers keep falling off.']},
+ {id:'burst',pri:7,tone:'gleeful',w:c=>c.burst,l:['And that smell will be with us for the rest of the night.',"That's what happens when you leave a brain out too long. Ask my mother.",'The brain has expired. Much like everyone on this field.']},
+ {id:'safety',pri:7,tone:'gleeful',w:c=>c.safety,l:['A safety! Two points for being terrible!','Tackled in his own end zone. Embarrassing, even for the dead.']},
+ {id:'putrid',pri:6,tone:'sinister',w:c=>c.stage===3&&!c.td&&!c.to,l:['One play left before that brain pops. I can smell the tension.','Do or die time. Well. Do or die again.']},
+ {id:'sack_2',pri:7,tone:'mocking',w:c=>c.sack&&c.st.sack>=2,l:['Another sack! Somebody block for that poor man!','That offensive line is about as useful as a tombstone. Less, actually. Tombstones stay put.']},
+ {id:'sack',pri:4,tone:'gleeful',w:c=>c.sack,l:['That quarterback will be picking turf out of his teeth. Both of them.','Flattened. Like a very old, very moldy pancake.','Ugly. Even by zombie standards.']},
+ {id:'qb_noarm',pri:8,tone:'mocking',w:c=>c.qbArms===0,l:["The quarterback has no arms. I'm no expert, but that seems like a problem.","A quarterback with no arms. That's not a passing game, that's a hopping game."]},
+ {id:'drop_arm',pri:7,tone:'mocking',w:c=>c.inc&&c.tgtArms<2,l:["To be fair, it's hard to catch with one arm. It's harder with none.","Throwing to a man with one arm. Bold strategy."]},
+ {id:'inc_3',pri:6,tone:'deadpan',w:c=>c.inc&&c.st.inc>=3,l:["Three incompletions in a row. The brain is starting to feel lonely.","Maybe try handing it off? Just a thought from the booth."]},
+ {id:'inc',pri:2,tone:'mocking',w:c=>c.inc,l:['He had it in his hands. Well. Hand.','Fingers. You need fingers for that one.','Great route. Then he remembered he has no grip strength.']},
+ {id:'hop_big',pri:8,tone:'gleeful',w:c=>c.carLegs===1&&c.gain>=10,l:['He did that on one leg! One leg! Give that man a medal!','Hopping for daylight! I have never been prouder of a stranger.']},
+ {id:'crawl',pri:8,tone:'gleeful',w:c=>c.carLegs===0&&c.gain>0,l:['He crawled for that yardage. Crawled! That is dedication.']},
+ {id:'pl_night',pri:6,tone:'gleeful',w:c=>c.pl&&c.pl.yds>=60&&c.gain>=8&&!c.td,l:['{n} is having himself a night!','{n} again! Somebody tackle that man!']},
+ {id:'long_pass',pri:5,tone:'hyped',w:c=>c.pass&&c.gain>=20&&!c.td,l:['What a throw! That brain had wings!','Right on the money! Or the corpse. Right on the corpse.']},
+ {id:'big',pri:5,tone:'hyped',w:c=>c.gain>=25&&!c.td,l:['Look at him go! Rigor mortis has not set in yet.','Fastest corpse in the cemetery.','Somebody check the tape. I think that man was jogging.']},
+ {id:'stuffed_3',pri:5,tone:'deadpan',w:c=>c.st.short>=3,l:['Three plays, no progress. This drive is deader than the players.','Running into a wall. A wall of the undead.']},
+ {id:'loss',pri:2,tone:'deadpan',w:c=>c.tackle&&c.gain<0&&!c.sack,l:['That went backward. Football is supposed to go forward.','A loss on the play. The coach is eating his clipboard.']},
+ {id:'ko',pri:6,tone:'sinister',w:c=>c.ko,l:["My cousins are taking him somewhere nice. He'll be fine. Probably.",'The bats are working overtime tonight.',"Don't worry. The vampires are professionals. Mostly."]},
+ {id:'head',pri:6,tone:'sinister',w:c=>c.head,l:['And somewhere out there, a head is still watching the game.','Heads up. Literally.']},
+ {id:'hit',pri:4,tone:'gleeful',w:c=>c.hit,l:['I felt that one in my coffin.',"You can't teach that kind of violence.",'That hit knocked the moss right off him.','Somebody is going to be finding teeth out there for weeks.']},
+ {id:'limb',pri:3,tone:'gleeful',w:c=>c.limbs,l:["Somebody grab that arm. He'll want it at halftime.","That's going straight to the lost and found.",'He came into this game with a lot more parts.','Nothing a little thread cannot fix. A lot of thread.']},
+ {id:'short_handed',pri:5,tone:'sinister',w:c=>c.outMax>=2,l:['The {short} are running out of bodies. Literally.','The {short} are playing short handed. And short footed. And short headed.']},
+ {id:'carnage',pri:4,tone:'gleeful',w:c=>c.debris>=35,l:['This field looks like my kitchen after a dinner party.','The grounds crew is going to need a bigger shovel.']},
+ {id:'late_close',pri:6,tone:'sinister',w:c=>c.late&&c.margin<=7,l:['Under a minute left. This is where legends are buried.',"Close game, late. I haven't been this nervous since the sun came up in eighteen oh two."]},
+ {id:'blowout',pri:4,tone:'deadpan',w:c=>c.margin>=21&&!c.td,l:['The {behind} are getting embalmed out there.',"Somebody call the morgue. Oh, they're already here."]},
+ {id:'tied',pri:3,tone:'sinister',w:c=>c.tiedAfterScore,l:['All tied up. Just how I like my dinner guests.']},
+ {id:'td_hop',pri:9,tone:'hyped',w:c=>c.td&&c.carLegs===1,l:['A touchdown on one leg! Hop, hop, hooray!']},
+ {id:'qb_run',pri:6,tone:'gleeful',w:c=>c.qbRun&&c.gain>=10&&!c.td,l:['The quarterback runs it himself! Look at those rotting legs go!']},
+ {id:'rolling',pri:5,tone:'hyped',w:c=>c.st.big>=2&&!c.td,l:['The {off} are rolling! Nobody can catch these corpses!']},
+ {id:'fresh',pri:3,tone:'gleeful',w:c=>c.fresh,l:["Fresh brain! Still warm, I'm told.",'Nothing like a fresh brain to wake up an offense.']},
+ {id:'oob',pri:2,tone:'deadpan',w:c=>c.oob,l:['He ran out of bounds. Coward.','Stepping out to save his last good leg.']},
+ {id:'zero',pri:2,tone:'deadpan',w:c=>c.tackle&&c.gain===0,l:['No gain. He went nowhere. Like my social life.']},
+ {id:'kos',pri:4,tone:'sinister',w:c=>c.kos>=3,l:["That's a lot of trips for the bats tonight. They're charging double."]},
+ {id:'idle',pri:1,tone:'deadpan',w:c=>true,l:['You can smell this game from the press box.',"My producer says I can't eat the brain. Again.",'Beautiful night for it. Fog, moon, a light drizzle of blood.','Three hundred years in this booth, and I still love this game.','Reminder. The concession stand is out of fingers.','I wanted to be a kicker. Turns out you need feet that stay on.',"If you're just joining us, everyone is dead. Carry on.","Remember, folks. Don't feed the linemen."]},
+];
+function commInit(){G.cm={st:[{inc:0,sack:0,short:0,big:0},{inc:0,sack:0,short:0,big:0}],pl:{},to:[0,0],used:new Set(),last:{},plays:0,maxDef:[0,0]};}
+function commPl(p){const k=p.team+':'+p.idx;return G.cm.pl[k]||(G.cm.pl[k]={fum:0,yds:0,td:0});}
+function commRecord(P,type,info,gain){             // called once per play from endPlay: update streaks and player history
+  if(!G.cm)commInit();const cm=G.cm,o=P.off,st=cm.st[o];cm.plays++;
+  const sack=type==='tackle'&&info.by===P.qb&&gain<0&&!P.thrown&&!P.handed;
+  st.inc=type==='incomplete'?st.inc+1:0;st.big=gain>=15&&type!=='turnover'?st.big+1:(type==='incomplete'?st.big:0);st.sack=sack?st.sack+1:0;st.short=(type==='tackle'||type==='oob')&&gain<3?st.short+1:(type==='incomplete'?st.short:0);
+  if(info.by&&info.by.team===o&&type!=='turnover'){const pl=commPl(info.by);pl.yds+=Math.max(0,gain);if(type==='td')pl.td++;}
+  if(type==='turnover')cm.to[o]++;if(P.fumbler)commPl(P.fumbler).fum++;
+  P.cm={type,gain,info,sack};}
+function commCtx(P){
+  const r=P.cm,cm=G.cm,SC=[...G.score];if(r.type==='td'&&!P.tdAdded)SC[P.off]+=7;const [a,b]=SC,margin=Math.abs(a-b),car=r.info.by&&r.info.by.team===P.off?r.info.by:null;
+  const lead=a===b?-1:(a>b?0:1);for(const t of [0,1])cm.maxDef[t]=Math.max(cm.maxDef[t],(t===P.off&&r.type==='td'&&!P.tdAdded?SC[1-t]-SC[t]+7:SC[1-t]-SC[t]));
+  const legs=p=>p?(p.limbs.ll?1:0)+(p.limbs.rl?1:0):2,outs=[0,1].map(t=>G.teams[t].filter(p=>p.out).length);
+  const c={td:r.type==='td',inc:r.type==='incomplete',tackle:r.type==='tackle',to:r.type==='turnover'||P.burst,int:r.type==='turnover'&&r.info.why==='int',fum:r.type==='turnover'&&r.info.why==='fumble',
+    burst:!!P.burst,oob:r.type==='oob',fresh:!!P.fresh,kos:G.stats.kos||0,qbRun:!!car&&car===P.qb&&!P.thrown&&!P.handed&&r.gain>0,safety:!!P.safety,defTd:!!P.defTd,sack:r.sack,gain:r.gain,pass:P.thrown&&r.type!=='incomplete'&&r.type!=='turnover',
+    margin,late:G.quarter>=4&&G.clock<60,stage:G.stage,st:cm.st[P.off],toCount:cm.to[P.off],
+    pl:car?commPl(car):null,n:car?car.name:'',fpl:P.fumbler?commPl(P.fumbler):null,f:P.fumbler?P.fumbler.name:'',
+    carLegs:car?legs(car):2,qbArms:P.qb&&!P.qb.out?armsOf(P.qb):2,tgtArms:P.target?armsOf(P.target):2,
+    hit:!!P.callHit,ko:!!P.callKo,limbs:!!P.callLimbs,head:!!P.headOff,debris:G.debris.length,outMax:Math.max(...outs),
+    short:TEAMS[outs[0]>=outs[1]?0:1].name,off:TEAMS[P.off].name,behind:TEAMS[lead===0?1:0].name,team:TEAMS[lead<0?P.off:lead].name,
+    leadChange:r.type==='td'&&lead===P.off&&SC[P.off]-7<SC[1-P.off],
+    comeback:r.type==='td'&&cm.maxDef[P.off]>=14&&SC[1-P.off]-SC[P.off]<=3,tiedAfterScore:r.type==='td'&&a===b};
+  return c;}
+function commPick(c){
+  const cm=G.cm,ok=[];
+  for(const s of COMM){if((cm.last[s.id]||-99)>cm.plays-3)continue;let w=false;try{w=s.w(c);}catch(e){}if(!w)continue;
+    const left=s.l.filter(t=>!cm.used.has(fill(t,c)));if(left.length)ok.push([s,left]);}
+  if(!ok.length)return null;ok.sort((x,y)=>y[0].pri-x[0].pri);
+  const [s,left]=ok[0];if(s.pri<5&&Math.random()>(s.pri<=1?0.3:0.6))return null;
+  const t=fill(left[Math.floor(Math.random()*left.length)],c);cm.used.add(t);cm.last[s.id]=cm.plays;return t;}
+function colorAfter(P,type,delay){                 // after the play: the vampire's comment on what just happened
+  if(!P.cm||P.commDone)return;
+  setTimeout(()=>{if(!G||P.commDone||!(mode==='dead'||mode==='playcall'||mode==='presnap'))return;P.commDone=1;
+    const t=commPick(commCtx(P));if(t){tick(t,true);annSay(t,2,'color');}},delay!=null?delay:2200);}
 function scoreSay(){const [a,b]=G.score;const o={a:Math.max(a,b),b:Math.min(a,b),as:TEAMS[a>=b?0:1].name,bs:TEAMS[a>=b?1:0].name};return o;}
 function annLive(){                                     // running commentary on the ball carrier
   const P=G.play,B=G.ball;if(!P||B.state!=='held'||!B.carrier)return;const c=B.carrier;if(c.team!==P.off)return;
   const gain=dir(P.off)*(c.x-G.los),toGo=P.off===0?110-c.x:c.x-10;
-  if(!P.callLoose&&gain>=12&&(P.thrown?gain>=22:true)){P.callLoose=1;call('loose',{n:c.name},2);}
-  if(P.callLoose||gain>=10){for(const [m,k] of [[20,'mark20'],[10,'mark10'],[5,'mark5']])if(toGo<=m&&!(P.callMarks||{})[m]){(P.callMarks=P.callMarks||{})[m]=1;if(gain>=8)call(k,{n:c.name},2);break;}}}
+  if(!P.callLoose&&gain>=12&&(P.thrown?gain>=22:true)){P.callLoose=1;call('loose',{n:c.name},2);crowdExcite(1);}
+  if(P.callLoose||gain>=10){for(const [m,k] of [[20,'mark20'],[10,'mark10'],[5,'mark5']])if(toGo<=m&&!(P.callMarks||{})[m]){(P.callMarks=P.callMarks||{})[m]=1;if(gain>=8){call(k,{n:c.name},2);crowdExcite(1);}break;}}}
 
 class Menu{
   constructor(el,items){this.el=el;this.items=items;this.i=Math.max(0,items.findIndex(x=>!x.disabled));this.render();}
@@ -486,7 +553,7 @@ class Menu{
   key(c){if(c==='ArrowUp'||c==='KeyW')this.move(-1);else if(c==='ArrowDown'||c==='KeyS')this.move(1);else if(c==='ArrowLeft'||c==='KeyA')this.side(-1);else if(c==='ArrowRight'||c==='KeyD')this.side(1);else if(c==='Enter'||c==='Space'||c==='NumpadEnter')this.activate();}
 }
 function cycleDiff(d){const o=['Easy','Normal','Hard'];settings.diff=o[(o.indexOf(settings.diff)+d+3)%3];store.set('deadball_settings',settings);}
-function toggleAnn(){settings.ann=settings.ann!==true;store.set('deadball_settings',settings);if(settings.ann===true){annUnlock();setTimeout(()=>annSay('Welcome to Dead Ball!',3),100);}else annStop();}
+function toggleAnn(){settings.ann=settings.ann===false;store.set('deadball_settings',settings);if(settings.ann!==false){annUnlock();setTimeout(()=>annSay('Welcome to Dead Ball!',3),100);}else annStop();}
 function toggleSound(){settings.sound=!settings.sound;store.set('deadball_settings',settings);if(settings.sound){audioInit();sfx.select();setTimeout(()=>sfx.groan(),150);}}
 const titleMenu=new Menu($('titleMenu'),[
   {label:'Start Game',act:()=>startGame()},
@@ -494,13 +561,13 @@ const titleMenu=new Menu($('titleMenu'),[
   {label:'How to Play',act:()=>showHowTo()},
   {label:()=>`Difficulty: <b>${settings.diff}</b>`,act:()=>cycleDiff(1),side:d=>cycleDiff(d)},
   {label:()=>`Sound: <b>${settings.sound?'On':'Off'}</b>`,act:()=>toggleSound(),side:()=>toggleSound()},
-  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann===true?'On':'Off'}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
+  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann!==false?'On':'Off'}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
   {label:'Exit Game',act:()=>exitGame()}]);
 const pauseMenu=new Menu($('pauseMenu'),[
   {label:'Resume',act:()=>resumeGame()},
   {label:'How to Play',act:()=>showHowTo()},
   {label:()=>`Sound: <b>${settings.sound?'On':'Off'}</b>`,act:()=>toggleSound(),side:()=>toggleSound()},
-  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann===true?'On':'Off'}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
+  {label:()=>`Announcer: <b>${!ANN.ok?'Not supported':settings.ann!==false?'On':'Off'}</b>`,act:()=>toggleAnn(),side:()=>toggleAnn()},
   {label:'Quit to Title',act:()=>toTitle()}]);
 const halfMenu=new Menu($('halfMenu'),[{label:'Start 2nd Half',act:()=>secondHalf()}]);
 const overMenu=new Menu($('overMenu'),[{label:'Play Again',act:()=>startGame()},{label:'Main Menu',act:()=>toTitle()}]);
@@ -542,7 +609,7 @@ function announce(t,pri){if(!G)return;G.ticker.push({t,life:4.5});if(G.ticker.le
 function big(t,dur=1.5,col='#ffffff'){if(G)G.big={t,life:dur,max:dur,col};}
 
 function startGame(){
-  G={score:[0,0],quarter:1,clock:QLEN,poss:0,los:35,stage:0,crossed:false,userTeam:0,
+  G={cm:null,score:[0,0],quarter:1,clock:QLEN,poss:0,los:35,stage:0,crossed:false,userTeam:0,
      teams:[0,1].map(t=>ROSTER.map((r,i)=>makePlayer(t,i))),debris:[],splats:[],parts:[],ticker:[],big:null,
      ctrl:null,play:null,ball:null,timer:0,after:null,hut:false,res:null,stats:{yards:[0,0],limbs:[0,0],bigHits:0,kos:0},abducts:[],shake:0};
   SS=18;camCX=35;camCY=MID;viewCX=35;viewCY=MID;showOverlay(null);
@@ -656,6 +723,7 @@ function removeLimb(p,k){
   announce(pick(LINES[kind]).split('{n}').join(p.name),kind==='head'?3:(G.ball&&G.ball.carrier===p?2:1));if(G.play)G.play.callLimbs=(G.play.callLimbs||0)+1;
   if(k!=='head'&&!p.limbs.la&&!p.limbs.ra&&!p.limbs.ll&&!p.limbs.rl){   // no limbs left: the bats carry him off; he's back after the next change of possession
     setTimeout(()=>{if(G&&!p.out)knockOut(p,'limbless');},350);}
+  if(k==='head'&&G.play)G.play.headOff=1;
   if(k==='head'){p.out=true;
     addDebris({k:'body',x:p.x,y:p.y,z:0,vz:0,vx:p.vx*0.3,vy:p.vy*0.3,rot:p.face,vr:rand(-2,2),team:p.team,idx:p.idx,scale:p.ty.scale});
     for(let i=0;i<5;i++)G.parts.push({k:'fountain',x:p.x,y:p.y,life:0,delay:i*0.18});
@@ -789,7 +857,7 @@ function throwTo(qb,r){
   const err=0.3+d*0.02+(armsOf(qb)===1?1.2:0)+(pressureOn(qb)<1.8?0.9:0);
   const a=Math.random()*Math.PI*2,mm=Math.random()*err;tx+=Math.cos(a)*mm;ty=clamp(ty+Math.sin(a)*mm,0.6,FW-0.6);
   Object.assign(B,{state:'air',carrier:null,fx:qb.x,fy:qb.y,tx,ty,t:0,dur:Math.max(0.3,fl),peak:0.6+d*0.05,target:r});
-  P.carrier=null;P.canPass=false;P.thrown=true;sfx.throw();call(d>20?'throwD':'throwS',{qb:qb.name,n:r.name},2);
+  P.carrier=null;P.canPass=false;P.thrown=true;sfx.throw();P.target=r;call(d>20?'throwD':'throwS',{qb:qb.name,n:r.name},2);if(d>20)crowdExcite(0.6);
   for(const d of G.teams[P.def])if(!d.out)d.rt=(dist(d,{x:tx,y:ty})>4?rand(0.3,0.55):rand(0.05,0.15))*(d.team===G.userTeam?1:D().lag);
 }
 function cpuQB(dt){
@@ -845,13 +913,13 @@ function updateAbducts(dt){
   G.abducts=G.abducts.filter(A=>!A.done);
 }
 function fumble(c){const B=G.ball,P=G.play;const a=Math.random()*Math.PI*2;Object.assign(B,{state:'loose',carrier:null,x:c.x,y:c.y,vx:Math.cos(a)*5,vy:Math.sin(a)*5,h:0});
-  P.carrier=null;P.run=true;c.stun=1.0;big('FUMBLE!',1.2,'#ffb04a');announce(`FUMBLE! ${c.name} lost the brain along with his arm!`,3);}
+  P.fumbler=c;P.carrier=null;P.run=true;c.stun=1.0;big('FUMBLE!',1.2,'#ffb04a');announce(`FUMBLE! ${c.name} lost the brain along with his arm!`,3);}
 // closing speed (yards/sec) of tackler d into carrier c along the line between them:
 // head-on or into a standing player is high; catching a runner from behind is low
 function impactOf(d,c){const dx=c.x-d.x,dy=c.y-d.y,L=Math.hypot(dx,dy)||1;return Math.max(0,((d.vx-c.vx)*dx+(d.vy-c.vy)*dy)/L);}
 function tryTackle(d,c){
   let brk=c.stiff>0?0.55:0.08;if(c.type==='shambler')brk+=0.08;if(c.burst>0)brk+=0.1;if(d.dive>0)brk*=0.5;if(legsOf(d)===0)brk+=0.3;if(armsOf(d)===0)brk+=0.25;
-  if(Math.random()<brk){d.stun=1.0;d.dive=0;d.vx=-d.vx*0.3;d.vy=-d.vy*0.3;sfx.hit();if(c.stiff>0)announce(pick(LINES.stiff).split('{n}').join(c.name).split('{d}').join(d.name));c.stiff=0;return false;}
+  if(Math.random()<brk){d.stun=1.0;d.dive=0;d.vx=-d.vx*0.3;d.vy=-d.vy*0.3;sfx.hit();if(c.stiff>0)announce(pick(LINES.stiff).split('{n}').join(c.name));c.stiff=0;return false;}
   // damage scales with closing speed (measured: median ~7 yd/s, top 5% above 13.5)
   const imp=impactOf(d,c),tier=imp>=13.5?3:imp>=10?2:imp>=4?1:0;
   const lost=[];let ko=false;
@@ -859,9 +927,9 @@ function tryTackle(d,c){
   if(tier===0){const k=limbRoll(c,0.4);if(k)lost.push(k);}
   else if(tier===1){const k=limbRoll(c,1.0+(d.dive>0?0.3:0));if(k)lost.push(k);}
   else if(tier===2){lost.push(removeRandomLimb(c));const k=limbRoll(c,0.5);if(k)lost.push(k);shake(8);sfx.bigHit();
-    big('BIG HIT!',1.3,'#ff9a4a');announce(pick(LINES.bighit).split('{n}').join(c.name).split('{d}').join(d.name),3);G.play.callHit=1;}
+    big('BIG HIT!',1.3,'#ff9a4a');announce(pick(LINES.bighit).split('{n}').join(c.name),3);sfx.cheerSmall();G.play.callHit=1;}
   else{lost.push(removeRandomLimb(c));lost.push(removeRandomLimb(c));shake(13);sfx.bigHit();sfx.bigHit(0.12);
-    big('CRUSHED!',1.5,'#ff5a3a');announce(pick(LINES.crush).split('{n}').join(c.name).split('{d}').join(d.name),3);G.play.callHit=1;
+    big('CRUSHED!',1.5,'#ff5a3a');announce(pick(LINES.crush).split('{n}').join(c.name),3);sfx.cheerSmall();G.play.callHit=1;
     if(!c.out&&Math.random()<0.45)ko=true;}
   if(tier>=2){const ang=Math.atan2(c.y-d.y,c.x-d.x),mx=(c.x+d.x)/2,my=(c.y+d.y)/2;   // hard contact sprays blood, limb or not
     bloodBurst(mx,my,tier===3?34:20,ang,0.9,tier===3?11:8);bloodBurst(mx,my,8,ang+Math.PI,0.7,4);}
@@ -897,8 +965,8 @@ function ballStep(dt){
     if(B.y<0||B.y>FW||B.x<0||B.x>120){endPlay('oob',{team:P.off,x:clamp(B.x,0.5,119.5),y:clamp(B.y,0,FW)});return;}
     for(const p of [...G.teams[0],...G.teams[1]]){if(p.out||p.stun>0)continue;if(Math.hypot(p.x-B.x,p.y-B.y)<0.9){
       B.state='held';B.carrier=p;sfx.chomp(0.45);
-      if(p.team===P.off){announce(`${p.name} falls on the loose brain.`,3);endPlay('recover',{team:p.team,x:p.x,y:p.y,by:p});}
-      else{announce(`${p.name} scoops up the loose brain!`,3);endPlay('turnover',{team:p.team,x:p.x,y:p.y,why:'fumble',by:p});}
+      if(p.team===P.off){announce('The offense falls on the loose brain.',3);endPlay('recover',{team:p.team,x:p.x,y:p.y,by:p});}
+      else{announce('The defense scoops up the loose brain!',3);endPlay('turnover',{team:p.team,x:p.x,y:p.y,why:'fumble',by:p});}
       return;}}
   }
 }
@@ -941,14 +1009,14 @@ function updateLive(dt){
 }
 function endPlay(type,info){
   const P=G.play;if(P.ended)return;P.ended=true;mode='dead';G.timer=1.7;G.res=Object.assign({type},info);
-  const gain=Math.round(dir(P.off)*(info.x-G.los));P.callGain=gain;
+  const gain=Math.round(dir(P.off)*(info.x-G.los));P.callGain=gain;commRecord(P,type,info,gain);
   {const n=info.by?info.by.name:'',d=info.tk?info.tk.name:'the defense',o={n,d,g:yds(gain),spot:spotSay(P.off,info.x),team:TEAMS[P.off].name};
    if(type==='td')call('tdNow',o,4);
    else if(type==='oob')call('oob',o,2);
    else if(type==='tackle'&&!inOwnEZ(P.off,info.x)){const sack=info.by===P.qb&&gain<0&&!P.thrown&&!P.handed;
      if(!P.callHit&&!P.callKo)call(sack?'sack':gain<0?'tklLoss':gain===0?'tklZero':gain<4?'tklShort':gain<15?'tklMid':'tklBig',o,sack?3:2);
      else if(gain>=15)call('tklBig',o,1);}
-   if(type!=='td')colorAfter(P,type);}
+   colorAfter(P,type,type==='td'?2500:undefined);}
   if(type==='td'){big('TOUCHDOWN!',2.3,'#ffd84a');sfx.whistle('td');sfx.cheer();G.timer=4.2;G.stats.yards[P.off]+=gain;
     const sc=info.by;if(sc&&!sc.out){sc.dance=3.8;sc.danceT=0;sc.routine=makeRoutine();sc.stun=0;setTimeout(()=>sfx.danceTune(),350);setTimeout(()=>{sfx.chomp(0.7);sfx.laugh();},3300);}
     focusCam(info.x,info.y,4.2,SSMAX*1.15);}
@@ -965,18 +1033,18 @@ function endPlay(type,info){
 }
 function resolvePlay(){
   const P=G.play,R=G.res,off=P.off,def=P.def;
-  if(R.type==='td'){G.score[R.team]+=7;{const o=scoreSay();call('score',o,2);colorAfter(P,'td',2300);}startPossession(1-R.team,own25(1-R.team));return advance();}
+  if(R.type==='td'){G.score[R.team]+=7;P.tdAdded=1;{leadCall(1);}startPossession(1-R.team,own25(1-R.team));return advance();}
   if(R.type==='turnover'){
-    if(inScoreEZ(R.team,R.x)){G.score[R.team]+=7;announce(`Defensive touchdown, ${TEAMS[R.team].name}!`,4);big('DEFENSIVE TD!',2,'#ffd84a');sfx.cheer();startPossession(1-R.team,own25(1-R.team));G.timer=2;G.after=advance;return;}
+    if(inScoreEZ(R.team,R.x)){G.score[R.team]+=7;P.defTd=1;colorAfter(P,'dtd',2600);announce(`Defensive touchdown, ${TEAMS[R.team].name}!`,4);big('DEFENSIVE TD!',2,'#ffd84a');sfx.cheer();startPossession(1-R.team,own25(1-R.team));G.timer=2;G.after=advance;return;}
     startPossession(R.team,R.x);return advance();}
   if(R.type==='incomplete'){G.clock=Math.max(0,G.clock-3);return brainStep(G.los);}
-  if(inOwnEZ(off,R.x)){G.score[def]+=2;announce(`Safety! 2 points for the ${TEAMS[def].name}.`,3);startPossession(def,own25(def));return advance();}
+  if(inOwnEZ(off,R.x)){G.score[def]+=2;P.safety=1;announce(`Safety! 2 points for the ${TEAMS[def].name}.`,3);startPossession(def,own25(def));return advance();}
   G.clock=Math.max(0,G.clock-(R.type==='oob'?3:10));
   brainStep(R.x);
 }
 function brainStep(x){
   const P=G.play,off=P.off;
-  if(!G.crossed&&pastMid(off,x)){G.crossed=true;G.stage=0;G.los=clamp(x,11,109);announce(pick(LINES.fresh),3);big('FRESH BRAIN!',1.4,'#ff9fb2');sfx.cheerSmall();mode='dead';G.timer=1.3;G.after=advance;return;}
+  if(!G.crossed&&pastMid(off,x)){G.crossed=true;G.stage=0;G.los=clamp(x,11,109);announce(pick(LINES.fresh),3);P.fresh=1;big('FRESH BRAIN!',1.4,'#ff9fb2');sfx.cheerSmall();mode='dead';G.timer=1.3;G.after=advance;return;}
   if(G.stage>=3){burst(x);return;}
   G.stage++;G.los=clamp(x,11,109);
   if(G.stage===3)announce(`The brain is putrid! ${G.crossed?'Score':'Cross midfield'} this play or it bursts!`,3);
@@ -986,7 +1054,7 @@ function burst(x){
   const P=G.play,B=G.ball,y=B.y||MID;
   for(let i=0;i<26;i++)G.parts.push({k:'gas',x:x+rand(-1,1),y:y+rand(-1,1),vx:rand(-3,3),vy:rand(-3,3),life:rand(1.4,2.4),r:rand(0.8,1.8),c:'#8dff4a'});
   bloodBurst(x,y,30,Math.random()*6.28,3.2,8);for(let i=0;i<6;i++)addSplat(x+rand(-1.5,1.5),y+rand(-1.5,1.5),rand(0.3,0.6),pick(['#c98a95','#a86b74','#7a0c0c']),0.8);sfx.fwump();big('BRAIN BURST!',2.2,'#8dff4a');
-  announce(pick(LINES.burst).split('{t}').join(TEAMS[P.off].name),4);
+  announce(pick(LINES.burst).split('{t}').join(TEAMS[P.off].name),4);P.burst=1;if(!P.cm)commRecord(P,'burst',{},0);setTimeout(()=>colorAfter(P,'burst',0),2600);
   const c=P.lastCarrier||B.carrier;
   if(c&&!c.out&&c.team===P.off&&armsOf(c)>0&&Math.random()<0.6)removeLimb(c,c.limbs.la?'la':'ra');
   for(const p of [...G.teams[0],...G.teams[1]])if(!p.out&&Math.hypot(p.x-x,p.y-y)<5)p.stun=2;
@@ -1000,7 +1068,7 @@ function advance(){
   }
   toPlayCall();
 }
-function halftime(){call('half',{score:fill(CALLS.score[0],scoreSay())},4);mode='half';activeMenu=halfMenu;halfMenu.render();$('halfScore').innerHTML=scoreLine();showOverlay('half');sfx.groan();}
+function halftime(){call('half',{},4);setTimeout(()=>{if(G)leadCall(3);},1600);mode='half';activeMenu=halfMenu;halfMenu.render();$('halfScore').innerHTML=scoreLine();showOverlay('half');sfx.groan();}
 function secondHalf(){for(const tm of G.teams)for(const p of tm){p.out=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
   G.quarter=3;G.clock=QLEN;showOverlay(null);announce('Second half! Everyone is stitched up. The spare parts stay where they fell.');startPossession(1,85);toPlayCall();}
 function scoreLine(){return `<span style="color:${TEAMS[0].trim}">${TEAMS[0].name.toUpperCase()} ${G.score[0]}</span> &nbsp;—&nbsp; <span style="color:#ff9a6a">${G.score[1]} ${TEAMS[1].name.toUpperCase()}</span>`;}
@@ -1008,7 +1076,7 @@ function gameOver(){
   mode='over';activeMenu=overMenu;overMenu.i=0;overMenu.render();
   const [a,b]=G.score;let t;
   if(a>b){t='YOU WIN!';record.w++;sfx.cheer();sfx.applause();}else if(a<b){t='BACK TO THE GRAVE';record.l++;sfx.groan();}else{t='DEAD HEAT';record.t++;}
-  store.set('deadball_record',record);call('final',{score:fill(CALLS.score[0],scoreSay())},4);
+  store.set('deadball_record',record);call('final',{},4);
   $('overTitle').textContent=t;$('overScore').innerHTML=scoreLine();
   $('overStats').innerHTML=`Total yards — ${TEAMS[0].name}: <b>${G.stats.yards[0]}</b> &nbsp;·&nbsp; ${TEAMS[1].name}: <b>${G.stats.yards[1]}</b><br>Limbs lost — ${TEAMS[0].name}: <b>${G.stats.limbs[0]}</b> &nbsp;·&nbsp; ${TEAMS[1].name}: <b>${G.stats.limbs[1]}</b><br>Your record: ${record.w} W – ${record.l} L – ${record.t} T`;
   showOverlay('over');
