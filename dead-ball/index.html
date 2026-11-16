@@ -9,6 +9,12 @@
 html,body{margin:0;height:100%;background:#070a06;overflow:hidden;font-family:'Roboto Condensed',Arial,sans-serif;color:#e6eedc;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
 .panel{touch-action:pan-y}
 .touchui{position:absolute;inset:0;pointer-events:none;display:none}
+#pcbar{position:absolute;left:58px;right:58px;bottom:8px;display:none;flex-wrap:wrap;justify-content:center;gap:5px 6px;z-index:20;pointer-events:none}
+#pcbar.on{display:flex}
+.pk{pointer-events:auto;display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:9px;background:rgba(12,20,9,.62);border:1.5px solid rgba(157,255,87,.45);color:#dfe9d2;font:14px 'Roboto Condensed',Arial,sans-serif;cursor:pointer;user-select:none;-webkit-user-select:none;white-space:nowrap}
+.pk:hover{background:rgba(47,90,36,.85);border-color:#9dff57}.pk.down{background:#9dff57;color:#111}
+.pk b{display:inline-block;min-width:20px;padding:1px 6px;border-radius:5px;background:#e9efe0;color:#151a12;font:bold 14px Arial;text-align:center;box-shadow:0 2px 0 #7f8a74}
+.pk.pkt{border-color:rgba(255,225,74,.7);color:#ffe9a0}.pk.off{opacity:.33;pointer-events:none}.pk.info{cursor:default;opacity:.8}.pk.info:hover{background:rgba(12,20,9,.62);border-color:rgba(157,255,87,.45)}
 .touchui.on{display:block}
 .touchui>*{pointer-events:auto;position:absolute}
 #joyZone{left:0;top:45%;width:50%;bottom:0}
@@ -79,6 +85,12 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 <div id="wrap">
 <div id="menuBtn">&#9776; MENU</div>
 <canvas id="cv" width="720" height="1280"></canvas>
+<div id="pcbar">
+  <div class="pk info" id="pkMove"><b>WASD</b>or hold mouse: run</div>
+  <div class="pk pkt" id="pkQ"><b>Q</b><span>throw</span></div><div class="pk pkt" id="pkE"><b>E</b><span>throw</span></div><div class="pk pkt" id="pkV"><b>V</b><span>throw</span></div>
+  <div class="pk" id="pkAct"><b>Space</b><span>dive</span></div><div class="pk" id="pkBurst"><b>Shift</b><span>burst</span></div><div class="pk" id="pkSw"><b>Tab</b><span>switch</span></div>
+  <div class="pk" id="pkEsc"><b>Esc</b>menu</div>
+</div>
 <div id="touch" class="touchui">
   <div id="joyZone"></div>
   <div id="joyBase"><div id="joyKnob"></div></div>
@@ -194,11 +206,12 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.5.0';
+const VERSION='0.5.1';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
 // ===== constants =====
+const SW=52;   // width of each sideline stand strip in game pixels
 const W=720,H=1280,HUD=120,FH=H-HUD,FW=53.333,MID=FW/2,QLEN=180;
 // Vertical field: world x (0..120 yards, goal to goal) runs UP the screen; world y (0..53.3, sideline to sideline) runs left->right.
 const SSMIN=W/46,SSMAX=26;   // pixels per yard: widest view shows the full field width; closest is about 2x
@@ -348,7 +361,7 @@ function crowdUpdate(){                     // loudness of each side follows the
   const base=mode==='claw'?(CLAW.R&&CLAW.R.phase==='freeze'?0.02:0.07):mode==='half'?0.26:(mode==='title'||mode==='howto')?0.05:0.08;
   for(const t of [0,1]){const v=Math.min(0.75,base+0.5*CROWD.live[t]+0.35*CROWD.hype[t]);const a=amb[t];
     if(Math.abs(v-a.lv)>0.01){a.lv=v;try{a.g.gain.setTargetAtTime(v,AC.currentTime,v>a.g.gain.value?0.25:0.7);}catch(e){}}}}
-function crowdSay(group,team,vol,delay){if(!sfx.ok())return;playS(group,vol||0.7,0.94+Math.random()*0.12,delay||0,{pan:sidePan(team)});}
+function crowdSay(group,team,vol,delay){if(team!=null&&(group==='boo'||group==='aww'))crowdMoodBoo(team,group==='boo'?2.2:1.4);if(!sfx.ok())return;playS(group,vol||0.7,0.94+Math.random()*0.12,delay||0,{pan:sidePan(team)});}
 function crowdHype(t,amt){CROWD.hype[t]=Math.min(1,CROWD.hype[t]+amt);}
 function crowdExcite(l){if(G&&G.play)crowdHype(G.play.off,l*0.5);}
 function crowdReact(kind,o){if(!G||!sfx.ok())return;const off=o.off,def=1-off;
@@ -682,7 +695,7 @@ function djPick(){              // what fits right now
 function djUpdate(){            // start a new cue each time the ball goes dead; the snap silences it (musicLevel = 0)
   if(!G)return;const between=mode==='playcall'||mode==='presnap'||(mode==='dead'&&!(G.res&&G.res.type==='td'));
   if(between&&!dj.gap){dj.gap=true;djPick();}
-  if(mode==='presnap'&&!CROWD.gap){CROWD.gap=true;crowdGap();}if(mode==='live')CROWD.gap=false;
+  if(mode==='playcall'&&!CROWD.gap){CROWD.gap=true;cheerStart();}if(mode==='live')CROWD.gap=false;
   if(mode==='live'&&dj.gap){dj.gap=false;setTimeout(()=>{if(mode==='live'){djClear();if(music.el)music.el.pause();}},500);}}
 const titleMenu=new Menu($('titleMenu'),[
   {label:'Start Game',act:()=>startGame()},
@@ -1310,7 +1323,7 @@ function update(dt){
   camCX+=(tgt.x-camCX)*Math.min(1,dt*4);camCY+=(tgt.y-camCY)*Math.min(1,dt*4);
   applyView();
 }
-function applyView(){const vl=FH/SS,vw=W/SS;viewCX=clamp(camCX,vl/2-3,123-vl/2);viewCY=vw>=FW?MID:clamp(camCY,vw/2,FW-vw/2);}
+function applyView(){const vl=FH/SS,vw=(W-2*SW)/SS;viewCX=clamp(camCX,vl/2-3,123-vl/2);viewCY=vw>=FW?MID:clamp(camCY,vw/2,FW-vw/2);}
 // Automatic camera: frames the action. Tight scrum -> zoom in; long pass or spread-out play -> zoom out.
 function focusCam(x,y,dur,ss){if(G)G.focus={x,y,until:time+dur,ss};}
 function camDirector(){
@@ -1328,7 +1341,7 @@ function camDirector(){
   else{const c={x:B.x,y:B.y};pts.push(c);const rad=mode==='dead'?5:8;
     for(const p of act)if(Math.hypot(p.x-c.x,p.y-c.y)<rad)pts.push(p);if(mode==='live')lead=f*5;}
   let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const p of pts){x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y);}
-  const ss=clamp(Math.min(W/(y1-y0+padY*2),FH/(x1-x0+padX*2)),SSMIN,SSMAX);
+  const ss=clamp(Math.min((W-2*SW)/(y1-y0+padY*2),FH/(x1-x0+padX*2)),SSMIN,SSMAX);
   // while the play-call cards cover the bottom of the screen, push the formation up into view
   if(mode==='playcall')lead-=FH*0.2/ss;
   return {x:(x0+x1)/2+lead,y:(y0+y1)/2,ss};
@@ -1497,11 +1510,12 @@ function drawHUD(){
   ctx.fillStyle='#dbe6cf';ctx.font='15px Roboto Condensed, Arial';ctx.fillText(rest,sx,104);
 }
 function drawTicker(){
-  if(!G.ticker.length)return;const ty=touchOn?HUD+10:H-40;const t=G.ticker[G.ticker.length-1];ctx.save();ctx.globalAlpha=Math.min(1,t.life);
+  if(!G.ticker.length)return;const ty=touchOn?HUD+10:H-160;const t=G.ticker[G.ticker.length-1];ctx.save();ctx.globalAlpha=Math.min(1,t.life);
   ctx.font='bold 16px Roboto Condensed, Arial';const w=Math.min(W-(touchOn?106:20),ctx.measureText(t.t).width+28);const tx=touchOn?96:10;ctx.fillStyle='rgba(8,12,6,0.82)';ctx.fillRect(tx,ty,w,30);ctx.strokeStyle='#9dff57';ctx.lineWidth=1;ctx.strokeRect(tx,ty,w,30);
   ctx.fillStyle=t.col?'#ffd84a':'#9dff57';ctx.fillRect(tx,ty,4,30);ctx.fillStyle=t.col?'#ffe9a0':'#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t.t,tx+12,ty+15,w-20);ctx.restore();
 }
 function drawHint(){
+  return;   // replaced by the clickable key bar (#pcbar)
   if(touchOn||(mode!=='live'&&mode!=='presnap'))return;const P=G.play;
   const t=P.off===G.userTeam?'WASD or hold mouse to move · Q / E / V throw · Tab take over · Space stiff-arm · Shift burst · Esc pause':'WASD or hold mouse to move · Space dive · Tab switch · Shift burst · Esc pause';
   ctx.font='13px Roboto Condensed, Arial';const w=ctx.measureText(t).width+16;ctx.fillStyle='rgba(8,12,6,0.6)';ctx.fillRect(W-w-10,H-74,w,22);ctx.fillStyle='#c4d1b6';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,W-w-2,H-63);
@@ -1741,6 +1755,62 @@ function drawBrawlCloud(){
   ctx.lineWidth=6;ctx.strokeStyle='#5a0f0f';ctx.strokeText(w,x+Math.sin(t*3)*R*0.6,y-R*1.05);ctx.fillStyle='#ffd84a';ctx.fillText(w,x+Math.sin(t*3)*R*0.6,y-R*1.05);
   ctx.restore();}
 
+// ===== sideline stands + cheer squads during play =====
+// Home fans (Graveyard Shift) line the left edge, away fans (Moldy Mummies) the right; they scroll with the field and react with the
+// stereo crowd: jump and wave when their team does well, slump and boo when it doesn't. Before each snap the cheer squads take turns
+// whipping up their side; the vampire waits for them to finish.
+const CHEER={slots:[],cur:null,t:0,squads:[null,null]};
+function crowdMoodBoo(t,dur){if(!CROWD.boo)CROWD.boo=[0,0];CROWD.boo[t]=Math.max(CROWD.boo[t],dur);}
+function drawStands(){
+  const dt=1/60;if(!CROWD.boo)CROWD.boo=[0,0];
+  for(const side of [0,1]){
+    CROWD.boo[side]=Math.max(0,CROWD.boo[side]-dt);
+    const T=STYLE_OF(side),x0=side?W-SW:0,e=Math.min(1,CROWD.live[side]+CROWD.hype[side]+(CHEER.cur&&CHEER.cur.side===side?0.5:0)),boo=CROWD.boo[side]>0;
+    const g=ctx.createLinearGradient(x0,0,x0+SW,0);g.addColorStop(side?1:0,'rgba(10,6,14,0.94)');g.addColorStop(side?0:1,'rgba(30,20,36,0.86)');ctx.fillStyle=g;ctx.fillRect(x0,HUD,SW,FH);
+    ctx.fillStyle=side?T.jersey:T.jersey;ctx.globalAlpha=0.55;ctx.fillRect(side?x0:x0+SW-3,HUD,3,FH);ctx.globalAlpha=1;     // railing in team colour
+    const rowH=24,scroll=viewCX*SS*0.55,off=((scroll%rowH)+rowH)%rowH,base=Math.floor(scroll/rowH);
+    for(let r=-1;r<FH/rowH+1;r++){const id=r-base,y=HUD+r*rowH+off;
+      for(let c=0;c<2;c++){const ph=(id*1.7+c*2.3+side)%6.28,fx=x0+(side?SW-15-c*20:15+c*20)+((id&1)?4:0);
+        const amp=boo?0:1+e*10,jump=Math.max(0,Math.sin(time*(5+e*7)+ph))*amp,fy=y+12-jump+(boo?3:0);
+        ctx.fillStyle=((id+c)%3)?T.jersey:T.trim;ctx.fillRect(fx-6,fy+4,12,10);
+        ctx.strokeStyle=T.skin;ctx.lineWidth=2.5;ctx.beginPath();
+        if(boo){ctx.moveTo(fx-5,fy+6);ctx.lineTo(fx+4,fy+10);ctx.moveTo(fx+5,fy+6);ctx.lineTo(fx-4,fy+10);}             // arms crossed
+        else if(e>0.3){const w=Math.sin(time*10+ph)*4;ctx.moveTo(fx-5,fy+5);ctx.lineTo(fx-9+w,fy-8);ctx.moveTo(fx+5,fy+5);ctx.lineTo(fx+9+w,fy-8);}
+        else{ctx.moveTo(fx-5,fy+5);ctx.lineTo(fx-7,fy+12);ctx.moveTo(fx+5,fy+5);ctx.lineTo(fx+7,fy+12);}
+        ctx.stroke();ctx.fillStyle=boo?T.skinDk:T.skin;ctx.beginPath();ctx.arc(fx,fy,5.5,0,7);ctx.fill();
+        if(T.species==='mummy'){ctx.fillStyle='#ffd23a';ctx.fillRect(fx-3,fy-1,2,2);ctx.fillRect(fx+1,fy-1,2,2);}else{ctx.fillStyle='#fff';ctx.fillRect(fx-3,fy-2,2.5,2.5);}}}
+    if(e>0.55&&Math.random()<e*0.5){const fx=x0+Math.random()*SW,fy=HUD+Math.random()*FH;ctx.fillStyle='rgba(255,255,255,0.85)';ctx.beginPath();ctx.arc(fx,fy,3+Math.random()*5,0,7);ctx.fill();}
+    if(boo){ctx.save();ctx.globalAlpha=Math.min(1,CROWD.boo[side]);ctx.font='20px Bangers, Arial';ctx.fillStyle='#ff6a5a';ctx.textAlign='center';
+      for(let i=0;i<3;i++){const yy=HUD+120+i*260+Math.sin(time*3+i)*20;ctx.fillText('BOO!',x0+SW/2,yy);}ctx.restore();}
+    drawSquad(side);}}
+function drawSquad(side){                          // three cheerleaders at the front of each stand
+  const T=STYLE_OF(side),on=CHEER.cur&&CHEER.cur.side===side,sq=CHEER.squads[side]||(CHEER.squads[side]={routine:makeRoutine(),danceT:0});
+  if(on){sq.danceT+=1/60;if(sq.danceT>3.8){sq.danceT=0;sq.routine=makeRoutine();}}
+  const size=46,x=side?W-SW/2:SW/2;
+  for(let i=0;i<3;i++){const y=HUD+FH*(0.38+i*0.14);const m={team:side,idx:2,danceT:sq.danceT+i*0.04,routine:sq.routine,dance:1};
+    ctx.fillStyle=on?'rgba(255,225,120,0.35)':'rgba(255,255,255,0.12)';ctx.beginPath();ctx.ellipse(x,y+2,SW*0.46,9,0,0,7);ctx.fill();
+    ctx.fillStyle='#120b18';ctx.fillRect(x-SW/2+2,y-size*1.15,SW-4,size*1.2);ctx.globalAlpha=1;
+    ctx.save();ctx.translate(x,y);let pose='stand';
+    if(on){const st=danceXform(m,size*0.4);if(st!=='down')pose='zombie';}else ctx.translate(Math.sin(time*2+i)*1.5,0);
+    drawZombie(ctx,0,0,size,{team:T,body:'wr',view:'front',phase:time*6+i,speed:0.3,limbs:{la:1,ra:1,ll:1,rl:1,head:1},pose,num:'',t:time,seed:i+side*5,ball:false});
+    const b=on?Math.sin(time*12+i)*5:Math.sin(time*2+i)*1.5;
+    for(const s2 of [-1,1]){const px=s2*size*0.32,py=(on?-size*1.0:-size*0.55)+b*(s2>0?1:-1);
+      for(let k=0;k<8;k++){const a=k/8*6.28;ctx.fillStyle=k%2?T.trim:T.jersey;ctx.beginPath();ctx.arc(px+Math.cos(a)*5,py+Math.sin(a)*5,4,0,7);ctx.fill();}}
+    ctx.restore();}}
+function cheerStart(){                            // queue both squads for this break, the side that needs it most first
+  if(!G||!G.play)return;const off=G.poss,toGo=off===0?110-G.los:G.los-10;
+  const first=toGo<=25?off:(G.stage>=2?1-off:(Math.random()<0.5?off:1-off));
+  CHEER.slots=[first,1-first];CHEER.cur=null;CHEER.wait=0;}
+function cheerUpdate(){
+  if(!G||!['playcall','presnap','dead'].includes(mode)){if(CHEER.cur||CHEER.slots.length){CHEER.cur=null;CHEER.slots=[];}return;}
+  const dt=1/60;
+  if(CHEER.cur){CHEER.cur.t+=dt;if(CHEER.cur.t>2.6)CHEER.cur=null;return;}
+  if(!CHEER.slots.length)return;
+  if(ANN.cur||now_s()<ANN.busyUntil){CHEER.wait+=dt;if(CHEER.wait>4)CHEER.slots=[];return;}   // never over the announcer
+  const side=CHEER.slots.shift();CHEER.cur={side,t:0};ANN.busyUntil=now_s()+2.7;            // ...and the announcer waits for the squad
+  crowdHype(side,0.9);playS('cheer_small',0.6,1,0,{pan:sidePan(side)});
+  const off=G.poss;crowdSay(side===off?'chant_brains':'chant_def',side,0.65,0.2);}
+
 function draw(){
   ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
   ctx.clearRect(0,0,W,H);
@@ -1768,6 +1838,7 @@ function draw(){
   ctx.globalAlpha=1;
   if(mouse.down&&mode==='live'){const s=9+Math.sin(time*10)*2;ctx.strokeStyle='rgba(255,225,74,0.9)';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(mouse.x,mouse.y,s,0,7);ctx.stroke();ctx.beginPath();ctx.arc(mouse.x,mouse.y,2.5,0,7);ctx.fillStyle='#ffe14a';ctx.fill();}
   if(sh)ctx.restore();
+  drawStands();
   drawHUD();drawTicker();drawHint();drawBig();
 }
 
@@ -1801,6 +1872,16 @@ function bindBtn(el,code,fn){
 bindBtn($('btnAct'),'Space');bindBtn($('btnBurst'),'ShiftLeft');bindBtn($('btnSwitch'),'Tab');
 bindBtn($('thr1'),'KeyQ');bindBtn($('thr2'),'KeyE');bindBtn($('thr3'),'KeyV');
 bindBtn($('btnPause'),null,()=>pauseGame());
+bindBtn($('pkQ'),'KeyQ');bindBtn($('pkE'),'KeyE');bindBtn($('pkV'),'KeyV');bindBtn($('pkAct'),'Space');bindBtn($('pkBurst'),'ShiftLeft');bindBtn($('pkSw'),'Tab');bindBtn($('pkEsc'),null,()=>pauseGame());
+let pcState='';
+function updatePCBar(){const bar=$('pcbar');const show=!touchOn&&!!G&&(mode==='live'||mode==='presnap');
+  if(!show){if(pcState!=='hide'){pcState='hide';bar.classList.remove('on');}return;}
+  const P=G.play,B=G.ball,c=G.ctrl,off=P.off===G.userTeam,isCar=!!c&&B.state==='held'&&B.carrier===c,canThrow=off&&isCar&&c===P.qb&&P.canPass&&armsOf(c)>0;
+  const nm=k=>{const r=P.recv[k];return r&&!r.out?r.name.split(' ')[0]:'';};
+  const st=[off,isCar,canThrow,c&&c.burstUsed,nm('KeyQ'),nm('KeyE'),nm('KeyV')].join('|');if(st===pcState)return;pcState=st;bar.classList.add('on');
+  for(const [id,k] of [['pkQ','KeyQ'],['pkE','KeyE'],['pkV','KeyV']]){const el=$(id);el.style.display=off?'flex':'none';el.querySelector('span').textContent=nm(k)?'→ '+nm(k):'';el.classList.toggle('off',!(canThrow&&nm(k)));}
+  $('pkAct').querySelector('span').textContent=off?'stiff arm':'dive';$('pkAct').classList.toggle('off',off&&!isCar);
+  $('pkBurst').classList.toggle('off',!!(c&&c.burstUsed));$('pkSw').querySelector('span').textContent=off?'take over':'switch';}
 $('wrap').addEventListener('pointerdown',()=>{if(mode==='claw')clawEnd();},true);
 {const mb=$('menuBtn');const go=e=>{e.preventDefault();e.stopPropagation();audioInit();pauseGame();};mb.addEventListener('pointerdown',go);mb.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});}
 function menuBtnUpdate(){const on=!!G&&['playcall','presnap','live','dead'].includes(mode);const mb=$('menuBtn');if(mb.style.display!==(on?'block':'none'))mb.style.display=on?'block':'none';}
@@ -1826,7 +1907,7 @@ function updateTouchUI(){
 // ===== loop =====
 let last=performance.now();
 function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
-  try{update(dt);draw();updateTouchUI();ambUpdate();musicUpdate();djUpdate();menuBtnUpdate();}catch(e){console.error(e);}
+  try{update(dt);draw();updateTouchUI();ambUpdate();musicUpdate();djUpdate();menuBtnUpdate();updatePCBar();cheerUpdate();}catch(e){console.error(e);}
   for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
