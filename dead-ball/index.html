@@ -206,7 +206,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.5.1';
+const VERSION='0.5.2';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -1072,7 +1072,7 @@ function knockOut(p,why){
   if(p.out)return;p.out=true;p.ko=true;G.stats.kos=(G.stats.kos||0)+1;
   if(p.blockedBy){p.blockedBy.engaged=null;p.blockedBy=null;}if(p.engaged){p.engaged.blockedBy=null;p.engaged=null;}
   if(G.ctrl===p)G.ctrl=null;
-  if(why!=='brawl')announce(pick(why==='limbless'?LINES.limbless:LINES.ko).split('{n}').join(p.name),3);crowdReact('ko',{off:G.play?G.play.off:0,hitter:1-p.team});if(mode==='live'||mode==='dead')clawMark('ko',4,p.x,p.y);if(G.play)G.play.callKo=1;
+  if(why!=='brawl')announce(pick(why==='limbless'?LINES.limbless:LINES.ko).split('{n}').join(p.name),3);crowdReact('ko',{off:G.play?G.play.off:0,hitter:1-p.team});if(mode==='live'||mode==='dead')clawMark('ko',4,p.x,p.y,{who:p.name});if(G.play)G.play.callKo=1;
   const body={team:p.team,idx:p.idx,type:p.type,ty:p.ty,num:p.num,x:p.x,y:p.y,vx:0,vy:0,face:p.face,phase:0,limbs:Object.assign({},p.limbs),stun:9,dive:0,stiff:0};
   G.abducts.push({body,phase:'wait',t:0,h:0,vamps:[],bats:[],side:p.y<MID?-1:1});
 }
@@ -1106,9 +1106,9 @@ function tryTackle(d,c){
   if(tier===0){const k=limbRoll(c,0.4);if(k)lost.push(k);}
   else if(tier===1){const k=limbRoll(c,1.0+(d.dive>0?0.3:0));if(k)lost.push(k);}
   else if(tier===2){lost.push(removeRandomLimb(c));const k=limbRoll(c,0.5);if(k)lost.push(k);shake(8);sfx.bigHit();
-    big('BIG HIT!',1.3,'#ff9a4a');announce(pick(LINES.bighit).split('{n}').join(c.name),3);crowdReact('bighit',{off:G.play.off,hitter:d.team});clawMark('hit',2,c.x,c.y);G.play.callHit=1;}
+    big('BIG HIT!',1.3,'#ff9a4a');announce(pick(LINES.bighit).split('{n}').join(c.name),3);crowdReact('bighit',{off:G.play.off,hitter:d.team});clawMark('hit',2,c.x,c.y,{by:d.name,who:c.name});G.play.callHit=1;}
   else{lost.push(removeRandomLimb(c));lost.push(removeRandomLimb(c));shake(13);sfx.bigHit();sfx.bigHit(0.12);
-    big('CRUSHED!',1.5,'#ff5a3a');announce(pick(LINES.crush).split('{n}').join(c.name),3);crowdReact('bighit',{off:G.play.off,hitter:d.team});clawMark('crush',3,c.x,c.y);G.play.callHit=1;
+    big('CRUSHED!',1.5,'#ff5a3a');announce(pick(LINES.crush).split('{n}').join(c.name),3);crowdReact('bighit',{off:G.play.off,hitter:d.team});clawMark('crush',3,c.x,c.y,{by:d.name,who:c.name});G.play.callHit=1;
     if(!c.out&&Math.random()<0.45)ko=true;}
   if(tier>=2){const ang=Math.atan2(c.y-d.y,c.x-d.x),mx=(c.x+d.x)/2,my=(c.y+d.y)/2;   // hard contact sprays blood, limb or not
     bloodBurst(mx,my,tier===3?34:20,ang,0.9,tier===3?11:8);bloodBurst(mx,my,8,ang+Math.PI,0.7,4);}
@@ -1190,8 +1190,8 @@ function endPlay(type,info){
   const P=G.play;if(P.ended)return;P.ended=true;mode='dead';G.timer=1.7;G.res=Object.assign({type},info);
   const gain=Math.round(dir(P.off)*(info.x-G.los));P.callGain=gain;G.playsDone=(G.playsDone||0)+1;commRecord(P,type,info,gain);
   {const sk=type==='tackle'&&info.by===P.qb&&gain<0&&!P.thrown&&!P.handed,o={off:P.off};
-   if(type==='td'&&gain>=20&&info.by){clawMark('td',3.5,info.x,info.y);P.claw.t=Math.max(0,CLAW.t-0.35);}
-   else if((type==='tackle'||type==='oob')&&gain>=30&&info.by){clawMark('run',2.5,info.x,info.y);if(P.claw&&P.claw.kind==='run')P.claw.t=Math.max(0,CLAW.t-1.0);}
+   if(type==='td'&&gain>=20&&info.by){clawMark('td',3.5,info.x,info.y,{who:info.by.name,gain});P.claw.t=Math.max(0,CLAW.t-0.35);}
+   else if((type==='tackle'||type==='oob')&&gain>=30&&info.by){clawMark('run',2.5,info.x,info.y,{who:info.by.name,gain});if(P.claw&&P.claw.kind==='run')P.claw.t=Math.max(0,CLAW.t-1.0);}
    if(type==='td')crowdReact('td',o);else if(type==='turnover')crowdReact('to',o);else if(type==='incomplete')crowdReact('inc',o);
    else if(sk)crowdReact('sack',o);else if((type==='tackle'||type==='oob')&&gain>=15)crowdReact('big',o);else if(type==='tackle'&&gain<0)crowdReact('loss',o);}
   {const n=info.by?info.by.name:'',d=info.tk?info.tk.name:'the defense',o={n,d,g:yds(gain),spot:spotSay(P.off,info.x),team:TEAMS[P.off].name};
@@ -1594,9 +1594,9 @@ const CLAW_LINES={intro:["Let's go to the Claw Cam!","Roll that back on the Claw
   run:['Look at those rotting legs churn!','Nobody can touch him. Look at all that daylight!'],
   brawl:['Look at that punch land. Right in the decomposition.','Freeze it. You can see the exact moment his jaw gave notice.']};
 function clawReset(){CLAW.rec=[];CLAW.acc=0;CLAW.t=0;}
-function clawMark(kind,score,x,y){                 // called the moment something replay-worthy happens
+function clawMark(kind,score,x,y,info){            // called the moment something replay-worthy happens
   const P=G&&G.play;if(!P||settings.claw===false)return;
-  if(!P.claw||score>P.claw.score)P.claw={kind,score,t:CLAW.t,x,y};}
+  if(!P.claw||score>P.claw.score)P.claw={kind,score,t:CLAW.t,x,y,info:info||{}};}
 function clawRecord(dt){
   CLAW.t+=dt;CLAW.acc+=dt;if(CLAW.acc<1/30)return;CLAW.acc=0;
   const B=G.ball,car=B&&B.state==='held'?B.carrier:null;
@@ -1613,10 +1613,10 @@ function clawStart(){
   if(G.brawl){G.brawl.a.brawling=G.brawl.b.brawling=false;G.brawl=null;}
   const P=G.play,c=P.claw;P.clawDone=1;CLAW.last=G.playsDone;annStop();djClear();
   const t0=CLAW.rec[0].t,tEnd=CLAW.rec[CLAW.rec.length-1].t,peak=Math.min(Math.max(c.t,t0+0.4),tEnd-0.2);
-  CLAW.R={limb:!!P.callLimbs,kind:c.kind,peak,st:Math.max(t0,peak-1.7),end:Math.min(tEnd,peak+1.6),phase:'in',real:0,yaw:0,tilt:1,ss:26,fx:c.x,fy:c.y,
+  CLAW.R={jumbo:clawJumbo(c,P),limb:!!P.callLimbs,kind:c.kind,peak,st:Math.max(t0,peak-1.15),end:Math.min(tEnd,peak+1.4),phase:'in',real:0,yaw:0,tilt:1,ss:26,fx:c.x,fy:c.y,
     dir:Math.random()<0.5?1:-1,said:false,fade:0};
-  mode='claw';clawWhoosh(true);
-  setTimeout(()=>{if(mode==='claw'){const l=pick(CLAW_LINES.intro);tick(l,true);annSay(l,3,'color');}},150);
+  clawAngle(CLAW.R);mode='claw';clawWhoosh(true);
+  setTimeout(()=>{if(mode==='claw'){const l=pick(CLAW_LINES.intro);tick(l,true);annSay(l,3,'color');}},60);
   if(settings.music!=='off')djTrack(0);}
 function clawEnd(){if(mode!=='claw')return;CLAW.R=null;annStop();mode='dead';G.timer=0.05;viewCX=camCX;viewCY=camCY;}
 function clawWhoosh(down){if(!sfx.ok())return;try{const t=AC.currentTime,s=AC.createBufferSource();s.buffer=noiseBuf(1.3);const f=AC.createBiquadFilter(),g=AC.createGain();
@@ -1624,15 +1624,53 @@ function clawWhoosh(down){if(!sfx.ok())return;try{const t=AC.currentTime,s=AC.cr
   g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.5,t+0.15);g.gain.linearRampToValueAtTime(0,t+1.2);s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+1.3);
   const o=AC.createOscillator(),og=AC.createGain();o.type='sine';o.frequency.setValueAtTime(down?180:60,t);o.frequency.exponentialRampToValueAtTime(down?45:200,t+1);
   og.gain.setValueAtTime(0.35,t);og.gain.exponentialRampToValueAtTime(0.001,t+1.1);o.connect(og);og.connect(master);o.start(t);o.stop(t+1.2);}catch(e){}}
+function clawJumbo(c,P){         // stadium-screen captions: what happened, and who did it
+  const I=c.info||{},U=t=>String(t||'').toUpperCase(),lines=[];
+  switch(c.kind){
+    case 'td':lines.push(`TOUCHDOWN ${U(I.who)}!`,I.gain?`${I.gain} YARDS TO PAYDIRT`:'SIX POINTS OF DECAY');break;
+    case 'run':lines.push(`${U(I.who)} BREAKS FREE!`,`${I.gain}-YARD RUN`);break;
+    case 'crush':lines.push(`CRUSHED BY ${U(I.by)}!`,`${U(I.who)} GOT EXHUMED`);break;
+    case 'hit':lines.push(`BIG HIT BY ${U(I.by)}!`,`${U(I.who)} FELT THAT`);break;
+    case 'ko':lines.push('KNOCKOUT!',`${U(I.who)} IS OUT COLD`);break;
+    case 'brawl':lines.push('BRAWL!',`${U(I.who)} WINS BY K.O.`);break;
+    default:lines.push('WHAT A PLAY!','');}
+  if(P.fumbler)lines[1]=`FUMBLE BY ${U(P.fumbler.name)}!`;
+  else if(P.callLimbs&&c.kind!=='td'&&c.kind!=='run')lines[1]+=' · LIMB LOST!';
+  return lines;}
+function drawJumbo(R){
+  const [l1,l2]=R.jumbo||['',''];if(!l1)return;
+  const bx=40,by=HUD+46,bw=W-80,bh=150,on=Math.floor(R.real*5)%2===0,sl=Math.min(1,R.real*4);
+  ctx.save();ctx.translate(0,(1-sl)*-40);ctx.globalAlpha=sl;
+  ctx.fillStyle='rgba(8,8,10,0.86)';ctx.fillRect(bx,by,bw,bh);
+  ctx.strokeStyle=on?'#ffd84a':'#ff3b3b';ctx.lineWidth=5;ctx.strokeRect(bx+3,by+3,bw-6,bh-6);
+  for(let i=0;i<14;i++){ctx.fillStyle=(i+Math.floor(R.real*10))%2?'#ffd84a':'#ff3b3b';ctx.beginPath();ctx.arc(bx+18+i*(bw-36)/13,by+12,3.5,0,7);ctx.fill();ctx.beginPath();ctx.arc(bx+18+i*(bw-36)/13,by+bh-12,3.5,0,7);ctx.fill();}
+  const fit=(t,max,size)=>{ctx.font=`${size}px Bangers, Impact, Arial`;let w=ctx.measureText(t).width;return w>max?Math.floor(size*max/w):size;};
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  const s1=fit(l1,bw-50,64);ctx.font=`${s1}px Bangers, Impact, Arial`;ctx.lineWidth=8;ctx.strokeStyle='#3a0606';
+  const c1=R.phase==='freeze'?(on?'#ffffff':'#ffd84a'):(on?'#ffd84a':'#ff5a3a');
+  ctx.shadowColor=c1;ctx.shadowBlur=on?22:8;ctx.strokeText(l1,W/2,by+60);ctx.fillStyle=c1;ctx.fillText(l1,W/2,by+60);ctx.shadowBlur=0;
+  if(l2){const s2=fit(l2,bw-60,34);ctx.font=`${s2}px Bangers, Impact, Arial`;ctx.fillStyle='#e8f4ff';ctx.lineWidth=5;ctx.strokeText(l2,W/2,by+112);ctx.fillText(l2,W/2,by+112);}
+  ctx.globalAlpha=0.12;ctx.fillStyle='#000';for(let y=by;y<by+bh;y+=4)ctx.fillRect(bx,y,bw,2);   // LED scanlines
+  ctx.restore();}
+function clawAngle(R){             // pick where the camera ends up, relative to the way the subject is facing at the frozen moment
+  const fr=clawFrame(R.peak);let sub=null;
+  if(fr){sub=fr.pl.find(q=>q.c)||null;let bd=1e9;if(!sub||Math.hypot(sub.x-R.fx,sub.y-R.fy)>3)for(const q of fr.pl){const d=Math.hypot(q.x-R.fx,q.y-R.fy);if(d<bd){bd=d;sub=q;}}}
+  let hx=0,hy=1;if(sub){if(Math.hypot(sub.vx,sub.vy)>0.6){hx=sub.vy;hy=-sub.vx;}else{hx=Math.sin(sub.f);hy=-Math.cos(sub.f);}}
+  const th=Math.atan2(hy,hx),P2=Math.PI/2,P4=Math.PI/4;
+  const views={front:P2,back:-P2,left:0,right:Math.PI,'front-left':P2+P4,'front-right':P2-P4};   // where his heading should point on screen
+  const norm=a=>{while(a>Math.PI)a-=2*Math.PI;while(a<=-Math.PI)a+=2*Math.PI;return a;};
+  const names=Object.keys(views).sort(()=>Math.random()-0.5);let pickName=names[0],d=0;
+  for(const n of names){d=norm(views[n]-th);if(Math.abs(d)>0.6){pickName=n;break;}}   // always a visible swing
+  R.yaw0=0;R.dYaw=d;R.view=pickName;R.yaw=0;}
 function clawUpdate(dt){
   const R=CLAW.R;if(!R)return;R.real+=dt;let sp;
-  if(R.phase==='in'){const left=R.peak-R.st;sp=left>0.35?0.55:0.03+0.52*Math.max(0,left/0.35);R.st+=sp*dt;R.ss+=(34-R.ss)*dt*0.8;R.tilt+=(0.86-R.tilt)*dt*1.2;
+  if(R.phase==='in'){const left=R.peak-R.st;sp=left>0.25?0.75:0.04+0.71*Math.max(0,left/0.25);R.st+=sp*dt;R.ss+=(34-R.ss)*dt*1.2;R.tilt+=(0.86-R.tilt)*dt*1.6;
     if(R.st>=R.peak){R.st=R.peak;R.phase='freeze';R.pt=0;clawWhoosh(true);}}
-  else if(R.phase==='freeze'){R.pt+=dt;const u=Math.min(1,R.pt/2.2),e=u*u*(3-2*u);R.yaw=R.dir*e*Math.PI/2;R.tilt=0.86-0.26*e-0.08*Math.sin(Math.PI*u);R.ss+=(46-R.ss)*dt*1.4;R.st+=0.015*dt;
-    if(!R.said&&R.pt>0.25){R.said=true;const k=R.kind==='crush'||R.kind==='hit'?(R.limb?'limb':'hit'):R.kind;const l=pick(CLAW_LINES[k]||CLAW_LINES.hit);tick(l,true);annSay(l,3,'color');}
-    if(R.pt>=2.4){R.phase='out';R.pt=0;clawWhoosh(false);}}
-  else if(R.phase==='out'){R.pt+=dt;R.ss+=(36-R.ss)*dt*0.9;sp=Math.min(0.45,0.03+R.pt*0.5);R.st+=sp*dt;if(R.st>=R.end||R.pt>4.2){R.phase='fade';R.fade=0;}}
-  else if(R.phase==='fade'){R.fade+=dt*2.5;if(R.fade>=1)clawEnd();}
+  else if(R.phase==='freeze'){R.pt+=dt;const u=Math.min(1,R.pt/1.5),e=u*u*(3-2*u);R.yaw=R.yaw0+R.dYaw*e;R.tilt=0.86-0.26*e-0.08*Math.sin(Math.PI*u);R.ss+=(46-R.ss)*dt*2;R.st+=0.015*dt;
+    if(!R.said&&R.pt>0.1){R.said=true;const k=R.kind==='crush'||R.kind==='hit'?(R.limb?'limb':'hit'):R.kind;const l=pick(CLAW_LINES[k]||CLAW_LINES.hit);tick(l,true);annSay(l,3,'color');}
+    if(R.pt>=1.7){R.phase='out';R.pt=0;clawWhoosh(false);}}
+  else if(R.phase==='out'){R.pt+=dt;R.ss+=(36-R.ss)*dt*0.9;sp=Math.min(0.6,0.04+R.pt*0.8);R.st+=sp*dt;if(R.st>=R.end||R.pt>3.0){R.phase='fade';R.fade=0;}}
+  else if(R.phase==='fade'){R.fade+=dt*3.5;if(R.fade>=1)clawEnd();}
   // follow the action, lock on the moment during the freeze
   const fr=clawFrame(R.st);if(fr&&R.phase!=='freeze'){const b=fr.b;const tx=b&&b.s!=='dead'?b.x:R.fx,ty=b&&b.s!=='dead'?b.y:R.fy;
     const k=R.phase==='in'&&R.peak-R.st<0.5?0.12:0.05;R.fx+=(tx-R.fx)*k;R.fy+=(ty-R.fy)*k;}}
@@ -1676,9 +1714,10 @@ function drawClaw(){
   for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(i*16,0);ctx.quadraticCurveTo(i*16+18,26,i*16+8,58);ctx.stroke();}
   ctx.font='46px Bangers, Arial';ctx.fillStyle='#fff';ctx.textBaseline='middle';ctx.fillText('CLAW CAM',66,30);
   ctx.font='20px Bangers, Arial';ctx.fillStyle=R.phase==='freeze'?'#9fd0ff':'#ff6a5a';ctx.fillText(R.phase==='freeze'?'BULLET TIME':'REPLAY  ●',72,64);ctx.restore();
+  drawJumbo(R);
   ctx.font='22px Arial';ctx.fillStyle='rgba(255,255,255,0.6)';ctx.textAlign='center';ctx.fillText('tap or press any key to skip',W/2,H-60);ctx.textAlign='left';
   drawTicker();
-  if(R.phase==='fade'||R.real<0.25){ctx.fillStyle=`rgba(0,0,0,${R.phase==='fade'?R.fade:1-R.real/0.25})`;ctx.fillRect(0,0,W,H);}}
+  if(R.phase==='fade'||R.real<0.15){ctx.fillStyle=`rgba(0,0,0,${R.phase==='fade'?R.fade:1-R.real/0.15})`;ctx.fillRect(0,0,W,H);}}
 function clawPlayer(a,b,sx,sy,ss,u){
   const R=CLAW.R,vx=a.vx+(b.vx-a.vx)*u,vy=a.vy+(b.vy-a.vy)*u,sp=Math.hypot(vx,vy);
   let hx,hy;if(sp>0.6){hx=vy;hy=-vx;}else{hx=Math.sin(a.f);hy=-Math.cos(a.f);}
@@ -1732,7 +1771,7 @@ function brawlFinish(){
   const Bw=G.brawl,{win,lose}=Bw;playS('hit',0.9,0.7);playS('bone',0.7);bloodBurst(lose.x,lose.y,22,Math.random()*6.28,3.1,8);G.shake=8;
   lose.x+=(lose.x-win.x)*0.8;lose.y+=(lose.y-win.y)*0.8;
   if(!lose.out){knockOut(lose,'brawl');}
-  if(G.play&&G.play.claw&&G.play.claw.kind==='ko')G.play.claw.kind='brawl';
+  if(G.play&&G.play.claw&&G.play.claw.kind==='ko'){G.play.claw.kind='brawl';G.play.claw.info={who:win.name,loser:lose.name};}
   win.brawling=false;win.dance=2.6;win.danceT=0;win.routine=makeRoutine();
   const ws=win.team;playS('cheer_small',0.7,1,0,{pan:sidePan(ws)});crowdSay('yeah',ws,0.85,0.1);crowdSay('boo',1-ws,0.6,0.5);crowdHype(ws,1);
   big('KNOCKOUT!',1.4,'#ffd84a');
