@@ -14,7 +14,7 @@ html,body{margin:0;height:100%;background:#070a06;overflow:hidden;font-family:'R
 .pk{pointer-events:auto;display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:9px;background:rgba(12,20,9,.62);border:1.5px solid rgba(157,255,87,.45);color:#dfe9d2;font:14px 'Roboto Condensed',Arial,sans-serif;cursor:pointer;user-select:none;-webkit-user-select:none;white-space:nowrap}
 .pk:hover{background:rgba(47,90,36,.85);border-color:#9dff57}.pk.down{background:#9dff57;color:#111}
 .pk b{display:inline-block;min-width:20px;padding:1px 6px;border-radius:5px;background:#e9efe0;color:#151a12;font:bold 14px Arial;text-align:center;box-shadow:0 2px 0 #7f8a74}
-.pk.pkt{border-color:rgba(255,225,74,.7);color:#ffe9a0}.pk.off{opacity:.33;pointer-events:none}.pk.info{cursor:default;opacity:.8}.pk.info:hover{background:rgba(12,20,9,.62);border-color:rgba(157,255,87,.45)}
+.pk.pks{border-color:rgba(180,255,90,.8);color:#d8ffb0}.pk.pkt{border-color:rgba(255,225,74,.7);color:#ffe9a0}.pk.off{opacity:.33;pointer-events:none}.pk.info{cursor:default;opacity:.8}.pk.info:hover{background:rgba(12,20,9,.62);border-color:rgba(157,255,87,.45)}
 .touchui.on{display:block}
 .touchui>*{pointer-events:auto;position:absolute}
 #joyZone{left:0;top:45%;width:50%;bottom:0}
@@ -28,6 +28,7 @@ html,body{margin:0;height:100%;background:#070a06;overflow:hidden;font-family:'R
 #btnAct{width:170px;height:170px;font-size:30px;right:30px;bottom:40px;border-color:#ffe14a}
 #btnBurst{right:220px;bottom:30px;width:116px;height:116px}
 #btnSwitch{right:40px;bottom:380px;width:116px;height:116px;font-size:20px}
+#btnSkill{right:170px;bottom:420px;width:116px;height:116px;font-size:17px;line-height:1.05;border-color:#b4ff5a;color:#d8ffb0;padding:6px}#btnSkill.cd{opacity:.4}
 #btnPause{display:none!important}
 #menuBtn{position:absolute;left:8px;top:64px;z-index:30;display:none;padding:6px 14px;font:24px Bangers,Arial,sans-serif;letter-spacing:1px;color:#fff;background:rgba(20,30,15,.85);border:2px solid #9dff57;border-radius:10px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation}
 #menuBtn:hover{background:#2f5a24}
@@ -88,7 +89,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 <div id="pcbar">
   <div class="pk info" id="pkMove"><b>WASD</b>or hold mouse: run</div>
   <div class="pk pkt" id="pkQ"><b>Q</b><span>throw</span></div><div class="pk pkt" id="pkE"><b>E</b><span>throw</span></div><div class="pk pkt" id="pkV"><b>V</b><span>throw</span></div>
-  <div class="pk" id="pkAct"><b>Space</b><span>dive</span></div><div class="pk" id="pkBurst"><b>Shift</b><span>burst</span></div><div class="pk" id="pkSw"><b>Tab</b><span>switch</span></div>
+  <div class="pk" id="pkAct"><b>Space</b><span>dive</span></div><div class="pk" id="pkBurst"><b>Shift</b><span>burst</span></div><div class="pk pks" id="pkSkill"><b>R</b><span>skill</span></div><div class="pk" id="pkSw"><b>Tab</b><span>switch</span></div>
   <div class="pk" id="pkEsc"><b>Esc</b>menu</div>
 </div>
 <div id="touch" class="touchui">
@@ -97,6 +98,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <div id="btnPause" class="tbtn">II</div>
   <div id="btnAct" class="tbtn">DIVE</div>
   <div id="btnBurst" class="tbtn">BURST</div>
+  <div id="btnSkill" class="tbtn">SKILL</div>
   <div id="btnSwitch" class="tbtn">SWITCH</div>
   <div id="thr1" class="tbtn thr">Q</div><div id="thr2" class="tbtn thr">E</div><div id="thr3" class="tbtn thr">V</div>
 </div>
@@ -148,6 +150,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
    <tr><th>Key</th><th>On offense</th><th>On defense</th></tr>
    <tr><td><span class="kbd">Arrows</span> / <span class="kbd">WASD</span></td><td>Move your player</td><td>Move your player</td></tr>
    <tr><td><span class="kbd">Hold left mouse</span></td><td>Run toward the pointer (any angle, precise)</td><td>Run toward the pointer</td></tr>
+   <tr><td><span class="kbd">R</span> / SKILL</td><td colspan="2">Special skill, once every 3 plays. Zombies: Brain Wave (QB, perfect throw), Fall Apart (RB, slip tackles), Rubber Arm (WR, long catch), Gut Bomb (line), Horde Lunge (defense). Mummies: Curse of the Pharaoh, Sandstorm, Unravel, Entomb, Wrap Tackle.</td></tr>
    <tr><td><span class="kbd">Q</span> <span class="kbd">E</span> <span class="kbd">V</span></td><td>Quarterback throws to that receiver (the letter floats over him): Q = left receiver, E = right receiver, V = running back</td><td>—</td></tr>
    <tr><td><span class="kbd">Space</span></td><td>Stiff-arm (ball carrier)</td><td>Dive tackle</td></tr>
    <tr><td><span class="kbd">Shift</span></td><td>Adrenaline Twitch: a speed burst, once per play</td><td>Same</td></tr>
@@ -206,7 +209,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.5.4';
+const VERSION='0.6.0';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -814,6 +817,7 @@ function cpuOffCall(){const w={dive:3,slant:3,screen:2,bomb:1.5};if(G.stage>=2&&
   if(armsOf(G.play.qb)===0)return 'dive';return weighted(w);}
 function cpuDefCall(){return weighted({blitz:2.5,zone:3,man:3});}
 function toPlayCall(){
+  G.sfx=[];G.hintMsg=null;for(const tm of G.teams)for(const p of tm){p.perfectThrow=false;p.reachT=p.slipT=p.noTackle=0;}
   if(G.brawl){G.brawl.a.brawling=G.brawl.b.brawling=false;G.brawl=null;}
   G.snap=snapshot();if(G.playsDone>0&&G.playsDone%3===0&&G.savedAt!==G.playsDone)saveNow();
   G.play={off:G.poss,def:1-G.poss,offCall:null,defCall:null,time:0,qb:null,carrier:null,run:false,canPass:false,handed:false,thrown:false,ended:false,recv:{},drop:4};
@@ -1000,6 +1004,7 @@ function ballPt(){const B=G.ball;return B.state==='air'?{x:B.tx,y:B.ty}:{x:B.x,y
 function handleUser(dt){
   const P=G.play,B=G.ball;let c=G.ctrl;
   if(!c||c.out){G.ctrl=c=nearestTo(G.userTeam,ballPt());if(!c)return;}
+  if(wasPressed('KeyR'))useSkill(c,false);
   let ix=0,iy=0,amag=1;if(isDown('ArrowLeft','KeyA'))ix--;if(isDown('ArrowRight','KeyD'))ix++;if(isDown('ArrowUp','KeyW'))iy--;if(isDown('ArrowDown','KeyS'))iy++;
   if(joy.active&&Math.hypot(joy.x,joy.y)>0.12){ix=joy.x;iy=joy.y;amag=Math.min(1,0.35+Math.hypot(ix,iy)*0.9);}
   {const sx=ix,sy=iy;ix=-sy;iy=sx;}   // screen (right,down) -> world (+x is up the field, +y is screen right)
@@ -1033,9 +1038,9 @@ function throwTo(qb,r){
   const P=G.play,B=G.ball,SPD=21;let tx=r.x,ty=r.y,fl=0;
   for(let i=0;i<3;i++){fl=Math.hypot(tx-qb.x,ty-qb.y)/SPD;tx=r.x+r.vx*fl;ty=r.y+r.vy*fl;}
   const d=Math.hypot(tx-qb.x,ty-qb.y);
-  const err=0.3+d*0.02+(armsOf(qb)===1?1.2:0)+(pressureOn(qb)<1.8?0.9:0);
+  let err=0.3+d*0.02+(armsOf(qb)===1?1.2:0)+(pressureOn(qb)<1.8?0.9:0);const perfect=!!qb.perfectThrow;if(perfect){err=0;qb.perfectThrow=false;}
   const a=Math.random()*Math.PI*2,mm=Math.random()*err;tx+=Math.cos(a)*mm;ty=clamp(ty+Math.sin(a)*mm,0.6,FW-0.6);
-  Object.assign(B,{state:'air',carrier:null,fx:qb.x,fy:qb.y,tx,ty,t:0,dur:Math.max(0.3,fl),peak:0.6+d*0.05,target:r});
+  Object.assign(B,{state:'air',carrier:null,fx:qb.x,fy:qb.y,tx,ty,t:0,dur:Math.max(0.3,fl),peak:0.6+d*0.05,target:r,perfect});
   P.carrier=null;P.canPass=false;P.thrown=true;sfx.throw();P.target=r;call(d>20?'throwD':'throwS',{qb:qb.name,n:r.name},2);if(d>20)crowdExcite(0.6);
   for(const d of G.teams[P.def])if(!d.out)d.rt=(dist(d,{x:tx,y:ty})>4?rand(0.3,0.55):rand(0.05,0.15))*(d.team===G.userTeam?1:D().lag);
 }
@@ -1047,16 +1052,17 @@ function cpuQB(dt){
   for(const k in P.recv){const r=P.recv[k];if(!r||r.out||armsOf(r)===0)continue;let open=1e9;for(const d of G.teams[P.def])if(!d.out)open=Math.min(open,dist(d,r));
     const s=Math.min(open,8)*1.2+f*(r.x-G.los)*0.12+(P.offCall==='screen'&&r===G.teams[P.off][1]?3:0);if(s>bs){bs=s;best=r;bo=open;}}
   if(!best){P.run=true;return;}
-  if(bo>2.2||press<2.2||P.time>readT+1.4)throwTo(qb,best);
+  if(bo>2.2||press<2.2||P.time>readT+1.4){if(qb.team!==G.userTeam&&skillOf(qb)&&skillOf(qb).id==='brainwave'&&skillLeft(qb)===0&&Math.random()<0.35)useSkill(qb,true);throwTo(qb,best);}
 }
 function resolveCatch(){
   const P=G.play,B=G.ball,L={x:B.tx,y:B.ty};
   let rec=null,rd=1e9,dfn=null,dd=1e9;
-  for(const p of G.teams[P.off]){if(p.out||(p.stun>0&&!p.catchDive))continue;const d=dist(p,L)-(p.catchDive?0.5:0);if(d<rd){rd=d;rec=p;}}
+  for(const p of G.teams[P.off]){if(p.out||(p.stun>0&&!p.catchDive))continue;const d=dist(p,L)-(p.catchDive?0.5:0)-(p.reachT>0?2.6:0);if(d<rd){rd=d;rec=p;}}
   for(const p of G.teams[P.def]){if(p.out||p.stun>0)continue;const d=dist(p,L);if(d<dd){dd=d;dfn=p;}}
   const recOK=rec&&rd<1.9&&armsOf(rec)>0,defOK=dfn&&dd<1.4&&armsOf(dfn)>0;
-  const catchP=recOK?(rec.catchDive?0.65:1)*rec.ty.catch*[0,0.6,1][armsOf(rec)]*(rd<1.2?1:0.8)*(defOK&&dd<1?0.85:1):0;
-  const intP=defOK?(dfn.team===G.userTeam?0.3:D().intc)*[0,0.6,1][armsOf(dfn)]*(dd<0.8?1:0.7):0;
+  let catchP=recOK?(rec.catchDive?0.65:1)*rec.ty.catch*[0,0.6,1][armsOf(rec)]*(rd<1.2?1:0.8)*(defOK&&dd<1?0.85:1):0;
+  let intP=defOK?(dfn.team===G.userTeam?0.3:D().intc)*[0,0.6,1][armsOf(dfn)]*(dd<0.8?1:0.7):0;
+  if(B.perfect&&recOK){catchP=1;intP=0;}   // Brain Wave
   let res='inc';
   if(defOK&&(!recOK||dd<rd-0.15)){if(Math.random()<intP)res='int';else if(Math.random()<catchP*0.8)res='catch';}
   else{if(Math.random()<catchP)res='catch';else if(defOK&&Math.random()<intP*0.4)res='int';}
@@ -1097,7 +1103,7 @@ function fumble(c){const B=G.ball,P=G.play;const a=Math.random()*Math.PI*2;Objec
 // head-on or into a standing player is high; catching a runner from behind is low
 function impactOf(d,c){const dx=c.x-d.x,dy=c.y-d.y,L=Math.hypot(dx,dy)||1;return Math.max(0,((d.vx-c.vx)*dx+(d.vy-c.vy)*dy)/L);}
 function tryTackle(d,c){
-  let brk=c.stiff>0?0.55:0.08;if(c.type==='shambler')brk+=0.08;if(c.burst>0)brk+=0.1;if(d.dive>0)brk*=0.5;if(legsOf(d)===0)brk+=0.3;if(armsOf(d)===0)brk+=0.25;
+  let brk=c.stiff>0?0.55:0.08;if(c.type==='shambler')brk+=0.08;if(c.burst>0)brk+=0.1;if(d.dive>0)brk*=0.5;if(legsOf(d)===0)brk+=0.3;if(armsOf(d)===0)brk+=0.25;if(c.slipT>0)brk=0.92;if(d.sure)brk*=0.5;
   if(Math.random()<brk){d.stun=1.0;d.dive=0;d.vx=-d.vx*0.3;d.vy=-d.vy*0.3;sfx.hit();if(c.stiff>0)announce(pick(LINES.stiff).split('{n}').join(c.name));c.stiff=0;return false;}
   // damage scales with closing speed (measured: median ~7 yd/s, top 5% above 13.5)
   const imp=impactOf(d,c),tier=imp>=13.5?3:imp>=10?2:imp>=4?1:0;
@@ -1122,7 +1128,7 @@ function tryTackle(d,c){
   endPlay('tackle',spot);return true;
 }
 function tackles(){const B=G.ball;if(B.state!=='held')return;const c=B.carrier;
-  for(const d of G.teams[1-c.team]){if(d.out||d.stun>0||d.blockedBy)continue;
+  for(const d of G.teams[1-c.team]){if(d.out||d.stun>0||d.blockedBy||d.noTackle>0)continue;
     const reach=(d.dive>0?1.35:0.95)*(d.team!==G.userTeam?D().reach:1);
     if(dist(d,c)<reach){if(tryTackle(d,c))return;}}}
 function blocks(dt){
@@ -1155,7 +1161,7 @@ function checkBounds(){const P=G.play,B=G.ball;if(B.state!=='held')return;const 
 
 // ===== play flow =====
 function updateLive(dt){
-  const P=G.play,B=G.ball,off=P.off,f=dir(off);annLive();
+  const P=G.play,B=G.ball,off=P.off,f=dir(off);annLive();skillsTick(dt);
   P.time+=dt;G.clock=Math.max(0,G.clock-dt);
   const all=[...G.teams[0],...G.teams[1]].filter(p=>!p.out);
   for(const p of all){p.stun=Math.max(0,p.stun-dt);p.burst=Math.max(0,p.burst-dt);p.stiff=Math.max(0,p.stiff-dt);p.stiffCd=Math.max(0,p.stiffCd-dt);p.shedCd=Math.max(0,p.shedCd-dt);p.delay=Math.max(0,p.delay-dt);p.stumble=Math.max(0,p.stumble-dt);p.hustle=false;
@@ -1850,6 +1856,89 @@ function cheerUpdate(){
   crowdHype(side,0.9);playS('cheer_small',0.6,1,0,{pan:sidePan(side)});
   const off=G.poss;crowdSay(side===off?'chant_brains':'chant_def',side,0.65,0.2);}
 
+// ===== SPECIAL SKILLS: one per zombie type, by role and species; usable once every 3 plays (R key / SKILL button) =====
+// On defense every player has his species' tackling skill. The computer uses skills too, at most one per team per play.
+const SKILLS={
+  zombie:{qb:{id:'brainwave',name:'Brain Wave',tip:'next throw is perfect'},rb:{id:'fallapart',name:'Fall Apart',tip:'shed an arm, slip tackles'},
+          wr:{id:'rubber',name:'Rubber Arm',tip:'catch from way out of reach'},line:{id:'gutbomb',name:'Gut Bomb',tip:'blast everyone around you'},
+          def:{id:'lunge',name:'Horde Lunge',tip:'leap onto the ball carrier'}},
+  mummy:{qb:{id:'curse',name:'Curse of the Pharaoh',tip:'freeze the nearest rusher'},rb:{id:'sandstorm',name:'Sandstorm',tip:'blind nearby tacklers'},
+          wr:{id:'unravel',name:'Unravel',tip:'bandage-whip catch from afar'},line:{id:'entomb',name:'Entomb',tip:'wrap up the man in front'},
+          def:{id:'wrap',name:'Wrap Tackle',tip:'lasso the carrier from range'}}};
+const SKILL_LINE={brainwave:'Brain Wave! That throw is guided by pure thought!',fallapart:"He's falling apart! On purpose!",rubber:'Rubber arm! That is not anatomically possible!',
+  gutbomb:'Gut bomb! Nobody wants to be in front of that!',lunge:'Horde lunge! He launched himself!',curse:"The curse of the Pharaoh! He's frozen solid!",
+  sandstorm:'Sandstorm! Nobody can see a thing!',unravel:'He unraveled himself to make the catch!',entomb:"Entombed! That rusher isn't going anywhere!",wrap:'Wrap tackle! Bandaged up like a birthday present!'};
+const SKILL_CD=3;
+function skillOf(p){if(!G||!G.play)return null;const sp=p.team===0?'zombie':'mummy';return SKILLS[sp][p.team===G.play.off?(BODY_OF[p.idx]||'qb'):'def'];}
+function skillLeft(p){return Math.max(0,SKILL_CD-(G.playsDone-(p.skillAt==null?-99:p.skillAt)));}   // plays until ready
+function enemies(p){return G.teams[1-p.team].filter(q=>!q.out);}
+function nearestEnemy(p,max){let b=null,bd=max||1e9;for(const q of enemies(p)){const d=dist(p,q);if(d<bd){bd=d;b=q;}}return b;}
+function skillFx(k,p,extra){(G.sfx||(G.sfx=[])).push(Object.assign({k,x:p.x,y:p.y,t:0,team:p.team,p},extra||{}));}
+function skillChime(up){if(!sfx.ok())return;try{const t=AC.currentTime;for(let i=0;i<4;i++){const o=AC.createOscillator(),g=AC.createGain();o.type='triangle';
+  o.frequency.value=(up?[523,659,784,1046]:[392,311,262,196])[i];g.gain.setValueAtTime(0,t+i*0.06);g.gain.linearRampToValueAtTime(0.18,t+i*0.06+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.06+0.4);
+  o.connect(g);g.connect(master);o.start(t+i*0.06);o.stop(t+i*0.06+0.45);}}catch(e){}}
+function useSkill(p,cpu){
+  const P=G.play,B=G.ball;if(!p||p.out||mode!=='live'||p.stun>0)return false;
+  const S=skillOf(p);if(!S)return false;
+  if(skillLeft(p)>0){if(!cpu)hint(`${S.name} ready in ${skillLeft(p)} play${skillLeft(p)>1?'s':''}`);return false;}
+  P.skillUsed=P.skillUsed||[0,0];G.teamSkillAt=G.teamSkillAt||[-99,-99];
+  if(P.skillUsed[p.team]||G.playsDone-G.teamSkillAt[p.team]<2){if(!cpu)hint('Your team already used a skill; next one in '+Math.max(1,2-(G.playsDone-G.teamSkillAt[p.team]))+' play');return false;}
+  const car=B.state==='held'?B.carrier:null;let ok=true;
+  switch(S.id){
+    case 'brainwave':ok=car===p&&P.canPass&&armsOf(p)>0;if(ok){p.perfectThrow=true;skillFx('glow',p,{col:'#9fe8ff',dur:1.5});}break;
+    case 'curse':{const q=nearestEnemy(p,7);ok=!!q;if(ok){q.stun=Math.max(q.stun,1.4);q.vx=q.vy=0;skillFx('curse',q,{dur:1.4});}}break;
+    case 'fallapart':ok=car===p;if(ok){const arm=p.limbs.la?'la':p.limbs.ra?'ra':null;if(arm&&armsOf(p)>1)removeLimb(p,arm);p.slipT=1.6;p.burst=Math.max(p.burst,0.9);skillFx('burst',p,{col:'#c4dcab',dur:0.6});}break;
+    case 'sandstorm':for(const q of enemies(p))if(dist(p,q)<3.6){q.stumble=Math.max(q.stumble,1.4);q.noTackle=1.4;}skillFx('sand',p,{dur:1.6,follow:true});break;
+    case 'rubber':case 'unravel':p.reachT=2.6;skillFx(S.id==='rubber'?'arm':'band',p,{dur:2.6,follow:true});break;
+    case 'gutbomb':{let n=0;for(const q of enemies(p))if(dist(p,q)<2.6){const dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy)||1;q.x+=dx/d*1.6;q.y+=dy/d*1.6;q.stun=Math.max(q.stun,0.9);n++;}
+      ok=n>0;if(ok){skillFx('ring',p,{col:'#b4ff5a',dur:0.6});G.shake=Math.max(G.shake,5);playS('splat',0.7);}}break;
+    case 'entomb':{const q=nearestEnemy(p,3.2);ok=!!q;if(ok){q.stun=Math.max(q.stun,1.5);q.vx=q.vy=0;skillFx('tomb',q,{dur:1.5});}}break;
+    case 'lunge':case 'wrap':{ok=!!car&&car.team!==p.team&&dist(p,car)<(S.id==='wrap'?4.2:3.4)&&dist(p,car)>0.6;
+      if(ok){const dx=car.x-p.x,dy=car.y-p.y,d=Math.hypot(dx,dy);skillFx(S.id==='wrap'?'lasso':'dash',p,{tx:car.x,ty:car.y,dur:0.45});
+        if(S.id==='lunge'){p.x+=dx/d*(d-0.5);p.y+=dy/d*(d-0.5);}else{car.x-=dx/d*Math.min(1.5,d-0.6);car.y-=dy/d*Math.min(1.5,d-0.6);car.vx=car.vy=0;car.stumble=0.8;}
+        p.sure=S.id==='lunge';p.dive=0.35;if(S.id==='lunge')tryTackle(p,car);p.sure=false;}}break;}
+  if(!ok){if(!cpu)hint(`${S.name}: ${S.tip}, not possible right now`);return false;}
+  p.skillAt=G.playsDone;P.skillUsed[p.team]=1;G.teamSkillAt[p.team]=G.playsDone;
+  skillChime(true);playS(p.team===0?'snarl':'groan',0.6);big(S.name.toUpperCase()+'!',1.1,p.team===0?'#b4ff5a':'#ffb46a');
+  annSay(SKILL_LINE[S.id],2,'color');tick(SKILL_LINE[S.id],true);
+  return true;}
+function hint(t){G.hintMsg={t,life:1.8};}
+function skillsTick(dt){
+  for(const tm of G.teams)for(const p of tm){if(p.reachT>0)p.reachT-=dt;if(p.slipT>0)p.slipT-=dt;if(p.noTackle>0)p.noTackle-=dt;}
+  if(G.sfx)G.sfx=G.sfx.filter(f=>(f.t+=dt)<f.dur);if(G.hintMsg&&(G.hintMsg.life-=dt)<=0)G.hintMsg=null;
+  // the computer's skills
+  const P=G.play,B=G.ball,cpuT=1-G.userTeam;if(G.userTeam<0)return skillsAI(0,dt),skillsAI(1,dt);skillsAI(cpuT,dt);}
+function skillsAI(t,dt){
+  const P=G.play,B=G.ball;if((P.skillUsed||[0,0])[t])return;if(Math.random()>dt*4)return;   // look about 4 times a second
+  const car=B.state==='held'?B.carrier:null;
+  for(const p of G.teams[t]){if(p.out||p.stun>0||skillLeft(p)>0)continue;const S=skillOf(p);if(!S)continue;let go=false;
+    switch(S.id){
+      case 'curse':go=car===p&&pressureOn(p)<2.4&&Math.random()<0.5;break;
+      case 'fallapart':case 'sandstorm':go=car===p&&p!==P.qb&&(nearestEnemy(p,1.9)!=null)&&Math.random()<0.35;break;
+      case 'rubber':case 'unravel':go=B.state==='air'&&B.target===p&&dist(p,{x:B.tx,y:B.ty})>1.7&&B.dur-B.t<0.9;break;
+      case 'gutbomb':case 'entomb':go=p.team===P.off&&!!(p.engaged)&&Math.random()<0.04;break;
+      case 'lunge':case 'wrap':go=car&&car.team!==t&&car!==P.qb&&dir(P.off)*(car.x-G.los)>2&&dist(p,car)>1.8&&dist(p,car)<(S.id==='wrap'?4:3.2)&&Math.random()<0.2;break;}
+    if(go&&useSkill(p,true))return;}}
+function drawSkillFx(){
+  for(const f of (G.sfx||[])){const p=f.follow&&f.p?f.p:f,x=SX(p.y),y=SY(p.x),u=f.t/f.dur;ctx.save();
+    switch(f.k){
+      case 'glow':ctx.strokeStyle=f.col;ctx.globalAlpha=1-u;ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y-SS*1.3,SS*(1+u*1.5),0,7);ctx.stroke();break;
+      case 'burst':for(let i=0;i<10;i++){const a=i/10*6.28;ctx.fillStyle=f.col;ctx.globalAlpha=1-u;ctx.beginPath();ctx.arc(x+Math.cos(a)*SS*2*u,y-SS*1.2+Math.sin(a)*SS*2*u,SS*0.25,0,7);ctx.fill();}break;
+      case 'ring':ctx.strokeStyle=f.col;ctx.globalAlpha=1-u;ctx.lineWidth=8*(1-u)+2;ctx.beginPath();ctx.ellipse(x,y,SS*2.8*u+SS*0.5,SS*1.2*u+SS*0.25,0,0,7);ctx.stroke();break;
+      case 'curse':ctx.fillStyle='rgba(120,255,140,'+(0.45*(1-u*0.5))+')';ctx.beginPath();ctx.ellipse(x,y-SS*1.2,SS*1.1,SS*1.6,0,0,7);ctx.fill();
+        ctx.font=`${Math.round(SS*1.2)}px serif`;ctx.textAlign='center';ctx.fillStyle='#d6ffd6';ctx.fillText('𓂀',x,y-SS*3.4);break;
+      case 'tomb':ctx.strokeStyle='#efe6cf';ctx.lineWidth=SS*0.3;for(let i=0;i<4;i++){ctx.beginPath();ctx.moveTo(x-SS*0.8,y-SS*(0.4+i*0.55));ctx.lineTo(x+SS*0.8,y-SS*(0.7+i*0.55));ctx.stroke();}break;
+      case 'sand':for(let i=0;i<26;i++){const a=i*2.4+f.t*3,r=SS*(1+((i*37)%30)/10);ctx.fillStyle=`rgba(214,180,110,${0.55*(1-u)})`;ctx.beginPath();ctx.arc(x+Math.cos(a)*r,y-SS+Math.sin(a)*r*0.6,SS*0.5,0,7);ctx.fill();}break;
+      case 'arm':case 'band':{const B=G.ball;if(B.state==='air'){const tx=SX(B.ty),ty=SY(B.tx),k=Math.min(1,f.t*3);
+          ctx.strokeStyle=ZOUT;ctx.lineWidth=SS*0.55;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,y-SS*1.6);ctx.lineTo(x+(tx-x)*k*0.85,y-SS*1.6+(ty-y+SS*1.6)*k*0.85);ctx.stroke();
+          ctx.strokeStyle=f.k==='arm'?STYLE_OF(f.team).skin:'#efe6cf';ctx.lineWidth=SS*0.35;ctx.stroke();}
+        ctx.strokeStyle=f.k==='arm'?'#b4ff5a':'#ffd23a';ctx.globalAlpha=0.6;ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y-SS*1.2,SS*(1.6+Math.sin(f.t*12)*0.2),0,7);ctx.stroke();}break;
+      case 'dash':case 'lasso':{const tx=SX(f.ty),ty=SY(f.tx);ctx.strokeStyle=f.k==='dash'?'rgba(180,255,90,0.8)':'#efe6cf';ctx.lineWidth=f.k==='dash'?SS*0.9*(1-u):SS*0.3;
+        ctx.setLineDash(f.k==='lasso'?[SS*0.6,SS*0.3]:[]);ctx.beginPath();ctx.moveTo(x,y-SS);ctx.lineTo(tx,ty-SS);ctx.stroke();ctx.setLineDash([]);}break;}
+    ctx.restore();}
+  if(G.hintMsg){ctx.save();ctx.globalAlpha=Math.min(1,G.hintMsg.life*2);ctx.font='22px Bangers, Arial';ctx.textAlign='center';ctx.fillStyle='#ffe14a';ctx.strokeStyle='#000';ctx.lineWidth=4;
+    ctx.strokeText(G.hintMsg.t,W/2,HUD+FH*0.62);ctx.fillText(G.hintMsg.t,W/2,HUD+FH*0.62);ctx.restore();}}
+
 function draw(){
   ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
   ctx.clearRect(0,0,W,H);
@@ -1868,7 +1957,7 @@ function draw(){
     hline(G.crossed?(P.off===0?110:10):60,'rgba(255,225,74,0.9)',3,[10,6]);}
   drawRoutes();
   if(G.ball&&G.ball.state==='air'){const B=G.ball,x=SX(B.ty),y=SY(B.tx),s=7+Math.sin(time*12)*2;ctx.strokeStyle=B.target&&B.target.team===G.userTeam?'#ffe14a':'#ff7a5a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x-s,y-s);ctx.lineTo(x+s,y+s);ctx.moveTo(x+s,y-s);ctx.lineTo(x-s,y+s);ctx.stroke();}
-  const ps=[...G.teams[0],...G.teams[1]].filter(p=>!p.out).sort((a,b)=>b.x-a.x);for(const p of ps)drawPlayer(p);drawBrawlCloud();
+  const ps=[...G.teams[0],...G.teams[1]].filter(p=>!p.out).sort((a,b)=>b.x-a.x);for(const p of ps)drawPlayer(p);drawBrawlCloud();drawSkillFx();
   drawBall();
   for(const A of G.abducts)drawAbduct(A);
   for(const q of G.parts)if(q.k==='smoke'){ctx.globalAlpha=Math.min(0.45,q.life*0.8);ctx.fillStyle=q.c;ctx.beginPath();ctx.arc(SX(q.y),SY(q.x),q.r*SS,0,7);ctx.fill();}
@@ -1908,19 +1997,21 @@ joyZone.addEventListener('pointerup',endJoy);joyZone.addEventListener('pointerca
 function bindBtn(el,code,fn){
   el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();audioInit();cap(el,e);el.classList.add('down');if(code){keys[code]=true;pressed[code]=true;}if(fn)fn();});
   const up=()=>{el.classList.remove('down');if(code)keys[code]=false;};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);}
-bindBtn($('btnAct'),'Space');bindBtn($('btnBurst'),'ShiftLeft');bindBtn($('btnSwitch'),'Tab');
+bindBtn($('btnAct'),'Space');bindBtn($('btnSkill'),'KeyR');bindBtn($('btnBurst'),'ShiftLeft');bindBtn($('btnSwitch'),'Tab');
 bindBtn($('thr1'),'KeyQ');bindBtn($('thr2'),'KeyE');bindBtn($('thr3'),'KeyV');
 bindBtn($('btnPause'),null,()=>pauseGame());
-bindBtn($('pkQ'),'KeyQ');bindBtn($('pkE'),'KeyE');bindBtn($('pkV'),'KeyV');bindBtn($('pkAct'),'Space');bindBtn($('pkBurst'),'ShiftLeft');bindBtn($('pkSw'),'Tab');bindBtn($('pkEsc'),null,()=>pauseGame());
+bindBtn($('pkSkill'),'KeyR');bindBtn($('pkQ'),'KeyQ');bindBtn($('pkE'),'KeyE');bindBtn($('pkV'),'KeyV');bindBtn($('pkAct'),'Space');bindBtn($('pkBurst'),'ShiftLeft');bindBtn($('pkSw'),'Tab');bindBtn($('pkEsc'),null,()=>pauseGame());
 let pcState='';
 function updatePCBar(){const bar=$('pcbar');const show=!touchOn&&!!G&&(mode==='live'||mode==='presnap');
   if(!show){if(pcState!=='hide'){pcState='hide';bar.classList.remove('on');}return;}
   const P=G.play,B=G.ball,c=G.ctrl,off=P.off===G.userTeam,isCar=!!c&&B.state==='held'&&B.carrier===c,canThrow=off&&isCar&&c===P.qb&&P.canPass&&armsOf(c)>0;
   const nm=k=>{const r=P.recv[k];return r&&!r.out?r.name.split(' ')[0]:'';};
-  const st=[off,isCar,canThrow,c&&c.burstUsed,nm('KeyQ'),nm('KeyE'),nm('KeyV')].join('|');if(st===pcState)return;pcState=st;bar.classList.add('on');
+  const S=c?skillOf(c):null,sl=c?skillLeft(c):0;
+  const st=[off,isCar,canThrow,c&&c.burstUsed,nm('KeyQ'),nm('KeyE'),nm('KeyV'),S&&S.name,sl].join('|');if(st===pcState)return;pcState=st;bar.classList.add('on');
   for(const [id,k] of [['pkQ','KeyQ'],['pkE','KeyE'],['pkV','KeyV']]){const el=$(id);el.style.display=off?'flex':'none';el.querySelector('span').textContent=nm(k)?'→ '+nm(k):'';el.classList.toggle('off',!(canThrow&&nm(k)));}
   $('pkAct').querySelector('span').textContent=off?'stiff arm':'dive';$('pkAct').classList.toggle('off',off&&!isCar);
-  $('pkBurst').classList.toggle('off',!!(c&&c.burstUsed));$('pkSw').querySelector('span').textContent=off?'take over':'switch';}
+  $('pkBurst').classList.toggle('off',!!(c&&c.burstUsed));
+  $('pkSkill').querySelector('span').textContent=S?(sl?`${S.name} (${sl})`:S.name):'skill';$('pkSkill').classList.toggle('off',!S||sl>0);$('pkSkill').title=S?S.tip:'';$('pkSw').querySelector('span').textContent=off?'take over':'switch';}
 $('wrap').addEventListener('pointerdown',()=>{if(mode==='claw')clawEnd();},true);
 {const mb=$('menuBtn');const go=e=>{e.preventDefault();e.stopPropagation();audioInit();pauseGame();};mb.addEventListener('pointerdown',go);mb.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});}
 function menuBtnUpdate(){const on=!!G&&['playcall','presnap','live','dead'].includes(mode);const mb=$('menuBtn');if(mb.style.display!==(on?'block':'none'))mb.style.display=on?'block':'none';}
@@ -1930,6 +2021,8 @@ document.addEventListener('touchend',()=>audioInit(),{passive:true});
 if(TOUCH)enableTouch();
 function updateTouchUI(){
   if(!touchOn)return;
+  {const el=$('btnSkill'),c=G&&G.ctrl,S=c&&mode==='live'?skillOf(c):null,sl=S?skillLeft(c):0,txt=S?S.name.replace('Curse of the Pharaoh','Pharaoh Curse')+(sl?` (${sl})`:''):'SKILL';
+   if(el.textContent!==txt)el.textContent=txt;el.classList.toggle('cd',!S||sl>0);el.style.display=G&&mode==='live'?'flex':'none';}
   const show=!!G&&(mode==='live'||mode==='presnap');let st='off';
   let off=false,isCar=false,canThrow=false,burstUsed=false,rv=[0,0,0];
   if(show){const P=G.play,B=G.ball,c=G.ctrl;off=P.off===G.userTeam;isCar=!!c&&B.state==='held'&&B.carrier===c;
