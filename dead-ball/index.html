@@ -206,7 +206,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.5.3';
+const VERSION='0.5.4';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -786,7 +786,7 @@ function continueGame(){const S=store.get(SAVE_KEY,null);if(!S)return;screenLeav
   G.poss=S.poss;G.los=S.los;G.stage=S.stage;G.crossed=S.crossed;G.savedAt=G.playsDone;
   toPlayCall();}
 function saveAndQuit(){saveNow();toTitle();}
-function startGame(){screenLeave();dj.gap=false;
+function startGame(){screenLeave();dj.gap=false;lastBrawl=-99;
   G=newG();
   SS=18;camCX=35;camCY=MID;viewCX=35;viewCY=MID;showOverlay(null);
   annStop();announce('Welcome to DEAD BALL! The Graveyard Shift get the ball first.',3);sfx.cheer();
@@ -1739,14 +1739,14 @@ const BRAWL_LINES={start:['Uh oh! We have a fight!','A brawl breaks out after th
 let lastBrawl=-9;
 function brawlCheck(){                              // once per play, half a second after the whistle
   const P=G.play;if(!P||P.brawlChecked||G.brawl)return;P.brawlChecked=1;
-  if(!G.res||G.res.type==='td'||G.playsDone-lastBrawl<4)return;
-  if(Math.random()>(P.callHit||P.callKo?0.45:0.2))return;
+  if(!G.res||G.res.type==='td'||G.playsDone-lastBrawl<12||(G.brawls||0)>=2)return;   // rare: at most 2 a game, 12+ plays apart
+  if(Math.random()>(P.callHit||P.callKo?0.09:0.025))return;
   let best=null,bd=4.5;
   for(const a of G.teams[0])for(const b of G.teams[1]){if(a.out||b.out||a.dance>0||b.dance>0)continue;
     const d=Math.hypot(a.x-b.x,a.y-b.y)-((a.engaged===b||b.engaged===a||a.blockedBy===b||b.blockedBy===a)?2:0);if(d<bd){bd=d;best=[a,b];}}
   if(!best)return;brawlStart(best[0],best[1]);}
 function brawlStart(a,b){
-  const P=G.play;lastBrawl=G.playsDone;P.commDone=1;
+  const P=G.play;lastBrawl=G.playsDone;G.brawls=(G.brawls||0)+1;P.commDone=1;
   const pow=p=>(p.ty.block||1)+((p.limbs.la?1:0)+(p.limbs.ra?1:0)+(p.limbs.ll?1:0)+(p.limbs.rl?1:0))*0.25+Math.random()*1.6;
   const win=pow(a)>=pow(b)?a:b,lose=win===a?b:a;
   G.brawl={a,b,win,lose,phase:'square',t:0,hitT:0,limbDone:false,cx:(a.x+b.x)/2,cy:(a.y+b.y)/2};
