@@ -206,7 +206,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.5.2';
+const VERSION='0.5.3';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Dead Ball v'+VERSION;
 
 'use strict';
@@ -1613,12 +1613,12 @@ function clawStart(){
   if(G.brawl){G.brawl.a.brawling=G.brawl.b.brawling=false;G.brawl=null;}
   const P=G.play,c=P.claw;P.clawDone=1;CLAW.last=G.playsDone;annStop();djClear();
   const t0=CLAW.rec[0].t,tEnd=CLAW.rec[CLAW.rec.length-1].t,peak=Math.min(Math.max(c.t,t0+0.4),tEnd-0.2);
-  CLAW.R={jumbo:clawJumbo(c,P),limb:!!P.callLimbs,kind:c.kind,peak,st:Math.max(t0,peak-1.15),end:Math.min(tEnd,peak+1.4),phase:'in',real:0,yaw:0,tilt:1,ss:26,fx:c.x,fy:c.y,
+  CLAW.R={jumbo:clawJumbo(c,P),limb:!!P.callLimbs,kind:c.kind,peak,st:Math.max(t0,peak-0.95),end:Math.min(tEnd,peak+1.1),phase:'in',real:0,yaw:0,tilt:1,ss:26,fx:c.x,fy:c.y,
     dir:Math.random()<0.5?1:-1,said:false,fade:0};
   clawAngle(CLAW.R);mode='claw';clawWhoosh(true);
   setTimeout(()=>{if(mode==='claw'){const l=pick(CLAW_LINES.intro);tick(l,true);annSay(l,3,'color');}},60);
   if(settings.music!=='off')djTrack(0);}
-function clawEnd(){if(mode!=='claw')return;CLAW.R=null;annStop();mode='dead';G.timer=0.05;viewCX=camCX;viewCY=camCY;}
+function clawEnd(){if(mode!=='claw')return;CLAW.R=null;mode='dead';G.timer=0.05;viewCX=camCX;viewCY=camCY;}
 function clawWhoosh(down){if(!sfx.ok())return;try{const t=AC.currentTime,s=AC.createBufferSource();s.buffer=noiseBuf(1.3);const f=AC.createBiquadFilter(),g=AC.createGain();
   f.type='bandpass';f.Q.value=2;f.frequency.setValueAtTime(down?2400:300,t);f.frequency.exponentialRampToValueAtTime(down?220:2600,t+1.1);
   g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.5,t+0.15);g.gain.linearRampToValueAtTime(0,t+1.2);s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+1.3);
@@ -1664,13 +1664,13 @@ function clawAngle(R){             // pick where the camera ends up, relative to
   R.yaw0=0;R.dYaw=d;R.view=pickName;R.yaw=0;}
 function clawUpdate(dt){
   const R=CLAW.R;if(!R)return;R.real+=dt;let sp;
-  if(R.phase==='in'){const left=R.peak-R.st;sp=left>0.25?0.75:0.04+0.71*Math.max(0,left/0.25);R.st+=sp*dt;R.ss+=(34-R.ss)*dt*1.2;R.tilt+=(0.86-R.tilt)*dt*1.6;
+  if(R.phase==='in'){const left=R.peak-R.st;sp=left>0.18?1.0:0.06+0.94*Math.max(0,left/0.18);R.st+=sp*dt;R.ss+=(34-R.ss)*dt*2;R.tilt+=(0.86-R.tilt)*dt*2.5;
     if(R.st>=R.peak){R.st=R.peak;R.phase='freeze';R.pt=0;clawWhoosh(true);}}
-  else if(R.phase==='freeze'){R.pt+=dt;const u=Math.min(1,R.pt/1.5),e=u*u*(3-2*u);R.yaw=R.yaw0+R.dYaw*e;R.tilt=0.86-0.26*e-0.08*Math.sin(Math.PI*u);R.ss+=(46-R.ss)*dt*2;R.st+=0.015*dt;
+  else if(R.phase==='freeze'){R.pt+=dt;const u=Math.min(1,R.pt/1.0),e=u*u*(3-2*u);R.yaw=R.yaw0+R.dYaw*e;R.tilt=0.86-0.26*e-0.08*Math.sin(Math.PI*u);R.ss+=(46-R.ss)*dt*3;R.st+=0.015*dt;
     if(!R.said&&R.pt>0.1){R.said=true;const k=R.kind==='crush'||R.kind==='hit'?(R.limb?'limb':'hit'):R.kind;const l=pick(CLAW_LINES[k]||CLAW_LINES.hit);tick(l,true);annSay(l,3,'color');}
-    if(R.pt>=1.7){R.phase='out';R.pt=0;clawWhoosh(false);}}
-  else if(R.phase==='out'){R.pt+=dt;R.ss+=(36-R.ss)*dt*0.9;sp=Math.min(0.6,0.04+R.pt*0.8);R.st+=sp*dt;if(R.st>=R.end||R.pt>3.0){R.phase='fade';R.fade=0;}}
-  else if(R.phase==='fade'){R.fade+=dt*3.5;if(R.fade>=1)clawEnd();}
+    if(R.pt>=1.15){R.phase='out';R.pt=0;clawWhoosh(false);}}
+  else if(R.phase==='out'){R.pt+=dt;R.ss+=(36-R.ss)*dt*0.9;sp=Math.min(0.85,0.08+R.pt*1.6);R.st+=sp*dt;if(R.st>=R.end||R.pt>1.9){R.phase='fade';R.fade=0;}}
+  else if(R.phase==='fade'){R.fade+=dt*5;if(R.fade>=1)clawEnd();}
   // follow the action, lock on the moment during the freeze
   const fr=clawFrame(R.st);if(fr&&R.phase!=='freeze'){const b=fr.b;const tx=b&&b.s!=='dead'?b.x:R.fx,ty=b&&b.s!=='dead'?b.y:R.fy;
     const k=R.phase==='in'&&R.peak-R.st<0.5?0.12:0.05;R.fx+=(tx-R.fx)*k;R.fy+=(ty-R.fy)*k;}}
