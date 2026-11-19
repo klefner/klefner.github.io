@@ -25,11 +25,11 @@ const GAMES = [
   },
   {
     id: 'dead-ball',
-    title: 'Dead Ball',
+    title: 'Rotball',
     tagline: 'Football. Undead.',
     description:
-      'Zombie football with a rotting brain for a ball: cross midfield before it goes putrid or it bursts. ' +
-      'Tackles knock limbs off, and a one-legged receiver plays like one. Keyboard on PC, touch controls on iPhone.',
+      'Zombie football with a rotting brain for a ball: gain enough yards or a zombie takes a bite, and three bites ' +
+      'and it\'s eaten. Tackles knock limbs off, and there\'s a zombie halftime show. Keyboard on PC, touch controls on iPhone.',
     screenshot: 'assets/dead-ball-screenshot.png',
     url: 'https://klefner.github.io/dead-ball/',
     accent: '#9dff57',

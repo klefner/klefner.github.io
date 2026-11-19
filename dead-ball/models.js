@@ -1,7 +1,9 @@
 // Dead Ball cartoon zombie renderer, ¾ view.
 // drawZombie(ctx, x, y, size, o): (x,y) = feet on the ground, size = on-screen height in px of a standing QB.
 // o = {team:STYLE, body:'line'|'wr'|'qb'|'rb', view:'front'|'back'|'side', flip:bool, phase:rad, speed:0..1,
-//      limbs:{la,ra,ll,rl,head}, pose:'run'|'stand'|'zombie'|'carry'|'down'|'dive'|'block', num:int, t:seconds, seed:int}
+//      limbs:{la,ra,ll,rl,head}, pose:'run'|'stand'|'zombie'|'carry'|'down'|'dive'|'block'|'stiff'|'die' (o.stiffK 0..1 arm reach, o.stiffBall: brain tucked in the far arm;
+//      'die' is side on: o.knee 0..1 knees buckle to kneeling, o.slump radians the upper body folds forward, o.hang radians of extra
+//      tilt the hanging arms correct for, o.arms 'limp'|'flail'|'clutch'|'cheer'|'out'), num:int, t:seconds, seed:int}
 const ZSTYLE={
   zombie:{jersey:'#6a2c9c',jerseyDk:'#4a1a72',trim:'#f3c34b',pants:'#e8dcc0',pantsDk:'#bfae8c',sock:'#6a2c9c',
     helmet:'#5a2388',helmetHi:'#9a5fd0',stripe:'#f3c34b',mask:'#c9ccd2',skin:'#9fbf86',skinDk:'#6f8f5c',skinHi:'#c4dcab',species:'zombie'},
@@ -130,25 +132,34 @@ function drawZombie(c,x,y,size,o){
   const S=o.team,B=ZBODY[o.body||'qb'],L=o.limbs||{la:1,ra:1,ll:1,rl:1,head:1},mum=S.species==='mummy';
   let view=o.view||'front',pose=o.pose||'run';if(view!=='side'&&pose!=='down'&&pose!=='dive')o=Object.assign({},o,{flip:false});const ph=o.phase||0,spd=o.speed==null?1:o.speed;
   const nLegs=(L.ll?1:0)+(L.rl?1:0);
-  if(nLegs===0&&pose!=='down'&&pose!=='dive'&&pose!=='stand')pose='crawl';                 // no legs: drag himself along on his arms
-  const hop=nLegs===1&&['run','carry','zombie','block'].includes(pose)&&spd>0.15;          // one leg: hops
+  if(nLegs===0&&pose!=='down'&&pose!=='dive'&&pose!=='stand'&&pose!=='die')pose='crawl';                 // no legs: drag himself along on his arms
+  const hop=nLegs===1&&['run','carry','zombie','block','stiff'].includes(pose)&&spd>0.15;          // one leg: hops
   const hopH=hop?Math.abs(Math.sin(ph*0.5))*13*Math.min(1,spd+0.3):0;
   c.save();c.translate(x,y);const k=size/100;c.scale(k*(o.flip&&(view==='side'||pose==='down'||pose==='dive'||pose==='crawl')?-1:1),k);
   // shadow
-  c.fillStyle='rgba(0,0,0,0.28)';c.beginPath();c.ellipse(0,1,pose==='down'||pose==='dive'||pose==='crawl'?52:(24*B.w+4)*(1-hopH/40),7*(1-hopH/40),0,0,7);c.fill();
+  if(!o.noShadow){c.fillStyle='rgba(0,0,0,0.28)';c.beginPath();c.ellipse(0,1,pose==='down'||pose==='dive'||pose==='crawl'?52:pose==='feed'?34:(24*B.w+4)*(1-hopH/40),7*(1-hopH/40),0,0,7);c.fill();}
   if(hop)c.translate(0,-hopH);
+  const DJ=pose==='dance'?(o.dj||{}):null;if(DJ&&DJ.air)c.translate(0,-DJ.air);   // dancing: a real jump lifts the whole body off its shadow
   if(pose==='down'){c.translate(46,-9);c.rotate(-Math.PI/2);view='side';}          // flat on his back, head to the left
   else if(pose==='dive'){c.translate(-44,-26);c.rotate(Math.PI/2*0.82);view='side';}  // airborne, head first to the right
   else if(pose==='crawl'){c.translate(-38+Math.sin(ph)*2,-12);c.rotate(Math.PI/2*0.9);view='side';}  // belly down, head first to the right
-  const bob=hop||pose==='crawl'?0:pose==='stand'||pose==='down'?Math.sin((o.t||0)*2.2)*0.8:-Math.abs(Math.sin(ph))*3*spd;
-  const lean=view==='side'&&pose!=='stand'&&pose!=='down'&&pose!=='crawl'?6*spd:0;
-  const hip=-B.leg+bob,sh=hip-B.torso,hd=sh-19*B.head;
+  else if(pose==='feed'||pose==='die')view='side';
+  else if(pose==='stiff')view='side';                                                  // stiff arm: always side on, shoving to the right                                                   // on hands and knees over a meal, head to the right
+  const kn=pose==='die'?Math.max(0,Math.min(1,o.knee||0)):0;
+  const bob=hop||pose==='crawl'||pose==='feed'||pose==='die'||pose==='dance'?0:pose==='stand'||pose==='down'?Math.sin((o.t||0)*2.2)*0.8:-Math.abs(Math.sin(ph))*3*spd;
+  const lean=pose==='stiff'?-5:view==='side'&&pose!=='stand'&&pose!=='down'&&pose!=='crawl'&&pose!=='feed'&&pose!=='die'?6*spd:0;
+  const hip=(pose==='feed'?-B.leg*0.5:pose==='die'?-B.leg*(1-0.5*kn):DJ?-B.leg*(1-0.4*(DJ.sq||0)):-B.leg)+bob,sh=hip-B.torso,hd=sh-19*B.head;
   c.translate(0,0);
   const legOK={l:L.ll,r:L.rl},armOK={l:L.la,r:L.ra};
   // ---------- legs
   const legs=[];
   for(const [s,key] of [[-1,'l'],[1,'r']]){
     const hx=s*7*B.w;let foot,knee;
+    if(pose==='feed'){legs.push([s,[s*2,hip],[-22+s*3,-1],[3+s*2,-3],key]);continue;}   // kneeling: knee on the turf, shin flat behind
+    if(DJ){const f=(s<0?DJ.lf:DJ.rf)||[0,0],hx2=(view==='side'?lean:hx)+(DJ.hx||0),sq=DJ.sq||0;   // dancing: feet planted where the move puts them, knees bend to fit
+      const ft=view==='side'?[f[0],-f[1]]:[hx*(B.belly?1.15:1)+s*sq*5+f[0],-f[1]],hp=[hx2,hip],l=B.leg*0.53,dx=ft[0]-hp[0],dy=ft[1]-hp[1],d=Math.hypot(dx,dy)||1,m=Math.sqrt(Math.max(0,l*l-d*d/4));
+      const nx=-dy/d,ny=dx/d,out=view==='side'?(nx>=0?1:-1):(nx*s>=0?1:-1);legs.push([s,hp,ft,[(hp[0]+ft[0])/2+nx*m*out,(hp[1]+ft[1])/2+ny*m*out],key]);continue;}
+    if(pose==='die'){const L2=(a,b)=>a+(b-a)*kn;legs.push([s,[L2(0,s*2),hip],[L2(s*1.5,-22+s*3),L2(0,-1)],[L2(3,3+s*2),L2(-B.leg*0.5,-3)],key]);continue;}   // knees buckle from standing to kneeling
     if(hop){foot=[s*1.5,-hopH*0.35];knee=[hx+(view==='side'?6:0),hip*0.5-hopH*0.25];legs.push([s,[hx,hip],foot,knee,key]);continue;}
     if(view==='side'){const a=ph+(s>0?Math.PI:0);const st=pose==='stand'?0:Math.sin(a)*14*spd*(B.leg/30),lift=pose==='stand'?0:Math.max(0,Math.cos(a))*9*spd;
       foot=[st+lean*0.2,-lift];knee=[(st*0.55)+5*spd+lean*0.5,hip*0.5-lift*0.6];legs.push([s,[lean,hip],foot,knee,key]);}
@@ -156,9 +167,27 @@ function drawZombie(c,x,y,size,o){
       foot=[hx*(B.belly?1.15:1),-lift];knee=[hx*1.05,hip*0.5-lift*0.5];legs.push([s,[hx,hip],foot,knee,key]);}}
   if(view==='side')legs.sort((a,b)=>a[0]-b[0]);
   for(const [s,hp,ft,kn,key] of legs){if(legOK[key])zLeg(c,S,B,s,hp,ft,kn,mum);else zStump(c,hp[0],hp[1]+3,B.legW*0.7,true);}
+  if(pose==='feed'){c.translate(0,hip);c.rotate(o.feedRot==null?1:o.feedRot);c.translate(0,-hip);}   // hunch the upper body over the food
+  if(pose==='stiff'){c.translate(0,hip);c.rotate(-0.3*Math.min(1,(o.stiffK||0)*1.5));c.translate(0,-hip);}   // lean the body away from the tackler
+  if(DJ){c.translate((DJ.hx||0),hip);c.rotate(DJ.tilt||0);c.translate(0,-hip);}   // hips shift and the upper body leans with the move
+  const slump=pose==='die'?(o.slump||0):0;if(slump){c.translate(0,hip);c.rotate(slump);c.translate(0,-hip);}   // dying: the upper body folds forward at the hips
   // ---------- arms helper
   const armPts=(s)=>{const sx=view==='side'?lean+(s>0?2:-2):s*16*B.w,sp=[sx,sh+6];let el,hn;
-    if(pose==='crawl'){const r=Math.sin(ph+(s>0?0:Math.PI));el=[sx+17,sh-30-r*6];hn=[sx+23,sh-58-r*10];}
+    if(pose==='feed'){if(o.feedLift&&s>0){el=[sx+16,sh+12];hn=[sx+12,hd+12];}
+      else{const r=Math.sin(ph*2+(s>0?0:Math.PI));el=[sx+B.arm*0.45,sh+B.arm*0.42];hn=[sx+B.arm*0.98+r*5,sh+B.arm*0.12-r*4];}}
+    else if(pose==='stiff'){const r=Math.max(0,Math.min(1,o.stiffK==null?1:o.stiffK));
+      if(s>0){el=[sx+B.arm*(0.25+0.6*r),sh+B.arm*(0.45-0.45*r)];hn=[sx+B.arm*(0.35+1.3*r),sh+B.arm*(0.5-0.55*r)];}   // near arm: punches straight out at shoulder height
+      else{el=[sx-7,sh+B.arm*0.55];hn=[sx-1,sh+B.arm*0.38];}}                                                         // far arm: brain tucked to the chest
+    else if(pose==='die'){const tt=o.t||0,A=o.arms||'limp',sd=o.seed||0;
+      if(A==='flail'){el=[sx+6+Math.sin(tt*17+s+sd)*7,sh-6+Math.cos(tt*13+s)*4];hn=[sx+10+Math.sin(tt*21+s*2+sd)*12,sh-B.arm*0.85+Math.cos(tt*19+s*3)*7];}
+      else if(A==='cheer'){const pu=Math.sin(tt*8+sd+(s>0?0:1.3));el=[sx+(s>0?13:-11),sh-6-pu*3];hn=[sx+(s>0?25:-21),sh-B.arm*0.85-pu*7];}   // both fists pumping up and out, clear of the helmet
+      else if(A==='clutch'){const j=Math.sin(tt*40+s)*1.6;el=[sx+13,sh+12];hn=[sx+8+j,hd+14-j];}
+      else if(A==='out'){el=[sx+B.arm*0.55,sh+3];hn=[sx+B.arm*1.05,sh+1+Math.sin(tt*9+s)*3];}
+      else{const g=(o.hang==null?slump:o.hang),gx=Math.sin(g),gy=Math.cos(g),sw=Math.sin(tt*2.6+s+sd)*2;   // limp: the arms hang straight down, whatever the body is doing
+        el=[sx+gx*B.arm*0.5+sw*0.5,sh+gy*B.arm*0.5];hn=[sx+gx*B.arm*0.95+sw,sh+gy*B.arm*0.95];}}
+    else if(DJ){const a=(s<0?DJ.la:DJ.ra)||[0.2,0.3],U=B.arm*0.52,mx=view==='side'?1:s;   // dancing: shoulder angle (0 down, 1.57 out, 3.14 up) and elbow bend, per arm
+      el=[sx+mx*U*Math.sin(a[0]),sh+6+U*Math.cos(a[0])];hn=[el[0]+mx*U*Math.sin(a[0]+a[1]),el[1]+U*Math.cos(a[0]+a[1])];}
+    else if(pose==='crawl'){const r=Math.sin(ph+(s>0?0:Math.PI));el=[sx+17,sh-30-r*6];hn=[sx+23,sh-58-r*10];}
     else if(pose==='zombie'||pose==='block'){ if(view==='side'){el=[sx+B.arm*0.55,sh+8+(s>0?0:2)];hn=[sx+B.arm*1.05,sh+10+Math.sin((o.t||0)*3+s)*2];}
                        else if(view==='front'){el=[s*12*B.w,sh+12];hn=[s*8*B.w,sh+16+Math.sin((o.t||0)*3+s)*1.5];}
                        else{el=[s*20*B.w,sh+14];hn=[s*19*B.w,sh+22];} }
@@ -187,5 +216,10 @@ function drawZombie(c,x,y,size,o){
   else if(view==='side'){drawArm(1,'r');}
   else if(pose!=='zombie'){drawArm(-1,'l');drawArm(1,'r');}
   if(pose==='carry'&&L.ra&&o.ball!==false)ball();
+  if(pose==='stiff'&&L.ra&&(o.stiffK||0)>0.55){const [,,hn]=armPts(1);c.save();c.translate(hn[0]+2,hn[1]);   // big open palm facing the tackler
+    c.beginPath();c.ellipse(1,0,6.5,10,0,0,7);zFill(c,S.skin,2.6);c.strokeStyle=S.skinDk||'#333';c.lineWidth=2;
+    for(let i=-1;i<=1;i++){c.beginPath();c.moveTo(4,i*4.8);c.lineTo(9,i*5.6);c.stroke();}c.restore();}
+  if(pose==='feed'&&o.feedLift&&L.ra){const [,,hn]=armPts(1);c.fillStyle='#e88a9c';c.beginPath();c.ellipse(hn[0]+4,hn[1]-3,7,5,0.4,0,7);c.fill();c.strokeStyle='#a8394e';c.lineWidth=1.4;c.stroke();
+    c.fillStyle='#c3122c';c.beginPath();c.arc(hn[0]+8,hn[1]+1,1.8,0,7);c.fill();}   // a scrap of brain, lifted to the mouth
   c.restore();}
 if(typeof module!=='undefined')module.exports={drawZombie,ZSTYLE,ZBODY};
