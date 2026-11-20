@@ -207,20 +207,24 @@ function cerMedusa(M,t){   // a glamorous gorgon: evening gown, sash, sunglasses
   if(M.carry)cerTrophy(30,hy+6,M.carry==='big'?0.95:0.5,M.carry==='big');
   ctx.restore();}
 
-function cerSnakes(M,t,D){   // eight snakes; they hiss toward the winner at the hand-off and recoil at the stone gag
-  const hiss=M.hiss,shock=M.glasses<0.3?1:0;
-  for(let i=0;i<8;i++){const base=-2.7+i*0.77/1.4,bx=Math.cos(base)*14,by=-204+Math.sin(base)*16;
-    const len=(30+(i%3)*6)*(hiss?1.25:1),w=t*(hiss?6:3.2)+i*1.3+M.k;let ang=base+Math.sin(w)*(hiss?0.08:0.25);   // hissing: they stretch out, stiff and tongues out
-    if(shock)ang+=Math.sin(t*40+i)*0.15;   // the stone gag: they recoil and shiver
-    const pts=[];for(let j=0;j<=8;j++){const u=j/8,a=ang+Math.sin(w*1.6+u*5)*0.35*(1-shock*0.5);
-      const r=u*len*(shock?0.75:1);pts.push([bx+Math.cos(a)*r+Math.sin(w+u*6)*3*u,by+Math.sin(a)*r*0.9]);}
+function cerSnakes(M,t,D){   // a full head of snakes rooted along the scalp: the top ones rise, the side ones curl out and down to frame the face, never across it
+  ctx.fillStyle='#2f6d2a';ctx.beginPath();ctx.ellipse(0,-205,17,11,0,Math.PI,0);ctx.fill();   // the scalp the snakes grow from
+  const hiss=M.hiss,shock=M.glasses<0.3?1:0,N=12;   // they stretch out stiff when they hiss at the winner, and recoil and shiver at the stone gag
+  for(let i=0;i<N;i++){const k=i/(N-1),a0=-Math.PI+0.3+k*(Math.PI-0.6),m=Math.cos(a0)<0?-1:1,b0=m>0?a0:-Math.PI-a0;   // b0: the root angle mirrored onto the right half
+    const bx=Math.cos(a0)*16,by=-199+Math.sin(a0)*20,side=Math.max(0,Math.cos(b0));   // root on the scalp; side = how far round the side of the head it grows
+    const len=(26+((i*7)%4)*4)*(hiss?1.25:1),w=t*(hiss?6:3.2)+i*1.3+M.k;
+    const pts=[];for(let j=0;j<=8;j++){const u=j/8;
+      let b=b0+side*1.3*u+Math.sin(w*1.6+u*5)*(hiss?0.06:0.22)*u*(1-shock*0.5)+(shock?Math.sin(t*40+i)*0.15*u:0);   // side snakes curl down and out; all of them wiggle from the root
+      b=Math.max(-1.52,Math.min(1.25,b));   // stay on this half of the head: up, out or down, never across the face
+      const r=u*len*(shock?0.75:1);pts.push([bx+m*Math.cos(b)*r,by+Math.sin(b)*r]);}
     ctx.strokeStyle='#2f6d2a';ctx.lineWidth=6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(const q of pts)ctx.lineTo(q[0],q[1]);ctx.stroke();
     ctx.strokeStyle='#5fa84d';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(const q of pts)ctx.lineTo(q[0],q[1]);ctx.stroke();ctx.lineCap='butt';
     const [hx,hy]=pts[8],[px,py]=pts[7],ha=Math.atan2(hy-py,hx-px);
     ctx.save();ctx.translate(hx,hy);ctx.rotate(ha);ctx.fillStyle='#3f8a36';ctx.beginPath();ctx.ellipse(2,0,6,4,0,0,7);ctx.fill();
     ctx.fillStyle='#ffe14a';ctx.beginPath();ctx.arc(4,-2,1.3,0,7);ctx.fill();
     if(hiss||Math.sin(t*6+i*2.3)>0.85){ctx.strokeStyle='#d81b30';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(8,0);ctx.lineTo(14,0);ctx.lineTo(17,-2);ctx.moveTo(14,0);ctx.lineTo(17,2);ctx.stroke();}
-    ctx.restore();}}
+    ctx.restore();}
+}
 
 function cerCredits(t,S){
   ctx.save();ctx.fillStyle='#07040b';ctx.fillRect(0,S,W,H-S);ctx.beginPath();ctx.rect(0,S,W,H-S-36);ctx.clip();

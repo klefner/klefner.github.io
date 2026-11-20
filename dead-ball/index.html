@@ -86,9 +86,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 #keysMenu .mi.cap .kk{background:#ffe14a;animation:kblink .6s infinite alternate}@keyframes kblink{to{opacity:.45}}
 #keysMenu .mi.plain{justify-content:center;text-align:center}
 #keysNote{font:22px 'Roboto Condensed',Arial;color:#dbe6cf;margin:-4px 0 10px;text-align:center;max-width:600px}
-.big{font-family:'Creepster';font-size:72px;color:#9dff57;text-shadow:0 4px 0 #2b5a12,0 8px 20px #000;margin-bottom:6px}
+.big{font-family:'Creepster';font-size:72px;text-align:center;color:#9dff57;text-shadow:0 4px 0 #2b5a12,0 8px 20px #000;margin-bottom:6px}
 .sub2{font-size:24px;color:#dbe6cf;margin-bottom:16px;text-align:center;max-width:600px;line-height:1.4}
-.score{font-family:'Bangers';font-size:44px;letter-spacing:2px;margin-bottom:6px}
+.score{font-family:'Bangers';font-size:44px;letter-spacing:2px;margin-bottom:6px;text-align:center;white-space:nowrap}
 .stats{font-size:22px;color:#cbd8bd;margin-bottom:16px;text-align:center;line-height:1.5}
 </style>
 </head>
@@ -256,7 +256,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.12.12';
+const VERSION='0.12.13';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -941,7 +941,7 @@ $('howBack').onclick=()=>closeHowTo();
 
 let mode='title',prevMode=null,howFrom=null,activeMenu=titleMenu;
 function showOverlay(id){for(const o of document.querySelectorAll('.overlay'))o.classList.toggle('show',o.id===id);}
-function updateRecord(){$('rec').textContent=`Your record: ${record.w} W – ${record.l} L – ${record.t} T`;}
+function updateRecord(){$('rec').textContent=`Your record: ${record.w} W – ${record.l} L`;}   // no ties since Dead Time
 function toTitle(){annStop();G=null;setTimeout(()=>screenSound('title'),0);SS=16;mode='title';activeMenu=titleMenu;titleMenu.i=0;titleMenu.render();updateRecord();showOverlay('title');initDemo();}
 function exitGame(){mode='exit';activeMenu=exitMenu;showOverlay('exit');}
 let setFrom=null;
@@ -1849,6 +1849,7 @@ function finDraw(){const F=G.fin;if(!F)return;
 function halftime(){dj.gap=true;djClear();call('half',{},4);mode='half';G.halfT=0;screenLeave();showOverlay(null);hsStart();}
 function secondHalf(){screenLeave();dj.gap=false;G.savedAt=-1;for(const tm of G.teams)for(const p of tm){p.out=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
   G.quarter=G.periods/2+1;G.clock=QLEN;G.clawN=0;showOverlay(null);announce('Second half! Everyone is stitched up. The spare parts stay where they fell.');startPossession(1,85);toPlayCall();saveNow();}
+function fitLine(el,max,maxW){let f=max;el.style.fontSize=f+'px';for(let i=0;i<30&&el.scrollWidth>maxW&&f>18;i++){f-=2;el.style.fontSize=f+'px';}}   // one centered line: shrink long team names to fit
 function scoreLine(){return `<span style="color:${TEAMS[0].trim}">${TEAMS[0].name.toUpperCase()} ${G.score[0]}</span> &nbsp;—&nbsp; <span style="color:#ff9a6a">${G.score[1]} ${TEAMS[1].name.toUpperCase()}</span>`;}
 function gameOver(){
   clearSave();
@@ -1857,8 +1858,8 @@ function gameOver(){
   if(a>b){t='YOU WIN!';record.w++;sfx.cheer();sfx.applause();}else if(a<b){t='BACK TO THE GRAVE';record.l++;sfx.groan();}else{t='DEAD HEAT';record.t++;}
   store.set('rotball_record',record);call('final',{},4);
   $('overTitle').textContent=t;$('overScore').innerHTML=scoreLine();
-  $('overStats').innerHTML=`Total yards — ${TEAMS[0].name}: <b>${G.stats.yards[0]}</b> &nbsp;·&nbsp; ${TEAMS[1].name}: <b>${G.stats.yards[1]}</b><br>Limbs lost — ${TEAMS[0].name}: <b>${G.stats.limbs[0]}</b> &nbsp;·&nbsp; ${TEAMS[1].name}: <b>${G.stats.limbs[1]}</b><br>Your record: ${record.w} W – ${record.l} L – ${record.t} T`;
-  showOverlay('over');
+  $('overStats').innerHTML=`Total yards — ${TEAMS[0].name}: <b>${G.stats.yards[0]}</b> &nbsp;·&nbsp; ${TEAMS[1].name}: <b>${G.stats.yards[1]}</b><br>Limbs lost — ${TEAMS[0].name}: <b>${G.stats.limbs[0]}</b> &nbsp;·&nbsp; ${TEAMS[1].name}: <b>${G.stats.limbs[1]}</b><br>Your record: ${record.w} W – ${record.l} L`;
+  showOverlay('over');fitLine($('overScore'),44,660);
 }
 
 // ===== demo (title background) =====
@@ -2250,6 +2251,7 @@ function drawHUD(){
     ctx.fillText(TEAMS[t].name.toUpperCase(),t===0?x0+12:x0+bw-12,36);
     ctx.font='38px Bangers, Arial';ctx.textAlign='center';ctx.fillText(String(G.score[t]),t===0?x0+bw-37:x0+37,37);
     if(G.poss===t){ctx.strokeStyle='#ffe14a';ctx.lineWidth=3;ctx.strokeRect(x0,8,bw,56);drawBrain(t===0?x0+bw-10:x0+10,18,shownStage(),5);}}
+  if(skipFn())return;   // a skippable show: its Hold to skip box takes the clock and brain row
   ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='25px Bangers, Arial';const m=Math.floor(G.clock/60),s=Math.floor(G.clock%60);
   if(G.ot){ctx.fillStyle='#ff6a4a';ctx.fillText(`DEAD TIME   ·   BALL ON ${ballOn(G.poss,G.los)}`,W/2,80);ctx.fillStyle='#fff';}
   else ctx.fillText(`${G.periods===2?'H':'Q'}${G.quarter}  ${m}:${String(s).padStart(2,'0')}   ·   BALL ON ${ballOn(G.poss,G.los)}`,W/2,80);
@@ -2864,9 +2866,11 @@ function updatePCBar(){const bar=$('pcbar');const show=!touchOn&&!!G&&(mode==='l
   $('pkBurst').classList.toggle('off',!!(c&&c.burstUsed));
   $('pkSkill').querySelector('span').textContent=S?(sl?`${skName(S)} (${sl})`:skName(S)):'skill';$('pkSkill').classList.toggle('off',!S||sl>0);$('pkSkill').title=S?S.tip:'';$('pkSw').querySelector('span').textContent=off?'take over':'switch';}
 // ===== hold to skip: a show is skipped only by holding the skip box (or Space / Enter) until it fills, about 1 s; letting go early drains it =====
-const HOLD={v:0,ptr:false,key:false,need:false,mode:null,id:null},HOLD_T=1.0,HOLD_BOX={w:260,h:64};
+const HOLD={v:0,ptr:false,key:false,need:false,mode:null,id:null},HOLD_T=1.0,HOLD_BOX={w:300,h:50};
 function skipFn(){if(!G)return null;return mode==='claw'?clawEnd:mode==='half'?hsSkip:mode==='finale'?finSkip:mode==='ceremony'?cerSkip:mode==='punt'?puntSkip:mode==='entrance'?entSkip:(mode==='dead'&&G.eat)?skipEat:null;}
-function holdRect(){return {x:W-HOLD_BOX.w-18,y:HUD+16,w:HOLD_BOX.w,h:HOLD_BOX.h};}   // top right, under the scoreboard, clear of banners and credits
+function holdRect(){const w=HOLD_BOX.w,h=HOLD_BOX.h;   // above every title and banner: the scoreboard's second row (hidden during a show),
+  if(mode==='claw')return {x:W-w-18,y:81,w,h};   // the Claw Cam bar, right of its logo
+  return {x:(W-w)/2,y:mode==='ceremony'?14:64,w,h};}   // or the top of the awards stage
 function holdTick(dt){const f=skipFn(),down=HOLD.ptr||HOLD.key,k=f?mode+(mode==='half'?HS.ph:''):null;
   if(k!==HOLD.mode){HOLD.mode=k;HOLD.v=0;HOLD.need=down;}   // a key or finger already down when the show starts doesn't count
   if(!f){HOLD.v=0;return;}if(!down)HOLD.need=false;
@@ -2877,12 +2881,12 @@ function drawHold(){if(!skipFn())return;const r=holdRect(),v=Math.min(1,HOLD.v);
   ctx.strokeStyle='#9dff57';ctx.lineWidth=3;ctx.strokeRect(r.x,r.y,r.w,r.h);
   ctx.font='28px Bangers, Arial';ctx.textAlign='center';ctx.textBaseline='middle';const lb=touchOn?'HOLD TO SKIP':'HOLD TO SKIP (SPACE)',tw=ctx.measureText(lb).width;if(tw>r.w-24)ctx.font=Math.floor(28*(r.w-24)/tw)+'px Bangers, Arial';
   ctx.lineWidth=5;ctx.lineJoin='round';ctx.strokeStyle='#0a0f08';ctx.strokeText(lb,r.x+r.w/2,r.y+r.h/2+1);ctx.fillStyle='#f2f7ea';ctx.fillText(lb,r.x+r.w/2,r.y+r.h/2+1);ctx.restore();}
-$('wrap').addEventListener('pointerdown',e=>{if(!skipFn())return;const p=toGame(e.clientX,e.clientY),r=holdRect(),m=24;
+$('wrap').addEventListener('pointerdown',e=>{if(!skipFn())return;const p=toGame(e.clientX,e.clientY),r=holdRect(),m=16;
   if(p.x>=r.x-m&&p.x<=r.x+r.w+m&&p.y>=r.y-m&&p.y<=r.y+r.h+m){HOLD.ptr=true;HOLD.id=e.pointerId;}},true);
 for(const ev of ['pointerup','pointercancel'])addEventListener(ev,e=>{if(HOLD.id==null||e.pointerId===HOLD.id){HOLD.ptr=false;HOLD.id=null;}});
 addEventListener('blur',()=>{HOLD.ptr=HOLD.key=false;});
 {const mb=$('menuBtn');const go=e=>{e.preventDefault();e.stopPropagation();audioInit();pauseGame();};mb.addEventListener('pointerdown',go);mb.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});}
-function menuBtnUpdate(){const on=!!G&&['playcall','presnap','live','dead'].includes(mode);const mb=$('menuBtn');if(mb.style.display!==(on?'block':'none'))mb.style.display=on?'block':'none';}
+function menuBtnUpdate(){const on=!!G&&['playcall','presnap','live','dead'].includes(mode)&&!skipFn();const mb=$('menuBtn');if(mb.style.display!==(on?'block':'none'))mb.style.display=on?'block':'none';}
 document.addEventListener('touchmove',e=>{if(!e.target.closest||!e.target.closest('.panel'))e.preventDefault();},{passive:false});
 document.addEventListener('touchstart',()=>{enableTouch();audioInit();},{passive:true});
 document.addEventListener('touchend',()=>audioInit(),{passive:true});
