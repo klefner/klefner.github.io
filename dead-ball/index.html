@@ -183,6 +183,8 @@ canvas{display:block;width:720px;height:1280px;background:#000}
    <tr><td><span style="color:#efe6cf">▤</span> Entomb · Line</td><td><b>Wrap Up:</b> Wrap up the man in front of you so he can't move.</td></tr>
    <tr><td><span style="color:#efe6cf">➰</span> Wrap Tackle · Defense</td><td><b>Lasso:</b> Lasso the ball carrier from range and pull him back.</td></tr>
   </table>
+  <h2>Season</h2>
+  <p>Pick <b>Season</b> on the title screen to coach the Graveyard Shift through a 12-team zombie league: 12 weekly games, standings in two divisions, and rival teams whose managers get stronger every week. Every game pays <b>Bones</b> (100 for a win, 30 for a loss, 10 per touchdown). Spend them in <b>Roster &amp; Training</b> to raise your players' Speed, Hands, Bite and Grit, plus your quarterback's Arm. Trained stats really change how your players run, catch, tackle, hold together and throw, and they add up to your <b>Team Power</b>. Your career saves itself after every game.</p>
   <h2>Controls</h2>
   <table>
    <tr><th>Key</th><th>On offense</th><th>On defense</th></tr>
@@ -256,7 +258,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.13.0';
+const VERSION='0.13.1';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -999,7 +1001,7 @@ function saveLabel(){const S=store.get(SAVE_KEY,null);if(!S)return 'no saved gam
   return `${(S.periods||4)===2?'H':'Q'}${S.quarter} ${m}:${sec} · ${(S.names||[])[0]||'Graveyard Shift'} ${S.score[0]} – ${S.score[1]} ${(S.names||[])[1]||'Moldy Mummies'}${S.season?' · Season':''}`;}
 function continueGame(){const S=store.get(SAVE_KEY,null);if(!S)return;screenLeave();dj.gap=false;
   if(S.season&&typeof leagueApply==='function')leagueApply(S.season.opp);else if(typeof leagueReset==='function')leagueReset();
-  G=newG();if(S.season)G.season=Object.assign({},S.season);Object.assign(G,{score:S.score,quarter:S.quarter,clock:S.clock,userTeam:S.userTeam,playsDone:S.playsDone||0,stats:S.stats||G.stats,
+  G=newG();if(S.season){G.season=Object.assign({},S.season);if(typeof seasonStats==='function')seasonStats();}Object.assign(G,{score:S.score,quarter:S.quarter,clock:S.clock,userTeam:S.userTeam,playsDone:S.playsDone||0,stats:S.stats||G.stats,
     debris:S.debris||[],splats:S.splats||[]});if(S.field!=null)G.field=S.field;
   if(S.cm){G.cm=Object.assign(S.cm,{used:new Set(S.cm.used||[])});}
   S.players.forEach((tm,t)=>tm.forEach((q,i)=>{const p=G.teams[t][i];p.limbs=q.limbs;p.out=q.out;p.ko=q.ko;p.spd=q.spd;}));
@@ -1115,7 +1117,8 @@ function assignPlay(){
 }
 
 // ===== physics helpers =====
-function speedOf(p){let s=p.ty.speed*(p.spd||1)*[0.25,0.6,1][legsOf(p)];if(G&&p.team!==G.userTeam)s*=D().cpuSpd;if(G&&p===G.ctrl)s*=1.08;if(p.hustle)s*=1.08;if(p.stumble>0)s*=0.35;
+const SK=(p,k)=>p.sk?p.sk[k]:1;   // Season stats (Speed, Hands, Bite, Grit, Arm) as small multipliers; 1 in a Quick Game
+function speedOf(p){let s=p.ty.speed*(p.spd||1)*SK(p,'spd')*[0.25,0.6,1][legsOf(p)];if(G&&p.team!==G.userTeam)s*=D().cpuSpd;if(G&&p===G.ctrl)s*=1.08;if(p.hustle)s*=1.08;if(p.stumble>0)s*=0.35;
   if(p.burst>0)s*=1.5;if(p.blockedBy)s*=0.12;if(p.engaged)s*=0.3;if(G&&G.ball&&G.ball.carrier===p)s*=0.95;return s;}
 function steer(p,tvx,tvy,dt){const a=(p.type==='shambler'?5:8)*dt;const k=Math.min(1,a);p.vx+=(tvx-p.vx)*k;p.vy+=(tvy-p.vy)*k;}
 // the direction the player is steering: what is held now, or what was held in the last 0.2 s (keys let go a moment before
@@ -1200,7 +1203,7 @@ function addDebris(d){d.age=0;G.debris.push(d);let n=G.debris.filter(x=>!x.sink)
 function removeRandomLimb(p){if(p.out)return null;const L=p.limbs,o=['la','ra','ll','rl'].filter(k=>L[k]);
   const k=o.length?pick(o):'head';removeLimb(p,k);return k;}
 function limbRoll(p,power){
-  if(p.out)return null;if(Math.random()>p.ty.frag*power*0.5)return null;
+  if(p.out)return null;if(Math.random()>p.ty.frag*power*0.5/SK(p,'grit'))return null;
   const L=p.limbs,o=[];if(L.la)o.push(['la',3]);if(L.ra)o.push(['ra',3]);if(L.ll)o.push(['ll',2]);if(L.rl)o.push(['rl',2]);
   o.push(['head',0.35+(4-(L.la+L.ra+L.ll+L.rl))*0.35]);
   let tot=0;for(const x of o)tot+=x[1];let r=Math.random()*tot;
@@ -1338,7 +1341,7 @@ function throwTo(qb,r){
   const P=G.play,B=G.ball,SPD=21;let tx=r.x,ty=r.y,fl=0;
   for(let i=0;i<3;i++){fl=Math.hypot(tx-qb.x,ty-qb.y)/SPD;tx=r.x+r.vx*fl;ty=r.y+r.vy*fl;}
   const d=Math.hypot(tx-qb.x,ty-qb.y);
-  let err=0.3+d*0.02+(armsOf(qb)===1?1.2:0)+(pressureOn(qb)<1.8?0.9:0);const perfect=!!qb.perfectThrow;if(perfect){err=0;qb.perfectThrow=false;}
+  let err=(0.3+d*0.02+(armsOf(qb)===1?1.2:0)+(pressureOn(qb)<1.8?0.9:0))/SK(qb,'arm');const perfect=!!qb.perfectThrow;if(perfect){err=0;qb.perfectThrow=false;}
   const a=Math.random()*Math.PI*2,mm=Math.random()*err;tx+=Math.cos(a)*mm;ty=clamp(ty+Math.sin(a)*mm,0.6,FW-0.6);
   Object.assign(B,{state:'air',carrier:null,fx:qb.x,fy:qb.y,tx,ty,t:0,dur:Math.max(0.3,fl),peak:0.6+d*0.05,target:r,perfect});
   P.carrier=null;P.canPass=false;P.thrown=true;sfx.throw();P.target=r;call(d>20?'throwD':'throwS',{qb:qb.name,n:r.name},2);if(d>20)crowdExcite(0.6);
@@ -1361,8 +1364,8 @@ function resolveCatch(){
   for(const p of G.teams[P.off]){if(p.out||(p.stun>0&&!p.catchDive))continue;const d=dist(p,L)-(p.catchDive?0.5:0)-(p.reachT>0?2.6:0);if(d<rd){rd=d;rec=p;}}
   for(const p of G.teams[P.def]){if(p.out||p.stun>0)continue;const d=dist(p,L);if(d<dd){dd=d;dfn=p;}}
   const recOK=rec&&rd<1.9&&armsOf(rec)>0,defOK=dfn&&dd<1.4&&armsOf(dfn)>0;
-  let catchP=recOK?(rec.catchDive?0.65:1)*rec.ty.catch*[0,0.6,1][armsOf(rec)]*(rd<1.2?1:0.8)*(defOK&&dd<1?0.85:1):0;
-  let intP=defOK?(dfn.team===G.userTeam?0.3:D().intc)*[0,0.6,1][armsOf(dfn)]*(dd<0.8?1:0.7):0;
+  let catchP=recOK?Math.min(1,SK(rec,'hands')*(rec.catchDive?0.65:1)*rec.ty.catch)*[0,0.6,1][armsOf(rec)]*(rd<1.2?1:0.8)*(defOK&&dd<1?0.85:1):0;
+  let intP=defOK?SK(dfn,'hands')*(dfn.team===G.userTeam?0.3:D().intc)*[0,0.6,1][armsOf(dfn)]*(dd<0.8?1:0.7):0;
   if(B.perfect&&recOK){catchP=1;intP=0;}   // Brain Wave
   let res='inc';
   if(defOK&&(!recOK||dd<rd-0.15)){if(Math.random()<intP)res='int';else if(Math.random()<catchP*0.8)res='catch';}
@@ -1407,7 +1410,7 @@ function fumble(c){const B=G.ball,P=G.play;const a=Math.random()*Math.PI*2;Objec
 function impactOf(d,c){const dx=c.x-d.x,dy=c.y-d.y,L=Math.hypot(dx,dy)||1;return Math.max(0,((d.vx-c.vx)*dx+(d.vy-c.vy)*dy)/L);}
 function tryTackle(d,c){
   if(c.sandT>0&&!(d.sure||(d.sureDive&&d.dive>0)))return false;   // Sand Blind: every normal tackle misses
-  let brk=c.stiff>0?0.55:0.08;if(c.type==='shambler')brk+=0.08;if(c.burst>0)brk+=0.1;if(d.dive>0)brk*=0.5;if(d.sureDive&&d.dive>0)brk*=0.5;if(legsOf(d)===0)brk+=0.3;if(armsOf(d)===0)brk+=0.25;if(c.slipT>0)brk=0.92;if(d.sure)brk*=0.5;if(d.sureDive&&d.dive>0)brk=Math.min(brk,0.2);
+  let brk=c.stiff>0?0.55:0.08;if(c.type==='shambler')brk+=0.08;if(c.burst>0)brk+=0.1;if(d.dive>0)brk*=0.5;if(d.sureDive&&d.dive>0)brk*=0.5;if(legsOf(d)===0)brk+=0.3;if(armsOf(d)===0)brk+=0.25;if(c.slipT>0)brk=0.92;if(d.sure)brk*=0.5;if(!(c.slipT>0))brk=Math.min(0.95,brk/SK(d,'bite'));if(d.sureDive&&d.dive>0)brk=Math.min(brk,0.2);
   if(Math.random()<brk){if(d===G.ctrl)skillFx('label',c,{dur:1.1,follow:true,name:c.slipT>0?'SLIPPED FREE!':c.stiff>0?'STIFF ARM!':'BROKE THE TACKLE!',does:''});d.stun=1.0;d.dive=0;d.vx=-d.vx*0.3;d.vy=-d.vy*0.3;sfx.hit();if(c.stiff>0){stiffShove(c,d);announce(pick(LINES.stiff).split('{n}').join(c.name));c.stiff=Math.min(c.stiff,0.12);}return false;}
   // damage scales with closing speed (measured: median ~7 yd/s, top 5% above 13.5)
   const imp=impactOf(d,c),tier=imp>=13.5?3:imp>=10?2:imp>=4?1:0;
