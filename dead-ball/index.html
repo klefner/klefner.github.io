@@ -184,7 +184,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
    <tr><td><span style="color:#efe6cf">➰</span> Wrap Tackle · Defense</td><td><b>Lasso:</b> Lasso the ball carrier from range and pull him back.</td></tr>
   </table>
   <h2>Season</h2>
-  <p>Pick <b>Season</b> on the title screen to coach the Graveyard Shift through a 12-team zombie league: 12 weekly games, standings in two divisions, and rival teams whose managers get stronger every week. Every game pays <b>Bones</b> (100 for a win, 30 for a loss, 10 per touchdown). Spend them in <b>Roster &amp; Training</b> to raise your players' Speed, Hands, Bite and Grit, plus your quarterback's Arm. Trained stats really change how your players run, catch, tackle, hold together and throw, and they add up to your <b>Team Power</b>. Your career saves itself after every game.</p>
+  <p>Pick <b>Season</b> on the title screen to coach the Graveyard Shift through a 12-team zombie league: 12 weekly games, standings in two divisions, and rival teams whose managers get stronger every week. Every game pays <b>Bones</b> (100 for a win, 30 for a loss, 10 per touchdown). Your career saves itself after every game.</p>
+  <p><b>Roster &amp; Training:</b> each zombie has skulls in Speed, Hands, Bite and Grit (plus Arm for a quarterback). Every skull you buy really changes how that zombie runs, catches, tackles, holds together or throws, and raises that zombie's <b>Player Power</b>. Your seven starters' Power makes your <b>Team Power</b>, with the quarterback counting extra.</p>
+  <p><b>The Graveyard:</b> fresh corpses dig their way up every week. Brainiacs play QB and Safety, Fresh corpses play running back, receiver, linebacker and corner, and Shamblers play the lines. Sign one to start (the starter moves to the bench) or to the bench. Up to three zombies sit on the bench, and when a starter is knocked out the next one comes in. With no bench left, your team plays a zombie short until halftime. Letting a zombie go pays back 20% of what it's worth.</p>
   <h2>Controls</h2>
   <table>
    <tr><th>Key</th><th>On offense</th><th>On defense</th></tr>
@@ -258,7 +260,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.13.1';
+const VERSION='0.13.2';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -282,9 +284,9 @@ const ROSTER=[
   {off:'WR2',def:'CB2',type:'fresh'},{off:'OL1',def:'DL1',type:'shambler'},{off:'OL2',def:'DL2',type:'shambler'},{off:'OL3',def:'DL3',type:'shambler'}];
 const TEAMS=[
   {name:'Graveyard Shift',jersey:'#6a2c9c',trim:'#f3c34b',skin:'#8dab78',ez:'#3a1857',
-   players:[['Brains McGee',7],['Lurch Johnson',22],['Stumbles',81],['Rotten Rodriguez',88],['Big Tombstone',66],["Moanin' Mo",70],['Gristle',77]]},
+   players:[['Brains McGee',7],['Lurch Johnson',22],['Stumbles',81],['Rotten Rodriguez',88],['Big Tombstone',66],["Moanin' Mo",70,{w:1,hair:{c:'#3a2a1c',s:'long'}}],['Gristle',77]]},
   {name:'Moldy Mummies',jersey:'#c25a26',trim:'#efe6cf',skin:'#a3a88c',ez:'#6a2a10',
-   players:[['Pharaoh Phil',12],['Old Bandages',33],['Mothball',80],['Musty',84],['Sarcophagus Sam',60],['Spore',72],['Lint',79]]}];
+   players:[['Pharaoh Phil',12],['Old Bandages',33],['Mothball',80,{w:1,hair:{c:'#d9d4c4',s:'braids'}}],['Musty',84],['Sarcophagus Sam',60],['Spore',72],['Lint',79]]}];
 const DIFFS={Easy:{cpuSpd:0.85,intc:0.1,read:1.9,stiff:0.3,reach:0.9,dive:0.55,lag:1.4},
              Normal:{cpuSpd:0.93,intc:0.18,read:1.45,stiff:0.6,reach:0.97,dive:0.85,lag:1.0},
              Hard:{cpuSpd:1.0,intc:0.26,read:1.1,stiff:1.0,reach:1.05,dive:1.2,lag:0.7}};
@@ -325,6 +327,11 @@ const LINES={
 const $=id=>document.getElementById(id);
 const rand=(a,b)=>a+Math.random()*(b-a);
 const pick=a=>a[Math.floor(Math.random()*a.length)];
+// Women zombies play too, so a line that says "he" or "his" is skipped when the zombie it is about is a woman.
+const HE_RX=/\b(he|he's|his|him|himself|man)\b/i;
+function wName(n){if(!G||!n)return false;for(const tm of G.teams)for(const p of tm)if(p.name===n&&p.look&&p.look.w)return true;return false;}
+function heFree(arr,...names){return names.some(wName)?arr.filter(t=>!HE_RX.test(t)):arr;}
+const pickFor=(arr,...names)=>{const a=heFree(arr,...names);return a.length?pick(a):null;};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const dir=t=>t===0?1:-1;
@@ -714,7 +721,7 @@ const CALLS={
   lead:['{team} out in front.','The {team} have the lead.'],tied:["We're all tied up!",'Tie game!'],
   half:["That's halftime!"],final:['And that is the final whistle!'],};
 function leadCall(pri){const [a,b]=G.score;if(a===b)call('tied',{},pri);else call('lead',{team:TEAMS[a>b?0:1].name},pri);}
-function call(key,o,pri,voice){const arr=key.split('.').reduce((a,k)=>a&&a[k],CALLS);if(!arr)return;const t=fill(annPick(key,arr),o||{});tick(t,voice==='color');annSay(t,pri,voice);}
+function call(key,o,pri,voice){const a0=key.split('.').reduce((a,k)=>a&&a[k],CALLS);if(!a0)return;const arr=heFree(a0,o&&o.n);if(!arr.length)return;const t=fill(annPick(arr===a0?key:key+'~w',arr),o||{});tick(t,voice==='color');annSay(t,pri,voice);}
 function tick(t,col){if(!G)return;G.ticker.push({t,life:4.5,col});if(G.ticker.length>3)G.ticker.shift();}
 // ===== between-play commentary: situation-aware lines, the most specific one that fits wins =====
 // c = what just happened (see commCtx). pri: higher = more specific. tone: how it is recorded. Lines never repeat in a game.
@@ -781,7 +788,7 @@ function commCtx(P){
   const c={td:r.type==='td',inc:r.type==='incomplete',tackle:r.type==='tackle',to:r.type==='turnover'||P.burst,int:r.type==='turnover'&&r.info.why==='int',fum:r.type==='turnover'&&r.info.why==='fumble',
     burst:!!P.burst,oob:r.type==='oob',fresh:!!P.fresh,kos:G.stats.kos||0,qbRun:!!car&&car===P.qb&&!P.thrown&&!P.handed&&r.gain>0,safety:!!P.safety,defTd:!!P.defTd,sack:r.sack,gain:r.gain,pass:P.thrown&&r.type!=='incomplete'&&r.type!=='turnover',
     margin,late:G.quarter>=G.periods&&G.clock<60,stage:G.stage,st:cm.st[P.off],toCount:cm.to[P.off],
-    pl:car?commPl(car):null,n:car?car.name:'',fpl:P.fumbler?commPl(P.fumbler):null,f:P.fumbler?P.fumbler.name:'',
+    pl:car?commPl(car):null,n:car?car.name:'',who:[car&&car.name,P.fumbler&&P.fumbler.name,P.qb&&P.qb.name,P.target&&P.target.name],fpl:P.fumbler?commPl(P.fumbler):null,f:P.fumbler?P.fumbler.name:'',
     carLegs:car?legs(car):2,qbArms:P.qb&&!P.qb.out?armsOf(P.qb):2,tgtArms:P.target?armsOf(P.target):2,
     hit:!!P.callHit,ko:!!P.callKo,limbs:!!P.callLimbs,head:!!P.headOff,debris:G.debris.length,outMax:Math.max(...outs),
     short:TEAMS[outs[0]>=outs[1]?0:1].name,off:TEAMS[P.off].name,behind:TEAMS[lead===0?1:0].name,team:TEAMS[lead<0?P.off:lead].name,
@@ -791,7 +798,7 @@ function commCtx(P){
 function commPick(c){
   const cm=G.cm,ok=[];
   for(const s of COMM){if((cm.last[s.id]||-99)>cm.plays-3)continue;let w=false;try{w=s.w(c);}catch(e){}if(!w)continue;
-    const left=s.l.filter(t=>!cm.used.has(fill(t,c)));if(left.length)ok.push([s,left]);}
+    const left=heFree(s.l,...(c.who||[])).filter(t=>!cm.used.has(fill(t,c)));if(left.length)ok.push([s,left]);}
   if(!ok.length)return null;ok.sort((x,y)=>y[0].pri-x[0].pri);
   const [s,left]=ok[0];if(s.pri<5&&Math.random()>(s.pri<=1?0.3:0.6))return null;
   const t=fill(left[Math.floor(Math.random()*left.length)],c);cm.used.add(t);cm.last[s.id]=cm.plays;return t;}
@@ -977,7 +984,7 @@ function onKey(c){
 let G=null,demo=[],demoT=0,pcCards=[],pcSel=0,pcTimer=10,time=0;
 function makePlayer(t,i){const r=ROSTER[i],info=TEAMS[t].players[i];
   const p={team:t,idx:i,type:r.type,ty:TYPES[r.type],name:info[0],num:info[1],x:0,y:0,vx:0,vy:0,face:0,phase:Math.random()*6,
-    limbs:{la:1,ra:1,ll:1,rl:1,head:1},out:false,role:r.off,spd:rand(0.86,1.14)};resetPlay(p);return p;}
+    limbs:{la:1,ra:1,ll:1,rl:1,head:1},out:false,role:r.off,spd:rand(0.86,1.14),look:info[2]||null};resetPlay(p);return p;}
 function resetPlay(p){Object.assign(p,{stun:0,blockedBy:null,blockTimer:0,engaged:null,shedCd:0,burst:0,burstUsed:false,stiff:0,stiffCd:0,dive:0,route:null,ri:0,after:null,ai:'idle',mark:null,zone:null,delay:0,vx:0,vy:0,tumble:0,stumble:0,rt:0,tgt:null,hustle:false,catchDive:0,batT:0});}
 function announce(t,pri){if(!G)return;G.ticker.push({t,life:4.5});if(G.ticker.length>3)G.ticker.shift();annSay(t,pri||2);}
 
@@ -990,9 +997,9 @@ function newG(){return {field:typeof fieldSeedNew==='function'?fieldSeedNew():0,
      teams:[0,1].map(t=>ROSTER.map((r,i)=>makePlayer(t,i))),debris:[],splats:[],parts:[],ticker:[],big:null,
      ctrl:null,play:null,ball:null,timer:0,after:null,hut:false,res:null,stats:{yards:[0,0],limbs:[0,0],bigHits:0,kos:0},abducts:[],shake:0};}
 function snapshot(){const cm=G.cm?Object.assign({},G.cm,{used:[...G.cm.used]}):null;
-  return {v:VERSION,sv:SAVE_V,names:[TEAMS[0].name,TEAMS[1].name],season:G.season&&!G.season.booked?{season:G.season.season,week:G.season.week,opp:G.season.opp,home:G.season.home}:null,field:G.field,periods:G.periods,at:Date.now(),diff:settings.diff,score:G.score.slice(),quarter:G.quarter,clock:G.clock,ot:!!G.ot,poss:G.poss,los:G.los,stage:G.stage,crossed:G.crossed,
+  return {v:VERSION,sv:SAVE_V,names:[TEAMS[0].name,TEAMS[1].name],season:G.season&&!G.season.booked?{season:G.season.season,week:G.season.week,opp:G.season.opp,home:G.season.home,used:(G.season.used||[0,0]).slice()}:null,field:G.field,periods:G.periods,at:Date.now(),diff:settings.diff,score:G.score.slice(),quarter:G.quarter,clock:G.clock,ot:!!G.ot,poss:G.poss,los:G.los,stage:G.stage,crossed:G.crossed,
     userTeam:G.userTeam,playsDone:G.playsDone,stats:JSON.parse(JSON.stringify(G.stats)),cm:cm&&JSON.parse(JSON.stringify(cm)),
-    players:G.teams.map(tm=>tm.map(p=>({limbs:Object.assign({},p.limbs),out:p.out,ko:!!p.ko,spd:p.spd}))),
+    players:G.teams.map(tm=>tm.map(p=>({limbs:Object.assign({},p.limbs),out:p.out,ko:!!p.ko,spd:p.spd,sub:p.sub==null?-1:p.sub}))),
     debris:G.debris.filter(d=>!d.sink).slice(-60).map(d=>Object.assign({},d,{vx:0,vy:0,vz:0,z:0})),splats:G.splats.slice(-160)};}
 function saveNow(){if(G&&G.snap){store.set(SAVE_KEY,G.snap);G.savedAt=G.playsDone;}}
 function hasSave(){return !!store.get(SAVE_KEY,null);}
@@ -1005,6 +1012,7 @@ function continueGame(){const S=store.get(SAVE_KEY,null);if(!S)return;screenLeav
     debris:S.debris||[],splats:S.splats||[]});if(S.field!=null)G.field=S.field;
   if(S.cm){G.cm=Object.assign(S.cm,{used:new Set(S.cm.used||[])});}
   S.players.forEach((tm,t)=>tm.forEach((q,i)=>{const p=G.teams[t][i];p.limbs=q.limbs;p.out=q.out;p.ko=q.ko;p.spd=q.spd;}));
+  if(G.season&&typeof seasonRestore==='function')seasonRestore(S);
   SS=18;camCX=S.los;camCY=MID;viewCX=S.los;viewCY=MID;showOverlay(null);
   annStop();announce('Welcome back to Rotball! Right where we left off.',3);
   G.poss=S.poss;G.los=S.los;G.stage=Math.min(2,S.stage|0);G.crossed=false;G.periods=S.periods||4;G.ot=!!S.ot;G.savedAt=G.playsDone;
@@ -1046,7 +1054,8 @@ function entSkip(){if(G&&G.ent&&mode==='entrance'&&G.ent.t>0.3)entEnd(true);}
 function startPossession(t,x){
   if(inOwnEZ(t,x))x=own25(t);
   x=clamp(x,11,109);G.poss=t;G.los=x;G.stage=0;G.crossed=pastMid(t,x);
-  for(const tm of G.teams)for(const p of tm)if(p.out){p.out=false;p.ko=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
+  for(const tm of G.teams)for(const p of tm)if(p.out){if(G.season&&typeof seasonSubIn==='function'&&seasonSubIn(p))continue;p.out=false;p.ko=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};}
+  if(G.season&&typeof seasonFloor==='function')seasonFloor();   // Season: knocked-out zombies stay out until halftime unless the bench covers them
 }
 
 // ===== formation & play calling =====
@@ -1187,7 +1196,7 @@ function removeLimb(p,k){
   bloodBurst(p.x,p.y,26,a,1.2,9);bloodBurst(p.x,p.y,10,a+Math.PI,0.6,5);
   p.squirt=k==='head'?1.4:0.9;p.squirtSide=k[1]==='a'?(k==='la'?-1:1):(k==='ll'?-1:1);p.squirtHead=k==='head';
   shake(k==='head'?9:5);sfx.pop();
-  announce(pick(LINES[kind]).split('{n}').join(p.name),kind==='head'?3:(G.ball&&G.ball.carrier===p?2:1));if(G.play)G.play.callLimbs=(G.play.callLimbs||0)+1;
+  {const l=pickFor(LINES[kind],p.name);if(l)announce(l.split('{n}').join(p.name),kind==='head'?3:(G.ball&&G.ball.carrier===p?2:1));}if(G.play)G.play.callLimbs=(G.play.callLimbs||0)+1;
   if(k!=='head'&&!p.limbs.la&&!p.limbs.ra&&!p.limbs.ll&&!p.limbs.rl){   // no limbs left: the bats carry him off; he's back after the next change of possession
     {const g=G;setTimeout(()=>{if(G&&G===g&&!p.out)knockOut(p,'limbless');},350);}}
   if(k==='head'&&G.play)G.play.headOff=1;
@@ -1384,7 +1393,7 @@ function knockOut(p,why){
   if(p.out)return;p.out=true;p.ko=true;G.stats.kos=(G.stats.kos||0)+1;
   if(p.blockedBy){p.blockedBy.engaged=null;p.blockedBy=null;}if(p.engaged){p.engaged.blockedBy=null;p.engaged=null;}
   if(G.ctrl===p)G.ctrl=null;
-  if(why!=='brawl')announce(pick(why==='limbless'?LINES.limbless:LINES.ko).split('{n}').join(p.name),3);crowdReact('ko',{off:G.play?G.play.off:0,hitter:1-p.team});if(mode==='live'||mode==='dead')clawMark('ko',4,p.x,p.y,{who:p.name});if(G.play)G.play.callKo=1;
+  if(why!=='brawl'){const l=pickFor(why==='limbless'?LINES.limbless:LINES.ko,p.name);if(l)announce(l.split('{n}').join(p.name),3);}crowdReact('ko',{off:G.play?G.play.off:0,hitter:1-p.team});if(mode==='live'||mode==='dead')clawMark('ko',4,p.x,p.y,{who:p.name});if(G.play)G.play.callKo=1;
   const body={team:p.team,idx:p.idx,type:p.type,ty:p.ty,num:p.num,x:p.x,y:p.y,vx:0,vy:0,face:p.face,phase:0,limbs:Object.assign({},p.limbs),stun:9,dive:0,stiff:0};
   G.abducts.push({body,phase:'wait',t:0,h:0,vamps:[],bats:[],side:p.y<MID?-1:1});
 }
@@ -1411,7 +1420,7 @@ function impactOf(d,c){const dx=c.x-d.x,dy=c.y-d.y,L=Math.hypot(dx,dy)||1;return
 function tryTackle(d,c){
   if(c.sandT>0&&!(d.sure||(d.sureDive&&d.dive>0)))return false;   // Sand Blind: every normal tackle misses
   let brk=c.stiff>0?0.55:0.08;if(c.type==='shambler')brk+=0.08;if(c.burst>0)brk+=0.1;if(d.dive>0)brk*=0.5;if(d.sureDive&&d.dive>0)brk*=0.5;if(legsOf(d)===0)brk+=0.3;if(armsOf(d)===0)brk+=0.25;if(c.slipT>0)brk=0.92;if(d.sure)brk*=0.5;if(!(c.slipT>0))brk=Math.min(0.95,brk/SK(d,'bite'));if(d.sureDive&&d.dive>0)brk=Math.min(brk,0.2);
-  if(Math.random()<brk){if(d===G.ctrl)skillFx('label',c,{dur:1.1,follow:true,name:c.slipT>0?'SLIPPED FREE!':c.stiff>0?'STIFF ARM!':'BROKE THE TACKLE!',does:''});d.stun=1.0;d.dive=0;d.vx=-d.vx*0.3;d.vy=-d.vy*0.3;sfx.hit();if(c.stiff>0){stiffShove(c,d);announce(pick(LINES.stiff).split('{n}').join(c.name));c.stiff=Math.min(c.stiff,0.12);}return false;}
+  if(Math.random()<brk){if(d===G.ctrl)skillFx('label',c,{dur:1.1,follow:true,name:c.slipT>0?'SLIPPED FREE!':c.stiff>0?'STIFF ARM!':'BROKE THE TACKLE!',does:''});d.stun=1.0;d.dive=0;d.vx=-d.vx*0.3;d.vy=-d.vy*0.3;sfx.hit();if(c.stiff>0){stiffShove(c,d);{const l=pickFor(LINES.stiff,c.name,d.name);if(l)announce(l.split('{n}').join(c.name));}c.stiff=Math.min(c.stiff,0.12);}return false;}
   // damage scales with closing speed (measured: median ~7 yd/s, top 5% above 13.5)
   const imp=impactOf(d,c),tier=imp>=13.5?3:imp>=10?2:imp>=4?1:0;
   const lost=[];let ko=false;
@@ -1420,9 +1429,9 @@ function tryTackle(d,c){
   if(tier===0){const k=limbRoll(c,0.4);if(k)lost.push(k);}
   else if(tier===1){const k=limbRoll(c,1.0+(d.dive>0?0.3:0));if(k)lost.push(k);}
   else if(tier===2){lost.push(removeRandomLimb(c));const k=limbRoll(c,0.5);if(k)lost.push(k);shake(8);sfx.bigHit();
-    big('BIG HIT!',1.3,'#ff9a4a');announce(pick(LINES.bighit).split('{n}').join(c.name),3);crowdReact('bighit',{off:G.play.off,hitter:d.team});clawMark('hit',2,c.x,c.y,{by:d.name,who:c.name});G.play.callHit=1;}
+    big('BIG HIT!',1.3,'#ff9a4a');{const l=pickFor(LINES.bighit,c.name);if(l)announce(l.split('{n}').join(c.name),3);}crowdReact('bighit',{off:G.play.off,hitter:d.team});clawMark('hit',2,c.x,c.y,{by:d.name,who:c.name});G.play.callHit=1;}
   else{lost.push(removeRandomLimb(c));lost.push(removeRandomLimb(c));shake(13);sfx.bigHit();sfx.bigHit(0.12);
-    big('CRUSHED!',1.5,'#ff5a3a');announce(pick(LINES.crush).split('{n}').join(c.name),3);crowdReact('bighit',{off:G.play.off,hitter:d.team});clawMark('crush',3,c.x,c.y,{by:d.name,who:c.name});G.play.callHit=1;
+    big('CRUSHED!',1.5,'#ff5a3a');{const l=pickFor(LINES.crush,c.name);if(l)announce(l.split('{n}').join(c.name),3);}crowdReact('bighit',{off:G.play.off,hitter:d.team});clawMark('crush',3,c.x,c.y,{by:d.name,who:c.name});G.play.callHit=1;
     if(!c.out&&Math.random()<0.45)ko=true;}
   if(tier>=2){const ang=Math.atan2(c.y-d.y,c.x-d.x),mx=(c.x+d.x)/2,my=(c.y+d.y)/2;   // hard contact sprays blood, limb or not
     bloodBurst(mx,my,tier===3?34:20,ang,0.9,tier===3?11:8);bloodBurst(mx,my,8,ang+Math.PI,0.7,4);}
@@ -2203,7 +2212,7 @@ function drawPlayer(p){
   if(diveRot){ctx.translate(x,y-size*0.25);ctx.rotate(diveRot);ctx.translate(-x,-(y-size*0.25));}   // a dive straight down the screen is drawn head-down, not sideways
   if(pose==='feed'&&p.feed.role==='shove'){const k=Math.sin(p.feed.ph*0.45);ctx.translate(x+k*SS*0.3,y);ctx.rotate(k*0.12);ctx.translate(-x,-y);}   // elbowing in for a bigger piece
   if(p.batT>0&&!p.out){pose='zombie';ctx.translate(x,y);ctx.rotate(Math.sin(time*24)*0.22);ctx.translate(-x,-y);}   // flailing at the bat
-  drawZombie(ctx,x,y,size,{team:STYLE_OF(p.team),body:BODY_OF[p.idx]||'qb',view,flip,phase:p.phase*0.55,speed:Math.min(1,sp/6.5),
+  drawZombie(ctx,x,y,size,{look:p.look,team:STYLE_OF(p.team),body:BODY_OF[p.idx]||'qb',view,flip,phase:p.phase*0.55,speed:Math.min(1,sp/6.5),
     limbs:p.limbs,pose,num:p.num,t:time,seed:p.idx*7+p.team*3,ball:false,feedRot,feedLift,stiffK,arms:armsK,knee:kneeK,slump:slumpK,dj:djK});
   ctx.restore();
   if(G&&mode!=='title'){
@@ -2410,7 +2419,7 @@ function clawStart(){
   if(G.brawl){G.brawl.a.brawling=G.brawl.b.brawling=false;G.brawl=null;}
   const P=G.play,c=P.claw;P.clawDone=1;CLAW.last=G.playsDone;if(c.kind!=='td')G.clawN=(G.clawN||0)+1;annStop();djClear();
   const t0=CLAW.rec[0].t,tEnd=CLAW.rec[CLAW.rec.length-1].t,peak=Math.min(Math.max(c.t,t0+0.4),tEnd-0.2);
-  CLAW.R={jumbo:clawJumbo(c,P),limb:!!P.callLimbs,kind:c.kind,peak,st:Math.max(t0,peak-0.95),end:Math.min(tEnd,peak+1.1),phase:'in',real:0,yaw:0,tilt:1,ss:26,fx:c.x,fy:c.y,
+  CLAW.R={who:[c.info&&c.info.who,c.info&&c.info.by],jumbo:clawJumbo(c,P),limb:!!P.callLimbs,kind:c.kind,peak,st:Math.max(t0,peak-0.95),end:Math.min(tEnd,peak+1.1),phase:'in',real:0,yaw:0,tilt:1,ss:26,fx:c.x,fy:c.y,
     dir:Math.random()<0.5?1:-1,said:false,fade:0};
   clawAngle(CLAW.R);mode='claw';clawWhoosh(true);
   setTimeout(()=>{if(mode==='claw'){const l=pick(CLAW_LINES.intro);tick(l,true);annSay(l,3,'color');}},60);
@@ -2464,7 +2473,7 @@ function clawUpdate(dt){
   if(R.phase==='in'){const left=R.peak-R.st;sp=left>0.18?1.0:0.06+0.94*Math.max(0,left/0.18);R.st+=sp*dt;R.ss+=(34-R.ss)*dt*2;R.tilt+=(0.86-R.tilt)*dt*2.5;
     if(R.st>=R.peak){R.st=R.peak;R.phase='freeze';R.pt=0;clawWhoosh(true);}}
   else if(R.phase==='freeze'){R.pt+=dt;const u=Math.min(1,R.pt/1.0),e=u*u*(3-2*u);R.yaw=R.yaw0+R.dYaw*e;R.tilt=0.86-0.26*e-0.08*Math.sin(Math.PI*u);R.ss+=(46-R.ss)*dt*3;R.st+=0.015*dt;
-    if(!R.said&&R.pt>0.1){R.said=true;const k=R.kind==='crush'||R.kind==='hit'?(R.limb?'limb':'hit'):R.kind;const l=pick(CLAW_LINES[k]||CLAW_LINES.hit);tick(l,true);annSay(l,3,'color');}
+    if(!R.said&&R.pt>0.1){R.said=true;const k=R.kind==='crush'||R.kind==='hit'?(R.limb?'limb':'hit'):R.kind;const l=pickFor(CLAW_LINES[k]||CLAW_LINES.hit,...(R.who||[]))||pick(CLAW_LINES.intro);tick(l,true);annSay(l,3,'color');}
     if(R.pt>=1.15){R.phase='out';R.pt=0;clawWhoosh(false);}}
   else if(R.phase==='out'){R.pt+=dt;R.ss+=(36-R.ss)*dt*0.9;sp=Math.min(0.85,0.08+R.pt*1.6);R.st+=sp*dt;if(R.st>=R.end||R.pt>1.9){R.phase='fade';R.fade=0;}}
   else if(R.phase==='fade'){R.fade+=dt*5;if(R.fade>=1)clawEnd();}
@@ -2523,7 +2532,7 @@ function clawPlayer(a,b,sx,sy,ss,u){
   if(a.dv>0){pose='dive';view='side';}else if(down)pose='down';else if(a.c)pose='carry';else if(a.bk)pose='block';
   else if(G.play&&a.t===G.play.def)pose='zombie';else if(sp<0.4)pose='stand';
   ctx.fillStyle='rgba(0,0,0,0.3)';
-  drawZombie(ctx,sx,sy,ss*2.75,{team:STYLE_OF(a.t),body:BODY_OF[a.i]||'qb',view,flip,phase:(a.ph+(b.ph-a.ph)*u)*0.55,speed:Math.min(1,sp/6.5),limbs:a.L,pose,
+  drawZombie(ctx,sx,sy,ss*2.75,{look:G.teams[a.t]&&G.teams[a.t][a.i]&&G.teams[a.t][a.i].look,team:STYLE_OF(a.t),body:BODY_OF[a.i]||'qb',view,flip,phase:(a.ph+(b.ph-a.ph)*u)*0.55,speed:Math.min(1,sp/6.5),limbs:a.L,pose,
     num:G.teams[a.t][a.i].num,t:R.phase==='freeze'?0:time,seed:a.i*7+a.t*3,ball:false});
   if(a.c)drawBrain(sx+(down||a.dv>0?ss*0.4:view==='side'?(flip?-1:1)*ss*0.5:ss*0.4),sy-(down||a.dv>0?ss*0.4:ss*1.25),CLAW.g,ss*0.45);}   // the carried brain, bites and all, like in live play
 
@@ -2572,8 +2581,8 @@ function brawlFinish(){
   win.brawling=false;win.dance=2.6;win.danceT=0;win.routine=makeRoutine();
   const ws=win.team;playS('cheer_small',0.7,1,0,{pan:sidePan(ws)});crowdSay('yeah',ws,0.85,0.1);crowdSay('boo',1-ws,0.6,0.5);crowdHype(ws,1);
   big('KNOCKOUT!',1.4,'#ffd84a');
-  const l=Math.random()<0.5?pick(BRAWL_LINES.ko):`The ${TEAMS[ws].name} win the brawl!`;tick(l,true);annSay(l,3,'color');
-  setTimeout(()=>{if(G&&(mode==='dead'||mode==='claw'||mode==='playcall')){const c=pick(BRAWL_LINES.color);tick(c,true);annSay(c,2,'color');}},2900);}
+  const l=(Math.random()<0.5&&pickFor(BRAWL_LINES.ko,lose.name,win.name))||`The ${TEAMS[ws].name} win the brawl!`;tick(l,true);annSay(l,3,'color');
+  setTimeout(()=>{if(G&&(mode==='dead'||mode==='claw'||mode==='playcall')){const c=pickFor(BRAWL_LINES.color,lose.name,win.name);if(c){tick(c,true);annSay(c,2,'color');}}},2900);}
 function drawBrawlCloud(){
   const Bw=G.brawl;if(!Bw||Bw.phase!=='fight')return;const x=SX(Bw.cy),y=SY(Bw.cx)-SS*1.4,R=SS*2.6,t=time;
   ctx.save();

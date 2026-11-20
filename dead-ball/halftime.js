@@ -73,7 +73,7 @@ function hsExitStart(){HS.ph='exit';HS.ex=0;HS.rk=[];
   const spots={stone:[[-150,-260],[-95,-292],[-40,-306],[15,-306],[70,-292],[125,-262],[-120,-150],[120,-150]],pole:[[-26,-362],[26,-362],[0,-392]],coffin:[[-14,-82],[14,-82],[0,-96]]};
   HS.bats=[];HS.set.forEach((p,pi)=>{for(const [ox,oy] of spots[p.k])HS.bats.push({pi,ox,oy,x:Math.random()*W,y:HUD-60-Math.random()*240,ph:Math.random()*6,d:0.3+Math.random()*0.7,s:22+Math.random()*8});});
   for(let i=0;i<18;i++)HS.bats.push({pi:-1,ox:0,oy:0,x:Math.random()*W,y:HUD-40-Math.random()*300,ph:Math.random()*6,d:Math.random()*1.2,s:14+Math.random()*10,wx:Math.random()*W,wy:HUD+80+Math.random()*500});
-  HS.plyr=[];for(const t of [0,1])for(let i=0;i<7;i++)HS.plyr.push({team:t,idx:i,d:2.4+i*0.13+Math.random()*0.2,tx:t?400+(i%4)*50+(i>3?25:0):320-(i%4)*50-(i>3?25:0),ty:640+(i>3?150:0)+(i%2)*40,ph:Math.random()*6});
+  HS.plyr=[];for(const t of [0,1])for(let i=0;i<7;i++)HS.plyr.push({team:t,idx:i,look:G&&G.teams&&G.teams[t][i]?G.teams[t][i].look:null,d:2.4+i*0.13+Math.random()*0.2,tx:t?400+(i%4)*50+(i>3?25:0):320-(i%4)*50-(i>3?25:0),ty:640+(i>3?150:0)+(i%2)*40,ph:Math.random()*6});
   for(const b of HS.band)b.exitD=Math.random()*0.5;for(const c of HS.cheer){c.exitD=Math.random()*0.3;c.ex0=null;}}
 function hsDone(){if(!HS.on)return;hsAudioStop();HS.on=false;if(HS.s)store.set('rotball_lastsong',HS.s.id);HT.song=null;htPick();secondHalf();}
 
@@ -435,7 +435,7 @@ function hsDrawCheer(t,ex,beat){const T=HS.T,size=96;
 }
 function hsDrawPlayers(ex){for(const p of HS.plyr){const k=Math.max(0,Math.min(1,(ex-p.d)/2.2));if(ex<p.d)continue;
   const fromX=p.team?W+60:-60,x=fromX+(p.tx-fromX)*ease(k),y=p.ty;const S=STYLE_OF(p.team);
-  drawZombie(ctx,x,y,74,{team:S,body:BODY_OF[p.idx]||'qb',view:k<1?'side':'front',flip:p.team===1,phase:ex*11+p.ph,speed:k<1?0.9:0.2,limbs:{la:1,ra:1,ll:1,rl:1,head:1},pose:k<1?'run':'stand',num:G&&G.teams?'':'',t:time,seed:p.idx+p.team*7,ball:false});}}
+  drawZombie(ctx,x,y,74,{look:p.look,team:S,body:BODY_OF[p.idx]||'qb',view:k<1?'side':'front',flip:p.team===1,phase:ex*11+p.ph,speed:k<1?0.9:0.2,limbs:{la:1,ra:1,ll:1,rl:1,head:1},pose:k<1?'run':'stand',num:G&&G.teams?'':'',t:time,seed:p.idx+p.team*7,ball:false});}}
 function hsDrawBats(ex){for(const b of HS.bats){const k=ex-b.d;if(k<0)continue;let x,y;
   if(b.pi>=0){const P=HS.set[b.pi],L=hsLift(P),tx=P.x+b.ox,ty=P.y+b.oy-L,u=ease(Math.min(1,k/1.1));x=b.x+(tx-b.x)*u+Math.sin(ex*7+b.ph)*4*(1-u);y=b.y+(ty-b.y)*u+Math.sin(ex*13+b.ph)*3;}
   else{const u=Math.min(1,k/1.6);x=b.x+(b.wx-b.x)*u+Math.sin(ex*3+b.ph)*40;y=b.y+(b.wy-b.y)*u-Math.max(0,ex-3)*240;}

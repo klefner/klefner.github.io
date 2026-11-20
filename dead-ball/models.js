@@ -1,6 +1,7 @@
 // Dead Ball cartoon zombie renderer, ¾ view.
 // drawZombie(ctx, x, y, size, o): (x,y) = feet on the ground, size = on-screen height in px of a standing QB.
 // o = {team:STYLE, body:'line'|'wr'|'qb'|'rb', view:'front'|'back'|'side', flip:bool, phase:rad, speed:0..1,
+//      look:{skin:hex, hair:{c,s}} (optional), prop:'bone' (optional),
 //      limbs:{la,ra,ll,rl,head}, pose:'run'|'stand'|'zombie'|'carry'|'down'|'dive'|'block'|'stiff'|'die' (o.stiffK 0..1 arm reach, o.stiffBall: brain tucked in the far arm;
 //      'die' is side on: o.knee 0..1 knees buckle to kneeling, o.slump radians the upper body folds forward, o.hang radians of extra
 //      tilt the hanging arms correct for, o.arms 'limp'|'flail'|'clutch'|'cheer'|'out'), num:int, t:seconds, seed:int}
@@ -122,14 +123,48 @@ function zHelmet(c,S,hx,hy,r,view,o){           // helmet sits high like a cap; 
     for(const s of [-1,1])zEll(c,hx+s*r*0.98,hy+r*0.3,r*0.12,r*0.12,S.mask,1.6);}
   else if(view==='side'){c.lineCap='round';const bar=()=>{c.beginPath();c.moveTo(hx+r*0.15,hy+r*0.2);c.quadraticCurveTo(hx+r*1.05,hy+r*0.45,hx+r*1.15,hy+r*0.95);};
     bar();c.strokeStyle=ZOUT;c.lineWidth=5;c.stroke();bar();c.strokeStyle=S.mask;c.lineWidth=2.6;c.stroke();zEll(c,hx+r*0.15,hy+r*0.2,r*0.12,r*0.12,S.mask,1.6);}}
+// Hair for zombies who have it (o.look.hair = {c:color, s:'long'|'braids'|'pony'|'shag'}): it hangs from under the helmet.
+// Front and side views draw it behind the face; the back view draws it over the back of the head.
+function zHair(c,H,hx,hy,r,view,o){
+  const col=H.c||'#3a2a1c',dk=zShade(col,-0.35),sw=Math.sin((o.t||0)*2.4+(o.seed||0))*r*0.06+Math.sin(o.phase||0)*r*0.08;
+  const fillJag=(x0,x1,yTop,yBot,n)=>{c.beginPath();c.moveTo(x0,yTop);c.lineTo(x0-r*0.08+sw*0.4,yBot);
+    for(let i=1;i<=n;i++){const x=x0+(x1-x0)*i/n;c.lineTo(x-(x1-x0)/n*0.5+sw*0.5,yBot-r*(i%2?0.22:0.05));c.lineTo(x+sw*0.5,yBot+(i%3===1?r*0.08:0));}
+    c.lineTo(x1,yTop);c.closePath();zFill(c,col,2.4);
+    c.strokeStyle=dk;c.lineWidth=1.3;for(let i=1;i<n;i++){const x=x0+(x1-x0)*i/n;c.beginPath();c.moveTo(x,yTop+r*0.15);c.lineTo(x+sw*0.4,yBot-r*0.28);c.stroke();}};
+  const braid=(x,y0,y1,s)=>{const n=6,dy=(y1-y0)/n;for(let i=0;i<n;i++){const xx=x+sw*(i/n)+s*(i%2?1:-1)*r*0.05;zEll(c,xx,y0+dy*(i+0.5),r*0.15,dy*0.62,col,1.8);}
+    zEll(c,x+sw,y1+r*0.06,r*0.12,r*0.08,'#b8323a',1.4);};
+  const tail=(x,y,dx,dy)=>{c.beginPath();c.moveTo(x-r*0.18,y);c.quadraticCurveTo(x+dx*0.6-r*0.25,y+dy*0.4,x+dx+sw,y+dy);c.quadraticCurveTo(x+dx*0.5+r*0.25,y+dy*0.5,x+r*0.18,y);c.closePath();zFill(c,col,2.2);
+    zEll(c,x,y,r*0.16,r*0.12,'#b8323a',1.4);};
+  const st=H.s||'long';
+  if(view==='front'){
+    if(st==='long')fillJag(hx-r*1.16,hx+r*1.16,hy-r*0.1,hy+r*1.45,7);
+    else if(st==='shag')fillJag(hx-r*1.14,hx+r*1.14,hy-r*0.1,hy+r*0.95,6);
+    else if(st==='braids'){fillJag(hx-r*1.1,hx+r*1.1,hy-r*0.1,hy+r*0.55,5);braid(hx-r*1.0,hy+r*0.35,hy+r*1.75,-1);braid(hx+r*1.0,hy+r*0.35,hy+r*1.75,1);}
+    else{tail(hx-r*0.75,hy-r*0.35,-r*0.75,r*1.35);fillJag(hx-r*1.1,hx+r*1.1,hy-r*0.1,hy+r*0.6,5);}}
+  else if(view==='side'){
+    if(st==='long')fillJag(hx-r*1.02,hx-r*0.05,hy-r*0.2,hy+r*1.45,5);
+    else if(st==='shag')fillJag(hx-r*1.0,hx-r*0.1,hy-r*0.2,hy+r*0.95,4);
+    else if(st==='braids'){fillJag(hx-r*0.98,hx-r*0.15,hy-r*0.2,hy+r*0.6,4);braid(hx-r*0.62,hy+r*0.4,hy+r*1.75,-1);}
+    else tail(hx-r*0.95,hy-r*0.2,-r*0.75,r*1.25);}
+  else{
+    if(st==='long')fillJag(hx-r*1.06,hx+r*1.06,hy-r*0.05,hy+r*1.5,7);
+    else if(st==='shag')fillJag(hx-r*1.04,hx+r*1.04,hy-r*0.05,hy+r*1.0,6);
+    else if(st==='braids'){fillJag(hx-r*1.0,hx+r*1.0,hy-r*0.05,hy+r*0.7,6);braid(hx-r*0.5,hy+r*0.5,hy+r*1.8,-1);braid(hx+r*0.5,hy+r*0.5,hy+r*1.8,1);}
+    else{fillJag(hx-r*1.0,hx+r*1.0,hy-r*0.05,hy+r*0.6,6);tail(hx,hy+r*0.1,sw*2,r*1.45);}}}
+function zShade(hex,k){const n=parseInt(hex.slice(1),16),f=v=>Math.max(0,Math.min(255,Math.round(k<0?v*(1+k):v+(255-v)*k)));
+  return '#'+[n>>16,(n>>8)&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join('');}
+const Z_SKIN={};   // a zombie's own skin color, on top of the team style: {skin, skinDk, skinHi} shaded from one base color
+function zSkinOf(S,base){const k=S.helmet+base;return Z_SKIN[k]||(Z_SKIN[k]=Object.assign({},S,{skin:base,skinDk:zShade(base,-0.3),skinHi:zShade(base,0.3)}));}
 function zHead(c,S,B,o,hx,hy,view){
-  const r=21*B.head;
+  const r=21*B.head,H=o.look&&o.look.hair;
+  if(H&&view!=='back')zHair(c,H,hx,hy,r,view,o);
   if(view==='back'){const g=c.createRadialGradient(hx,hy,r*0.2,hx,hy+r*0.2,r*1.05);g.addColorStop(0,S.skin);g.addColorStop(1,S.skinDk);c.beginPath();c.ellipse(hx,hy+r*0.1,r*0.98,r,0,0,7);zFill(c,g,3);
     if(S.species==='mummy'){c.strokeStyle=S.skinDk;c.lineWidth=1.6;for(let i=0;i<4;i++){c.beginPath();c.moveTo(hx-r,hy+r*(0.4+i*0.18));c.lineTo(hx+r,hy+r*(0.5+i*0.18));c.stroke();}}}
   else zFace(c,S,hx,hy,r,o,view);
+  if(H&&view==='back')zHair(c,H,hx,hy,r,view,o);
   zHelmet(c,S,hx,hy,r,view,o);}
 function drawZombie(c,x,y,size,o){
-  const S=o.team,B=ZBODY[o.body||'qb'],L=o.limbs||{la:1,ra:1,ll:1,rl:1,head:1},mum=S.species==='mummy';
+  const S=o.look&&o.look.skin?zSkinOf(o.team,o.look.skin):o.team,B=ZBODY[o.body||'qb'],L=o.limbs||{la:1,ra:1,ll:1,rl:1,head:1},mum=S.species==='mummy';
   let view=o.view||'front',pose=o.pose||'run';if(view!=='side'&&pose!=='down'&&pose!=='dive')o=Object.assign({},o,{flip:false});const ph=o.phase||0,spd=o.speed==null?1:o.speed;
   const nLegs=(L.ll?1:0)+(L.rl?1:0);
   if(nLegs===0&&pose!=='down'&&pose!=='dive'&&pose!=='stand'&&pose!=='die')pose='crawl';                 // no legs: drag himself along on his arms
@@ -216,6 +251,9 @@ function drawZombie(c,x,y,size,o){
   else if(view==='side'){drawArm(1,'r');}
   else if(pose!=='zombie'){drawArm(-1,'l');drawArm(1,'r');}
   if(pose==='carry'&&L.ra&&o.ball!==false)ball();
+  if(o.prop==='bone'&&L.ra){const [,,hn]=armPts(1);c.save();c.translate(hn[0],hn[1]-4);c.rotate(-0.9+Math.sin((o.t||0)*7)*0.15);   // a bone to chew on
+    c.beginPath();c.rect(-2.6,-11,5.2,22);zFill(c,'#efe6cf',1.8);for(const y of [-11,11])for(const x of [-2.6,2.6])zEll(c,x,y,3.4,3.4,'#efe6cf',1.8);
+    c.fillStyle='#efe6cf';c.fillRect(-1.6,-10,3.2,20);c.restore();}
   if(pose==='stiff'&&L.ra&&(o.stiffK||0)>0.55){const [,,hn]=armPts(1);c.save();c.translate(hn[0]+2,hn[1]);   // big open palm facing the tackler
     c.beginPath();c.ellipse(1,0,6.5,10,0,0,7);zFill(c,S.skin,2.6);c.strokeStyle=S.skinDk||'#333';c.lineWidth=2;
     for(let i=-1;i<=1;i++){c.beginPath();c.moveTo(4,i*4.8);c.lineTo(9,i*5.6);c.stroke();}c.restore();}

@@ -150,7 +150,7 @@ function cerZombie(c,t){const p=c.p,size=128,x=c.x,y=664,ph=t*7+c.cheer;
   ctx.fillStyle='rgba(0,0,0,0.35)';ctx.beginPath();ctx.ellipse(x,y+4,size*0.32,size*0.08,0,0,7);ctx.fill();
   const S=stone?cerStoneStyle(STYLE_OF(CR.win)):STYLE_OF(CR.win),bounce=stone?0:Math.abs(Math.sin(ph*0.5))*(up?7:4);
   const arm=stone?[0.5,0.3]:up?[2.8,0.1]:[2.2+Math.sin(ph)*0.5,0.5];
-  drawZombie(ctx,x,y,size,{team:S,body:BODY_OF[c.i]||'line',view:'front',flip:false,phase:0,speed:0,limbs:p.limbs,pose:'dance',num:p.num,t:stone?0:t,seed:c.i*7,ball:false,
+  drawZombie(ctx,x,y,size,{look:p.look,team:S,body:BODY_OF[c.i]||'line',view:'front',flip:false,phase:0,speed:0,limbs:p.limbs,pose:'dance',num:p.num,t:stone?0:t,seed:c.i*7,ball:false,
     dj:{sq:stone?0:0.1+0.1*Math.abs(Math.sin(ph*0.5)),air:bounce,la:arm,ra:stone?[0.5,0.3]:up?arm:[2.2+Math.sin(ph+1.5)*0.5,0.5],tilt:stone?0:Math.sin(ph*0.25)*0.05}});
   if(stone){ctx.save();ctx.strokeStyle='rgba(40,40,40,0.6)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x-8,y-70);ctx.lineTo(x+2,y-55);ctx.lineTo(x-4,y-40);ctx.moveTo(x+12,y-30);ctx.lineTo(x+4,y-18);ctx.stroke();ctx.restore();}
   if(c.trophy==='feet')cerTrophy(x+28,y+2,0.55,false);
