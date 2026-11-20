@@ -31,8 +31,8 @@ const GMS={
   patcher:{name:'The Patcher',share:0.5,eff:0.9,tough:true}};   // patches his zombies up, so losses wear his team down less
 const BONES={win:100,loss:30,td:10};
 // Your players' stats. Every stat starts at level 1; each training step costs more than the last. Team Power = 20 + 10 x the average level.
-const STATS=[{k:'spd',name:'Speed',ab:'SPD',does:'runs faster'},{k:'hands',name:'Hands',ab:'HND',does:'catches more, and picks off more throws'},
-  {k:'bite',name:'Bite',ab:'BIT',does:'tackles stick'},{k:'grit',name:'Grit',ab:'GRT',does:'keeps his arms, legs and head on'},
+const STATS=[{k:'spd',name:'Speed',ab:'SPD',does:'runs faster'},{k:'hands',name:'Hands',ab:'HND',does:'catches and picks off more'},
+  {k:'bite',name:'Bite',ab:'BIT',does:'tackles stick'},{k:'grit',name:'Grit',ab:'GRT',does:'keeps his limbs on'},
   {k:'arm',name:'Arm',ab:'ARM',does:'throws land on target',qb:true}];
 const TRAIN_COST=[50,100,200,400,800],MAX_LV=TRAIN_COST.length+1;
 const POS=['QB / S','RB / LB','WR / CB','WR / CB','LINE','LINE','LINE'];
@@ -192,7 +192,7 @@ function seasonRoster(keep){const u=userTeam();
 function seasonPlayer(i,keep){const u=userTeam(),o=u.stats[i],[nm,num]=u.roster[i];
   seasonSub(`${nm.toUpperCase()} #${num}`,`<div class="sn-head">${POS[i]} &nbsp;·&nbsp; <span class="sn-bones">Bones <b>${CAREER.bones.toLocaleString()}</b></span></div>`,
     [...STATS.filter(S=>o[S.k]!=null).map(S=>{const L=o[S.k],c=trainCost(L);return {label:`${S.name}: <b>Level ${L}</b>`,
-      sub:c==null?`${S.does} · fully trained`:`${S.does} · train to ${L+1} for ${c} Bones${CAREER.bones<c?' (not enough yet)':''}`,
+      sub:c==null?`${S.does} · fully trained`:`${S.does} · level ${L+1} costs ${c}${CAREER.bones<c?' (not enough Bones)':''}`,
       act:()=>{if(train(i,S.k)){sfx.cheer&&sfx.cheer();}else sfx.groan&&sfx.groan();seasonPlayer(i,true);}};}),
      {label:'Back to Roster',act:()=>seasonRoster(true)}],()=>seasonRoster(true),keep);}
 function seasonStandings(){seasonSub('STANDINGS',standingsHTML());}
