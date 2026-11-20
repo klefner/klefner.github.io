@@ -142,10 +142,12 @@ const teamDot=id=>`<span class="sn-dot" style="background:${LEAGUE[id].jersey}">
 const recStr=t=>`${t.w}–${t.l}`;
 function seasonEsc(){if(SN.sub){seasonOpen();return;}toTitle();}
 const SN={sub:null,menu:null,sub2:null};
+// One Menu per screen element, reused: a menu re-renders itself after its button runs, so a second Menu on the same element would paint over the new one.
+function snMenu(k,id,items){const m=SN[k];if(!m)return new Menu($(id),items);m.items=items;m.i=Math.max(0,items.findIndex(x=>!x.disabled&&!x.hidden));m.render();return m;}
 function seasonOpen(){careerLoad();seasonDOM();leagueReset();annStop&&annStop();G=null;SN.sub=null;mode='season';
   if(!CAREER){$('seasonH').textContent='SEASON';
     $('seasonBody').innerHTML=`<div class="sn-line">Coach the <b style="color:#f3c34b">Graveyard Shift</b> through a 12-team zombie league. Win games, earn <b style="color:#efe6cf">Bones</b>, and build a team that's all yours, against rivals who grow every week too.<br><br>Your career saves itself after every game.</div><br>`;
-    SN.menu=new Menu($('seasonMenu'),[{label:'Start My Career',act:()=>{CAREER=careerNew();careerSave();seasonOpen();}},{label:'Main Menu',act:()=>toTitle()}]);}
+    SN.menu=snMenu('menu','seasonMenu',[{label:'Start My Career',act:()=>{CAREER=careerNew();careerSave();seasonOpen();}},{label:'Main Menu',act:()=>toTitle()}]);}
   else if(seasonOver()){seasonEndScreen();return;}
   else{const u=userTeam(),opp=nextOpp(),g=userGame(CAREER,CAREER.week),o=CAREER.teams[opp],D=LEAGUE[opp];
     $('seasonH').textContent=`SEASON ${CAREER.season}`;
@@ -154,13 +156,13 @@ function seasonOpen(){careerLoad();seasonDOM();leagueReset();annStop&&annStop();
       <div class="sn-vs">${g.h===0?'VS':'AT'}</div>
       <div class="sn-team" style="background:${D.jersey};color:${D.trim}"><div class="nm">${D.name}</div><div class="pw">${Math.round(o.power)}</div><div class="lb">Team Power · ${recStr(o)}</div></div></div>
       <div class="sn-verdict">${favored(u.power,o.power)} ${g.h===0?'Home game.':'Road game.'}</div>`;
-    SN.menu=new Menu($('seasonMenu'),[{label:`Play Week ${CAREER.week+1}`,act:()=>seasonPlay()},{label:'League Standings',act:()=>seasonStandings()},
+    SN.menu=snMenu('menu','seasonMenu',[{label:`Play Week ${CAREER.week+1}`,act:()=>seasonPlay()},{label:'League Standings',act:()=>seasonStandings()},
       {label:'Last Week\'s Scores',hidden:!CAREER.results.length,act:()=>seasonScores(CAREER.results.length-1)},{label:'Main Menu',act:()=>toTitle()}]);}
   activeMenu=SN.menu;showOverlay('season');}
 function standingsHTML(){return [0,1].map(d=>`<h2>${DIVS[d]}</h2><table class="sn-tbl"><tr><th>Team</th><th>W</th><th>L</th><th>+/-</th><th>Power</th></tr>${
   standings(d).map(t=>`<tr class="${t.id===0?'you':''}"><td>${teamDot(t.id)}${LEAGUE[t.id].name}</td><td>${t.w}</td><td>${t.l}</td><td>${t.pf-t.pa>0?'+':''}${t.pf-t.pa}</td><td>${Math.round(t.power)}</td></tr>`).join('')}</table>`).join('');}
 function seasonSub(title,html,items){seasonDOM();SN.sub=title;$('snSubH').textContent=title;$('snSubBody').innerHTML=html;
-  SN.sub2=new Menu($('snSubMenu'),items||[{label:'Back',act:()=>seasonOpen()}]);activeMenu=SN.sub2;mode='season';showOverlay('snSub');}
+  SN.sub2=snMenu('sub2','snSubMenu',items||[{label:'Back',act:()=>seasonOpen()}]);activeMenu=SN.sub2;mode='season';showOverlay('snSub');}
 function seasonStandings(){seasonSub('STANDINGS',standingsHTML());}
 function scoresHTML(res,skipYou){return res.filter(r=>!(skipYou&&(r.h===0||r.a===0))).map(r=>{const hw=r.hs>r.as,w=hw?r.h:r.a,l=hw?r.a:r.h,ws=Math.max(r.hs,r.as),ls=Math.min(r.hs,r.as);
   return `${teamDot(w)}<b>${LEAGUE[w].name} ${ws}</b>, ${LEAGUE[l].name} ${ls}`;}).join('<br>');}
