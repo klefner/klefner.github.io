@@ -256,7 +256,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.12.9';
+const VERSION='0.12.10';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -380,7 +380,7 @@ function audioInit(){annUnlock();
 function noiseBuf(dur){const n=Math.max(1,Math.floor(AC.sampleRate*dur)),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;return b;}
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec);}
 // ===== recorded sound clips (sounds/*.mp3); synthesized sounds are the fallback =====
-const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,chew:4,swallow:2,brains:1,laugh:1,quip:6,halfq:4,ooh:2,aww:2,boo:2,yeah:2,eww:2,gogo:1,chant_brains:1,chant_def:1,laughc:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0,ghost:5},raw:{},buf:{},bags:{},last:{}};
+const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,chew:4,swallow:2,brains:1,laugh:1,quip:6,halfq:4,ooh:2,aww:2,boo:2,yeah:2,eww:2,gogo:1,chant_brains:1,chant_def:1,laughc:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0,ghost:5,anthem:0},raw:{},buf:{},bags:{},last:{}};
 function sndNames(){const L=[];for(const k in SND.groups){const n=SND.groups[k];if(n)for(let i=1;i<=n;i++)L.push(k+i);else L.push(k);}return L;}
 for(const n of sndNames())fetch('sounds/'+n+'.mp3').then(r=>r.ok?r.arrayBuffer():null).then(b=>{if(b){SND.raw[n]=b;decodeSnd(n);}}).catch(()=>{});
 function decodeSnd(n){if(!AC||!SND.raw[n]||SND.buf[n])return;const b=SND.raw[n];SND.raw[n]=null;
@@ -823,7 +823,8 @@ function toggleSound(){settings.sound=!settings.sound;if(!settings.sound)musicSt
 const TRACKS=[{id:'march',name:"Zombies' March"},{id:'hullabaloo',name:'Halloween Hullabaloo'},{id:'hallow',name:'Hallow Quest'},{id:'surf',name:'Graveyard Surf'},{id:'crusher',name:'Bone Crusher'}];
 if(!settings.music||(settings.music!=='off'&&!TRACKS.some(t=>t.id===settings.music)))settings.music='march';
 const music={el:null,g:null,tok:0,duck:false};
-function musicLevel(){if(mode==='live'||mode==='pause'||mode==='half')return 0;            // never during a live play
+function musicLevel(){if(mode==='live'||mode==='pause'||mode==='half'||mode==='entrance')return 0;   // the walk-out anthem has the stage to itself
+              // never during a live play
   const base=(mode==='title'||mode==='half'||mode==='over'||((mode==='howto'||mode==='settings')&&!G))?0.5:0.3;return music.duck?base*0.36:base;}
 function musicUpdate(){if(!music.g||!AC)return;const v=musicLevel();if(v===music.lv)return;
   music.lv=v;try{music.g.gain.setTargetAtTime(v,AC.currentTime,v===0?0.12:0.6);}catch(e){}}
@@ -1026,7 +1027,11 @@ function startEntrance(){
   const vl=FH/SS,lo=viewCX-vl/2-2,hi=viewCX+vl/2+2;
   for(const t of [0,1])G.teams[t].forEach((p,i)=>{p.ent={tx:p.x,ty:p.y,tf:p.face,d:0.15+i*0.08+Math.random()*0.12};
     p.x=t===0?lo-(i%3)*1.3:hi+(i%3)*1.3;p.y=MID+((i%4)-1.5)*1.7+rand(-0.5,0.5);p.vx=p.vy=0;p.face=t===0?0:Math.PI;});
-  G.ent={t:0,cx:camCX,ss:SS,done:false,hold:0};mode='entrance';showOverlay(null);playS('cheer_small',0.7);}
+  G.ent={t:0,cx:camCX,ss:SS,done:false,hold:0};mode='entrance';showOverlay(null);entCrowd();}
+function entCrowd(){   // the walk-out: our own anthem and both stands screaming, home fans on the left speaker, away fans on the right
+  G.ent.anthem=playS('anthem',0.95,1);
+  for(const t of [0,1]){playS('cheer_td',0.85,t?0.97:1.03,t*0.12,{pan:sidePan(t)});playS('cheer_td',0.6,t?1.08:0.92,1.6+t*0.2,{pan:sidePan(t)});
+    crowdSay('yeah',t,0.8,0.4+t*0.3);crowdSay('gogo',t,0.6,2.2+t*0.25);crowdHype(t,1);}}
 function entUpdate(dt){const E=G.ent;if(!E)return;E.t+=dt;let all=true;
   for(const p of [...G.teams[0],...G.teams[1]]){const e=p.ent;if(!e||p.out)continue;
     if(E.t<e.d){all=false;continue;}
@@ -1035,8 +1040,8 @@ function entUpdate(dt){const E=G.ent;if(!E)return;E.t+=dt;let all=true;
     else{p.x=e.tx;p.y=e.ty;p.vx=p.vy=0;p.face=e.tf;}}
   if(all&&!E.done){E.done=true;E.hold=0.45;}
   if(E.done){E.hold-=dt;if(E.hold<=0)entEnd();}}
-function entEnd(){if(mode!=='entrance')return;for(const p of [...G.teams[0],...G.teams[1]]){if(p.ent){p.x=p.ent.tx;p.y=p.ent.ty;p.face=p.ent.tf;p.ent=null;}p.vx=p.vy=0;}G.ent=null;toPlayCall();}
-function entSkip(){if(G&&G.ent&&mode==='entrance'&&G.ent.t>0.3)entEnd();}
+function entEnd(skip){if(mode!=='entrance')return;if(skip&&G.ent&&G.ent.anthem)try{G.ent.anthem.stop(AC.currentTime+0.06);}catch(e){}for(const p of [...G.teams[0],...G.teams[1]]){if(p.ent){p.x=p.ent.tx;p.y=p.ent.ty;p.face=p.ent.tf;p.ent=null;}p.vx=p.vy=0;}G.ent=null;toPlayCall();}
+function entSkip(){if(G&&G.ent&&mode==='entrance'&&G.ent.t>0.3)entEnd(true);}
 function startPossession(t,x){
   if(inOwnEZ(t,x))x=own25(t);
   x=clamp(x,11,109);G.poss=t;G.los=x;G.stage=0;G.crossed=pastMid(t,x);
@@ -2362,7 +2367,7 @@ function hline(x,col,w,dash){ctx.save();ctx.strokeStyle=col;ctx.lineWidth=w;if(d
 // Every live play is recorded (30 fps). A big hit, knockout, long touchdown or huge run marks a highlight; when the ball is dead
 // the replay runs: slow motion into the moment, time nearly freezes, the camera orbits 90 degrees around the frozen action
 // (fake 3D: the field turns and tilts, each zombie switches to the view that matches the new angle), then the play resumes from the side.
-const CLAW={rec:[],acc:0,t:0,pid:0,R:null,last:-99};
+const CLAW={rec:[],acc:0,t:0,pid:0,R:null,last:-99,g:0};
 const CLAW_LINES={intro:["Let's go to the Claw Cam!","Roll that back on the Claw Cam!","Oh, you have to see this again. Claw Cam!"],
   hit:['Look at the impact. You can see his soul trying to leave.','Freeze it right there. That is the sound of bones giving up.','Every rib, every vertebra, all saying goodbye at once.'],
   ko:['Lights out. Look at those eyes roll back.','And from this angle you can see exactly when he stopped caring.'],
@@ -2382,7 +2387,7 @@ function clawRecord(dt){
       c:p===car,bk:!!(p.engaged||p.blockedBy),o:p.out});}
   const parts=[];for(let k=G.parts.length-1;k>=0&&parts.length<170;k--){const q=G.parts[k];if(q.k!=='blood')continue;if(!q.id)q.id=++CLAW.pid;parts.push([q.id,q.x,q.y,q.z||0,q.r,q.c]);}
   const deb=[];for(const d of G.debris){if(d.sink||(d.age>2.5&&!(d.z>0.05)))continue;if(!d.id)d.id=++CLAW.pid;deb.push([d.id,d.k,d.x,d.y,d.z||0,d.rot,d.team,d.idx]);}
-  CLAW.rec.push({t:CLAW.t,pl,b:B?{s:B.state,x:B.x,y:B.y,h:B.h||0}:null,parts,deb});
+  CLAW.rec.push({t:CLAW.t,pl,b:B?{s:B.state,x:B.x,y:B.y,h:B.h||0}:null,g:shownStage(),parts,deb});   // g: the brain's bites as they were at that moment
   if(CLAW.rec.length>240)CLAW.rec.shift();}
 function clawWanted(P){if(!P||!P.claw||P.clawDone||settings.claw===false||CLAW.rec.length<10)return false;
   const big=P.claw.kind==='ko'||P.claw.kind==='td'||P.claw.kind==='brawl';if(big)return P.claw.kind==='td'||(G.clawN||0)<3;return (G.clawN||0)<2&&G.playsDone-CLAW.last>=2;}   // big hits at most every other play
@@ -2454,7 +2459,7 @@ function clawUpdate(dt){
 function clawFrame(st){const r=CLAW.rec;if(!r.length)return null;let lo=0,hi=r.length-1;if(st<=r[0].t)return Object.assign({u:0,b2:r[0]},r[0]);
   while(hi-lo>1){const m=(lo+hi)>>1;if(r[m].t<=st)lo=m;else hi=m;}const a=r[lo],b=r[hi],u=b.t>a.t?Math.min(1,Math.max(0,(st-a.t)/(b.t-a.t))):0;return Object.assign({u,b2:b},a);}
 function drawClaw(){
-  const R=CLAW.R;if(!R)return;const fr=clawFrame(R.st);if(!fr)return;const u=fr.u,nx=fr.b2;
+  const R=CLAW.R;if(!R)return;const fr=clawFrame(R.st);if(!fr)return;const u=fr.u,nx=fr.b2;CLAW.g=fr.g!=null?fr.g:G.stage;
   const lerp=(a,b)=>a+(b-a)*u;
   ctx.fillStyle=typeof pitchBg==='function'?pitchBg():'#1d3a16';ctx.fillRect(0,0,W,H);
   const FX=W/2,FY=HUD+FH*0.56,cy=Math.cos(R.yaw),sy=Math.sin(R.yaw),ss=R.ss;
@@ -2475,8 +2480,8 @@ function drawClaw(){
   for(const a of fr.deb){const b=bd.get(a[0])||a,[sx,sy2]=proj(lerp(a[2],b[2]),lerp(a[3],b[3])),z=lerp(a[4],b[4]),rot=lerp(a[5],b[5])+R.yaw;
     items.push({z:sy2,draw:()=>{if(z>0.05){ctx.fillStyle='rgba(0,0,0,0.25)';ctx.beginPath();ctx.ellipse(sx,sy2,ss*0.5,ss*0.18,0,0,7);ctx.fill();}
       drawDebris({k:a[1],x:R.fx-((sy2-z*ss*0.8)-HUD-FH/2)/ss,y:R.fy+(sx-W/2)/ss,z:0,rot,team:a[6],idx:a[7]});}});}
-  if(fr.b&&fr.b.s==='air'){const b=nx.b||fr.b,[sx,sy2]=proj(lerp(fr.b.x,b.x),lerp(fr.b.y,b.y)),h=lerp(fr.b.h,b.h);
-    items.push({z:sy2,draw:()=>{ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(sx,sy2,ss*0.4,ss*0.15,0,0,7);ctx.fill();drawBrain(sx,sy2-h*ss*0.9,G.stage,ss*0.38);}});}
+  if(fr.b&&fr.b.s!=='held'&&fr.b.s!=='dead'){const b=nx.b||fr.b,[sx,sy2]=proj(lerp(fr.b.x,b.x),lerp(fr.b.y,b.y)),h=lerp(fr.b.h,b.h);
+    items.push({z:sy2,draw:()=>{ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(sx,sy2,ss*0.4,ss*0.15,0,0,7);ctx.fill();drawBrain(sx,sy2-h*ss*0.9,CLAW.g,ss*0.38);}});}
   items.sort((a,b)=>a.z-b.z);for(const it of items)it.draw();
   SS=keepSS;
   // bullet-time look: desaturate, cool tint, speed lines while frozen
@@ -2505,7 +2510,8 @@ function clawPlayer(a,b,sx,sy,ss,u){
   else if(G.play&&a.t===G.play.def)pose='zombie';else if(sp<0.4)pose='stand';
   ctx.fillStyle='rgba(0,0,0,0.3)';
   drawZombie(ctx,sx,sy,ss*2.75,{team:STYLE_OF(a.t),body:BODY_OF[a.i]||'qb',view,flip,phase:(a.ph+(b.ph-a.ph)*u)*0.55,speed:Math.min(1,sp/6.5),limbs:a.L,pose,
-    num:G.teams[a.t][a.i].num,t:R.phase==='freeze'?0:time,seed:a.i*7+a.t*3,ball:a.c&&pose==='carry'});}
+    num:G.teams[a.t][a.i].num,t:R.phase==='freeze'?0:time,seed:a.i*7+a.t*3,ball:false});
+  if(a.c)drawBrain(sx+(down||a.dv>0?ss*0.4:view==='side'?(flip?-1:1)*ss*0.5:ss*0.4),sy-(down||a.dv>0?ss*0.4:ss*1.25),CLAW.g,ss*0.45);}   // the carried brain, bites and all, like in live play
 
 // ===== ZOMBIE BRAWLS: now and then two opponents near each other keep fighting after the whistle =====
 // They square up, vanish into a cartoon fight cloud, and one gets knocked out (the bats carry him off until the next change
