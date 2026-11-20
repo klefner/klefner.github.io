@@ -151,7 +151,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
    <tr><td>2 legs</td><td>Crawls.</td></tr>
    <tr><td>Head</td><td>Out for the rest of the drive. A fresh substitute comes in on the next possession.</td></tr>
   </table>
-  <p>At <b>halftime</b>, the Stitch-Up sews every limb back on while the Marching Rot and the Cadaver Cheer Squad put on a show. Tap to skip it.</p>
+  <p>At <b>halftime</b>, the Stitch-Up sews every limb back on while the Marching Rot and the Cadaver Cheer Squad put on a show. Hold the skip box to skip it.</p>
   <h2>Body types</h2>
   <p>Every zombie is a little different: some are quicker than others, and any of them can stumble mid-run. A zombie missing a leg stumbles a lot more often.</p>
   <p><b>Shamblers</b> (linemen): slow and very tough. <b>Fresh Ones</b> (running back, receivers): fast and fragile. <b>Brainiac</b> (quarterback): best arm, fragile.</p>
@@ -178,7 +178,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
    <tr><td><span style="color:#b4ff5a">➶</span> Horde Lunge · Defense</td><td><b>Sure Tackle:</b> A long, fast leap you can steer. Hit the ball carrier and he almost always goes down.</td></tr>
    <tr><th>Mummies (orange)</th><th></th></tr>
    <tr><td><span style="color:#78ff8c">𓂀</span> Curse of the Pharaoh · QB</td><td><b>Freeze:</b> Freeze the nearest rusher for a moment.</td></tr>
-   <tr><td><span style="color:#d6b46e">🌀</span> Sandstorm · RB</td><td><b>Untacklable:</b> A swirl of sand around the runner: nearby tacklers are blinded and can't tackle.</td></tr>
+   <tr><td><span style="color:#d6b46e">🌀</span> Sandstorm · RB</td><td><b>Sand Blind:</b> A swirl of sand around the runner for about a second and a half: every normal tackle misses. Only the tackle specials (Sure Tackle, Lasso) get through.</td></tr>
    <tr><td><span style="color:#ffd23a">〰</span> Unravel · WR</td><td><b>Long Reach:</b> Whip out a bandage to catch a far throw.</td></tr>
    <tr><td><span style="color:#efe6cf">▤</span> Entomb · Line</td><td><b>Wrap Up:</b> Wrap up the man in front of you so he can't move.</td></tr>
    <tr><td><span style="color:#efe6cf">➰</span> Wrap Tackle · Defense</td><td><b>Lasso:</b> Lasso the ball carrier from range and pull him back.</td></tr>
@@ -256,7 +256,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.12.11';
+const VERSION='0.12.12';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -509,13 +509,14 @@ const keys={},pressed={};
 const isDown=(...c)=>c.some(x=>keys[x]);
 const wasPressed=(...c)=>c.some(x=>pressed[x]);
 addEventListener('keydown',e=>{audioInit();const c=e.code;
+  if((c==='Space'||c==='Enter'||c==='NumpadEnter')&&!e.repeat)HOLD.key=true;
   if(keyCap){e.preventDefault();keyCapture(c);return;}                 // the Keys screen is waiting for a new key
   const g=gameCode(c);                                                  // the action this key is bound to (see KEY_ACTIONS)
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(c)||(g&&g!==c&&['live','presnap','playcall','dead'].includes(mode)))e.preventDefault();
   if(g){if(!keys[g])pressed[g]=true;keys[g]=true;}
   const play=['live','presnap','dead'].includes(mode),pick=mode==='playcall'&&['ArrowLeft','ArrowRight'].includes(g);
   onKey(play||pick?(g||c):c);});
-addEventListener('keyup',e=>{const g=gameCode(e.code);if(g)keys[g]=false;keys[e.code]=false;});
+addEventListener('keyup',e=>{if(e.code==='Space'||e.code==='Enter'||e.code==='NumpadEnter')HOLD.key=false;const g=gameCode(e.code);if(g)keys[g]=false;keys[e.code]=false;});
 addEventListener('mousedown',()=>audioInit());
 for(const ev of ['click','pointerup','touchend'])addEventListener(ev,()=>audioInit(),{passive:true,capture:true});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;if(mode==='live'||mode==='presnap')pauseGame();});
@@ -952,13 +953,7 @@ function pauseGame(){if(!G||!['playcall','presnap','live','dead'].includes(mode)
 function resumeGame(){mode=prevMode;for(const k in keys)keys[k]=false;if(mode==='playcall')showOverlay('playcall');else showOverlay(null);}
 
 function onKey(c){
-  if(mode==='claw'){clawEnd();return;}
-  if(mode==='half'){hsSkip();return;}
-  if(mode==='finale'){finSkip();return;}
-  if(mode==='ceremony'){cerSkip();return;}
-  if(mode==='punt'){puntSkip();return;}
-  if(mode==='entrance'){entSkip();return;}
-  if(mode==='dead'&&G&&G.eat){skipEat();return;}
+  if(skipFn())return;   // skippable shows are skipped only by holding the skip box (see HOLD below), never by a key press
   if(['title','pause','over','exit'].includes(mode)){if(mode==='pause'&&c==='Escape'){resumeGame();return;}activeMenu&&activeMenu.key(c);return;}
   if(mode==='settings'){if(c==='Escape'||c==='Backspace')closeSettings();else activeMenu&&activeMenu.key(c);return;}
   if(mode==='keys'){if(c==='Escape'||c==='Backspace')closeKeys();else keysMenu.key(c);return;}
@@ -1021,7 +1016,7 @@ function startGame(){screenLeave();dj.gap=false;lastBrawl=-99;
   G.coach=settings.tips?{off:0,def:0,done:false}:null;
   startPossession(0,35);startEntrance();
 }
-// ===== kickoff entrance: both teams run onto the field from their own ends before the first play call (tap or any key skips) =====
+// ===== kickoff entrance: both teams run onto the field from their own ends before the first play call (hold the skip box to skip) =====
 function startEntrance(){
   G.play={off:G.poss,def:1-G.poss,offCall:null,defCall:null,time:0,qb:null,carrier:null,run:false,canPass:false,handed:false,thrown:false,ended:false,recv:{},drop:4};
   setupFormation();applyView();
@@ -1065,7 +1060,7 @@ function cpuOffCall(){const w={dive:3,slant:3,screen:2,bomb:1.5};if(G.stage>=2){
   if(armsOf(G.play.qb)===0)return 'dive';return weighted(w);}
 function cpuDefCall(){return weighted({blitz:2.5,zone:3,man:3});}
 function toPlayCall(){
-  G.sfx=[];G.hintMsg=null;for(const tm of G.teams)for(const p of tm){p.perfectThrow=false;p.reachT=p.slipT=p.noTackle=0;}
+  G.sfx=[];G.hintMsg=null;for(const tm of G.teams)for(const p of tm){p.perfectThrow=false;p.reachT=p.slipT=p.noTackle=p.sandT=0;}
   if(G.brawl){G.brawl.a.brawling=G.brawl.b.brawling=false;G.brawl=null;}
   G.snap=snapshot();if(G.playsDone>0&&G.playsDone%3===0&&G.savedAt!==G.playsDone)saveNow();
   G.pendingCtrl=null;G.ctrlHold=0;G.aim=null;G.play={off:G.poss,def:1-G.poss,offCall:null,defCall:null,time:0,qb:null,carrier:null,run:false,canPass:false,handed:false,thrown:false,ended:false,recv:{},drop:4};
@@ -1158,7 +1153,7 @@ function integrate(p,dt){
 }
 function separate(all){for(let i=0;i<all.length;i++)for(let j=i+1;j<all.length;j++){const a=all[i],b=all[j];
   let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);const min=(a.engaged===b||b.engaged===a)?0.75:0.85;
-  if(d<min){if(d<0.001){dx=Math.random()-0.5;dy=Math.random()-0.5;d=Math.hypot(dx,dy);}const o=(min-d)/2;a.x-=dx/d*o;a.y-=dy/d*o;b.x+=dx/d*o;b.y+=dy/d*o;}}}
+  if(d<min){if(d<0.001){dx=Math.random()-0.5;dy=Math.random()-0.5;d=Math.hypot(dx,dy);}const o=(min-d)/2,wa=a.sandT>0?0:b.sandT>0?2:1,wb=2-wa;a.x-=dx/d*o*wa;a.y-=dy/d*o*wa;b.x+=dx/d*o*wb;b.y+=dy/d*o*wb;}}}
 
 // ===== limbs & particles =====
 const BLOOD=['#7a0c0c','#9b1212','#b31a1a','#5e0909'];
@@ -1408,11 +1403,13 @@ function fumble(c){const B=G.ball,P=G.play;const a=Math.random()*Math.PI*2;Objec
 // head-on or into a standing player is high; catching a runner from behind is low
 function impactOf(d,c){const dx=c.x-d.x,dy=c.y-d.y,L=Math.hypot(dx,dy)||1;return Math.max(0,((d.vx-c.vx)*dx+(d.vy-c.vy)*dy)/L);}
 function tryTackle(d,c){
+  if(c.sandT>0&&!(d.sure||(d.sureDive&&d.dive>0)))return false;   // Sand Blind: every normal tackle misses
   let brk=c.stiff>0?0.55:0.08;if(c.type==='shambler')brk+=0.08;if(c.burst>0)brk+=0.1;if(d.dive>0)brk*=0.5;if(d.sureDive&&d.dive>0)brk*=0.5;if(legsOf(d)===0)brk+=0.3;if(armsOf(d)===0)brk+=0.25;if(c.slipT>0)brk=0.92;if(d.sure)brk*=0.5;if(d.sureDive&&d.dive>0)brk=Math.min(brk,0.2);
   if(Math.random()<brk){if(d===G.ctrl)skillFx('label',c,{dur:1.1,follow:true,name:c.slipT>0?'SLIPPED FREE!':c.stiff>0?'STIFF ARM!':'BROKE THE TACKLE!',does:''});d.stun=1.0;d.dive=0;d.vx=-d.vx*0.3;d.vy=-d.vy*0.3;sfx.hit();if(c.stiff>0){stiffShove(c,d);announce(pick(LINES.stiff).split('{n}').join(c.name));c.stiff=Math.min(c.stiff,0.12);}return false;}
   // damage scales with closing speed (measured: median ~7 yd/s, top 5% above 13.5)
   const imp=impactOf(d,c),tier=imp>=13.5?3:imp>=10?2:imp>=4?1:0;
   const lost=[];let ko=false;
+  if((d.sure||(d.sureDive&&d.dive>0))&&(c.sandT>0||c.slipT>0||c.stiff>0))skillFx('label',c,{dur:1.6,follow:true,name:'SPECIAL GETS THROUGH!',does:''});
   sfx.hit();
   if(tier===0){const k=limbRoll(c,0.4);if(k)lost.push(k);}
   else if(tier===1){const k=limbRoll(c,1.0+(d.dive>0?0.3:0));if(k)lost.push(k);}
@@ -1434,8 +1431,9 @@ function tryTackle(d,c){
 }
 function tackles(){const B=G.ball;if(B.state!=='held')return;const c=B.carrier;
   for(const d of G.teams[1-c.team]){if(d.out||d.stun>0||(d.blockedBy&&!(d.sureDive&&d.dive>0)))continue;
+    if(c.sandT>0&&!(d.sureDive&&d.dive>0)){if(d===G.ctrl&&dist(d,c)<1.8&&!(d.ntSaid>time-1.5)){d.ntSaid=time;skillFx('label',d,{dur:1.2,follow:true,name:'MISSED!',does:'Sand Blind: only a special gets through'});}continue;}
     const reach=(d.sureDive&&d.dive>0?SURE.reach:d.dive>0?1.35:0.95)*(d.team!==G.userTeam?D().reach:1);
-    if(d.noTackle>0){if(d===G.ctrl&&dist(d,c)<reach+0.4&&!(d.ntSaid>time-1.5)){d.ntSaid=time;skillFx('label',d,{dur:1.2,follow:true,name:"CAN'T TACKLE!",does:'Blinded by '+c.name});}continue;}   // say why, instead of a silent fly-by
+    if(d.noTackle>0&&!(d.sureDive&&d.dive>0)){if(d===G.ctrl&&dist(d,c)<reach+0.4&&!(d.ntSaid>time-1.5)){d.ntSaid=time;skillFx('label',d,{dur:1.2,follow:true,name:"CAN'T TACKLE!",does:'Blinded by '+c.name});}continue;}   // say why, instead of a silent fly-by
     if(dist(d,c)<reach){if(tryTackle(d,c))return;}}}
 function blocks(dt){
   const P=G.play,B=G.ball;
@@ -1569,14 +1567,14 @@ function resolvePlay(){
 }
 function brainStep(x){
   const P=G.play,off=P.off,gain=Math.round(dir(off)*(x-G.los));G.los=clamp(x,11,109);
-  if(gain>=HEAL_YDS&&G.stage>0){G.stage--;announce(pick(LINES.fresh),3);P.fresh=1;crowdReact('fresh',{off});big('BITE HEALED!',1.4,'#9dff57','The brain grows back a chunk.');G.brainFx={k:'heal',t:0};mode='dead';G.timer=1.3+(tipFirst('heal')?1.4:0);G.after=advance;return;}
+  if(gain>=HEAL_YDS&&G.stage>0){G.stage--;announce(pick(LINES.fresh),3);P.fresh=1;crowdReact('fresh',{off});{const tp=tipFirst('heal');big('BITE HEALED!',2.2,'#9dff57',tp?'':'15+ yards heals a bite');G.brainFx={k:'heal',t:0};mode='dead';G.timer=2.0+(tp?1.4:0);}G.after=advance;return;}
   if(gain>=biteYds())return advance();
   const from=G.stage;G.stage++;
   if(G.stage>=3){burst(x);return;}
   startChomp(from,G.stage);crowdReact('bite',{off});
-  big(G.stage===1?'BITE!':'SECOND BITE!',1.5,STAGE_COL[G.stage],G.stage===1?'Short of the green line: they took a chunk.':`One more bite and the brain is EATEN.`);
+  const tp=tipFirst('bite');big(G.stage===1?'BITE!':'SECOND BITE!',2.4,STAGE_COL[G.stage],tp?'':G.stage===1?'Bite 1 of 3':'Bite 2 of 3: one left!');
   if(G.stage===2)announce(`Two bites! Gain ${biteYds()} yards this play or the brain gets eaten.`,3);
-  mode='dead';G.timer=1.6+(tipFirst('bite')?2.2:0);G.after=advance;
+  mode='dead';G.timer=2.3+(tp?1.6:0);G.after=advance;
 }
 function burst(x){   // the third bite: the defense eats the brain, turnover at the spot
   const P=G.play,B=G.ball,y=B.y||MID;
@@ -1704,7 +1702,7 @@ function advance(){
 }
 function startOT(){   // tied at the end: DEAD TIME. A fresh brain at midfield, a coin toss for who gets it, the next score wins.
   G.ot=true;G.quarter=G.periods+1;G.clock=QLEN;G.stage=0;const t=Math.random()<0.5?0:1;
-  big('DEAD TIME',3,'#ff6a4a','Tied! The next score wins, and the losers die.');sfx.cheer();
+  big('DEAD TIME',3.2,'#ff6a4a','Next score wins!');sfx.cheer();
   announce(`We're tied! It's Dead Time. Next score wins, and the losing team dies on the field. The ${TEAMS[t].name} win the toss.`,4);
   if(G.play){G.play.brawlChecked=true;G.play.clawDone=true;}
   startPossession(t,60);G.stage=0;mode='dead';G.res={type:'ot'};G.timer=3.0;G.after=()=>toPlayCall();}
@@ -1728,7 +1726,7 @@ function finStart(win){
   for(const p of G.teams[win]){p.vx=p.vy=0;p.stun=0;p.dive=0;p.dance=0;p.finSide=(L.length?(y0+y1)/2:wx)>p.y?1:-1;}
   G.fin={win,lose,t:0,deaths,cam:{x:(x0+x1)/2,y:(y0+y1)/2,ss,fast:true},batAt:t0+1.6,bats:[],carry:[],end:null};
   mode='finale';showOverlay(null);annStop&&annStop();
-  big('DEAD TIME IS OVER',2.2,'#ff6a4a',`The ${TEAMS[win].name} win it. The ${TEAMS[lose].name} drop dead.`);
+  big('DEAD TIME IS OVER',3,'#ff6a4a',`${TEAMS[win].name} win!`);
   announce(`The ${TEAMS[win].name} score in Dead Time! And the ${TEAMS[lose].name}... are dead. Properly dead this time.`,4);
   sfx.cheer();}
 function finSkip(){if(G&&G.fin&&mode==='finale'&&G.fin.t>0.6){G.fin.done=true;}}
@@ -1877,6 +1875,7 @@ function update(dt){
   time+=dt;
   if(mode==='title'||mode==='exit'||((mode==='howto'||mode==='settings')&&!G))updateDemo(dt);
   if(!G)return;
+  holdTick(dt);
   if(mode==='half'){hsUpdate(dt);return;}
   if(mode==='ceremony'){cerUpdate(dt);return;}
   if(['pause','howto','settings','half','over'].includes(mode))return;
@@ -2026,11 +2025,10 @@ function startChomp(from,to){const s=brainSpot();let who=null,bd=1e9;
 function hudChunks(n){G.hudBits=G.hudBits||[];for(let i=0;i<n;i++)G.hudBits.push({x:0,y:0,vx:rand(-140,140),vy:rand(-260,-120),life:0.9,r:rand(2.5,5)});}
 function tipFirst(k){let seen={};try{seen=store.get('rotball_bitetips',{})||{};}catch(e){}if(seen[k])return false;seen[k]=1;store.set('rotball_bitetips',seen);
   const you=G.play&&G.play.def===G.userTeam;
-  const T={bite:you?'Your defense took a BITE out of their brain! Stop them short of the green line again. Three bites and your team eats it and gets the ball.'
-                   :'The defense took a BITE out of your brain. Reach the green line every play or they bite again. Three bites and the brain is eaten: no brain, no touchdown.',
-    heal:'Big gain! Any play of 15+ yards heals one bite.',
-    eaten:'Third bite: the brain is gone. No brain, no touchdown. The other team gets a fresh brain right here.'}[k];
-  G.btip={text:T,life:k==='eaten'?4.8:3.8};return true;}
+  const T={bite:you?'Nice bite! Two more and it\'s yours.':'They bit your brain! Reach the green line.',
+    heal:'15+ yard gain heals a bite!',
+    eaten:'3 bites: brain eaten. Their ball.'}[k];
+  G.btip={text:T,life:k==='eaten'?4.8:k==='heal'?3.4:3.9};return true;}
 const EAT_GATHER=0.45,EAT_SWALLOW=2.45,EAT_GHOST=2.6,EAT_END=4.75;
 function startEat(x){const P=G.play,s=brainSpot();
   const eaters=G.teams[P.def].filter(p=>!p.out).sort((a,b)=>Math.hypot(a.x-s.x,a.y-s.y)-Math.hypot(b.x-s.x,b.y-s.y)).slice(0,6);
@@ -2049,7 +2047,7 @@ function ghostPos(E,t){            // the ghost's flight: in from one sideline, 
 function eatTick(dt){const E=G.eat;if(!E)return;E.t+=dt;const t=E.t;
   for(const p of E.eaters){const f=p.feed;if(!f||p.out)continue;const k=Math.min(1,dt*7);p.x+=(f.tx-p.x)*k;p.y+=(f.ty-p.y)*k;p.vx=p.vy=0;
     p.face=Math.atan2(E.y-p.y,E.x-p.x);p.stun=0;p.dance=0;f.ph+=dt*(8+f.i*0.7);}
-  if(t>=EAT_GATHER&&!E.banner){E.banner=true;big('BRAIN EATEN!',2.6,'#ff4a4a','No brain, no touchdown. Turnover.');G.brainFx={k:'eaten',t:0};hudChunks(8);}
+  if(t>=EAT_GATHER&&!E.banner){E.banner=true;big('BRAIN EATEN!',2.8,'#ff4a4a','Turnover!');G.brainFx={k:'eaten',t:0};hudChunks(8);}
   if(t>EAT_GATHER&&t<EAT_SWALLOW-0.15){E.nx-=dt;if(E.nx<=0){E.nx=rand(0.26,0.42);if(Math.random()<0.45)sfx.chomp(rand(0.4,0.6));else playS('chew',rand(0.45,0.62));chunkBurst(E.x,E.y,2,0.3);}}
   if(t>=EAT_SWALLOW&&!E.swallowed){E.swallowed=true;sfx.swallow(0.95);}
   if(t>=EAT_GHOST){for(const p of E.eaters)if(p.feed){p.feed=null;p.face=Math.atan2(E.y-p.y,E.x-p.x);}   // dinner's over: they get up
@@ -2322,7 +2320,7 @@ function coachTip(){   // the guided first drive: one short tip for whatever the
   if(!coachOn())return null;const P=G.play;if(!P)return null;const B=G.ball,c=G.ctrl,off=P.off===G.userTeam,T=touchOn;
   if(mode==='playcall'){if(!off)return 'Your turn on defense. Pick a coverage to stop them.';
     return G.coach.off===0?(T?'Pick a play: tap a card. There is no play clock while you learn.':'Pick a play: click a card or press 1 to 4. There is no play clock while you learn.')
-      :`Reach the green line each play (${biteYds()} yards). Fall short and the defense takes a bite. Three bites is a turnover.`;}
+      :`Reach the green line (${biteYds()} yds) or they take a bite.`;}
   if(mode!=='presnap'&&mode!=='live')return null;
   if(!off)return T?'Chase the ball carrier and tap DIVE to tackle. You switch to whoever is closest to the ball.':'Chase the ball carrier and press Space to dive and tackle. You switch to whoever is closest to the ball.';
   if(c&&B.state==='held'&&B.carrier===c&&c===P.qb&&P.canPass)return SIMPLE()
@@ -2333,17 +2331,23 @@ function coachTip(){   // the guided first drive: one short tip for whatever the
   return null;}
 function wrapText(t,maxW){const words=t.split(' '),lines=[];let cur='';for(const w of words){const n=cur?cur+' '+w:w;if(ctx.measureText(n).width>maxW&&cur){lines.push(cur);cur=w;}else cur=n;}if(cur)lines.push(cur);return lines;}
 function drawCoach(){
-  const bt=G.btip,t=bt?bt.text:coachTip();if(!t)return;ctx.save();ctx.font='bold 25px Roboto Condensed, Arial';
+  const bt=G.btip;if(bt){drawBiteTip(bt);return;}
+  const t=coachTip();if(!t)return;ctx.save();ctx.font='bold 25px Roboto Condensed, Arial';
   const bw=W-60,lines=wrapText(t,bw-60),bh=26+lines.length*31,x=30,y=bt?HUD+250:HUD+(touchOn?58:16);if(bt)ctx.globalAlpha=Math.min(1,bt.life*3);
   const ga=ctx.globalAlpha;ctx.globalAlpha=0.94*ga;ctx.fillStyle='#10200b';ctx.fillRect(x,y,bw,bh);ctx.globalAlpha=ga;ctx.strokeStyle='#9dff57';ctx.lineWidth=2;ctx.strokeRect(x,y,bw,bh);
   ctx.fillStyle='#9dff57';ctx.fillRect(x,y,8,bh);ctx.font='20px Bangers, Arial';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('TIP',x+18,y+14);
   ctx.font='bold 25px Roboto Condensed, Arial';ctx.fillStyle='#f2f7ea';lines.forEach((l,i)=>ctx.fillText(l,x+62,y+12+i*31));ctx.restore();}
+function drawBiteTip(bt){   // the first-time bite tip: a few words, big, centered under the banner
+  ctx.save();ctx.globalAlpha=Math.min(1,bt.life*3);ctx.font='bold 38px Roboto Condensed, Arial';
+  const lines=wrapText(bt.text,W-140),tw=Math.max(...lines.map(l=>ctx.measureText(l).width)),bw=Math.min(W-40,tw+70),bh=30+lines.length*46,x=(W-bw)/2,y=HUD+262;
+  const ga=ctx.globalAlpha;ctx.globalAlpha=0.94*ga;ctx.fillStyle='#10200b';ctx.fillRect(x,y,bw,bh);ctx.globalAlpha=ga;ctx.strokeStyle='#9dff57';ctx.lineWidth=3;ctx.strokeRect(x,y,bw,bh);
+  ctx.fillStyle='#f2f7ea';ctx.textAlign='center';ctx.textBaseline='top';lines.forEach((l,i)=>ctx.fillText(l,W/2,y+16+i*46));ctx.restore();}
 function drawBig(){
   const b=G.big;if(!b)return;const age=b.max-b.life,sc=age<0.15?0.6+age/0.15*0.4:1;ctx.save();ctx.globalAlpha=Math.min(1,b.life*2);
   ctx.translate(W/2,HUD+170);ctx.scale(sc,sc);ctx.font='58px Bangers, Arial';ctx.textAlign='center';ctx.textBaseline='middle';
   const mw=ctx.measureText(b.t).width;if(mw>W-40){const k=(W-40)/mw;ctx.scale(k,k);}
   ctx.lineWidth=8;ctx.lineJoin='round';ctx.strokeStyle='#0a0f08';ctx.strokeText(b.t,0,0);ctx.fillStyle=b.col;ctx.fillText(b.t,0,0);
-  if(b.sub){ctx.font='bold 27px Roboto Condensed, Arial';const sw=ctx.measureText(b.sub).width,k=Math.min(1,(W-40)/sw);ctx.scale(k,k);ctx.lineWidth=6;ctx.strokeText(b.sub,0,48/k);ctx.fillStyle='#f2f7ea';ctx.fillText(b.sub,0,48/k);}
+  if(b.sub){ctx.font='bold 36px Roboto Condensed, Arial';const sw=ctx.measureText(b.sub).width,k=Math.min(1,(W-40)/sw);ctx.scale(k,k);ctx.lineWidth=6;ctx.strokeText(b.sub,0,54/k);ctx.fillStyle='#f2f7ea';ctx.fillText(b.sub,0,54/k);}
   ctx.restore();
 }
 function drawVamp(v){const x=SX(v.y),y=SY(v.x),u=SS*2.0;ctx.save();ctx.translate(x,y);
@@ -2499,8 +2503,7 @@ function drawClaw(){
   ctx.font='46px Bangers, Arial';ctx.fillStyle='#fff';ctx.textBaseline='middle';ctx.fillText('CLAW CAM',66,30);
   ctx.font='20px Bangers, Arial';ctx.fillStyle=R.phase==='freeze'?'#9fd0ff':'#ff6a5a';ctx.fillText(R.phase==='freeze'?'BULLET TIME':'REPLAY  ●',72,64);ctx.restore();
   drawJumbo(R);
-  ctx.font='22px Arial';ctx.fillStyle='rgba(255,255,255,0.6)';ctx.textAlign='center';ctx.fillText('tap or press any key to skip',W/2,H-60);ctx.textAlign='left';
-  drawTicker();
+    drawTicker();
   if(R.phase==='fade'||R.real<0.15){ctx.fillStyle=`rgba(0,0,0,${R.phase==='fade'?R.fade:1-R.real/0.15})`;ctx.fillRect(0,0,W,H);}}
 function clawPlayer(a,b,sx,sy,ss,u){
   const R=CLAW.R,vx=a.vx+(b.vx-a.vx)*u,vy=a.vy+(b.vy-a.vy)*u,sp=Math.hypot(vx,vy);
@@ -2690,7 +2693,7 @@ const SKILLS={
   zombie:{qb:{id:'brainwave',name:'Brain Wave',tip:'next throw is perfect'},rb:{id:'fallapart',name:'Fall Apart',tip:'shed an arm, slip tackles'},
           wr:{id:'rubber',name:'Rubber Arm',tip:'catch from way out of reach'},line:{id:'gutbomb',name:'Gut Bomb',tip:'blast everyone around you'},
           def:{id:'lunge',name:'Horde Lunge',tip:'leap onto the ball carrier'}},
-  mummy:{qb:{id:'curse',name:'Curse of the Pharaoh',tip:'freeze the nearest rusher'},rb:{id:'sandstorm',name:'Sandstorm',tip:'blind nearby tacklers'},
+  mummy:{qb:{id:'curse',name:'Curse of the Pharaoh',tip:'freeze the nearest rusher'},rb:{id:'sandstorm',name:'Sandstorm',tip:'normal tackles miss, only specials get through'},
           wr:{id:'unravel',name:'Unravel',tip:'bandage-whip catch from afar'},line:{id:'entomb',name:'Entomb',tip:'wrap up the man in front'},
           def:{id:'wrap',name:'Wrap Tackle',tip:'lasso the carrier from range'}}};
 const SKILL_LINE={brainwave:'Brain Wave! That throw is guided by pure thought!',fallapart:"He's falling apart! On purpose!",rubber:'Rubber arm! That is not anatomically possible!',
@@ -2702,9 +2705,9 @@ function skillLeft(p){return Math.max(0,SKILL_CD-(G.playsDone-(p.skillAt==null?-
 function enemies(p){return G.teams[1-p.team].filter(q=>!q.out);}
 function nearestEnemy(p,max){let b=null,bd=max||1e9;for(const q of enemies(p)){const d=dist(p,q);if(d<bd){bd=d;b=q;}}return b;}
 const SKILL_DOES={brainwave:'Next throw is perfect',fallapart:'Sheds an arm to slip tackles',rubber:'Stretches to catch far throws',gutbomb:'Blasts everyone nearby back',
-  lunge:'Leaps at the ball carrier',curse:'Freezes the nearest rusher',sandstorm:"Blinds tacklers: they can't tackle",unravel:'Bandage-whips far catches',entomb:'Wraps up the man in front',wrap:'Lassos the carrier from range'};
+  lunge:'Leaps at the ball carrier',curse:'Freezes the nearest rusher',sandstorm:'Normal tackles miss; only specials get through',unravel:'Bandage-whips far catches',entomb:'Wraps up the man in front',wrap:'Lassos the carrier from range'};
 const SKILL_WORD={brainwave:'Perfect Throw',fallapart:'Slippery',rubber:'Long Reach',gutbomb:'Shockwave',lunge:'Sure Tackle',
-  curse:'Freeze',sandstorm:'Untacklable',unravel:'Long Reach',entomb:'Wrap Up',wrap:'Lasso'};
+  curse:'Freeze',sandstorm:'Sand Blind',unravel:'Long Reach',entomb:'Wrap Up',wrap:'Lasso'};
 const skName=S=>SIMPLE()?(SKILL_WORD[S.id]||S.name):S.name;   // Simple controls name the effect, Pro names the skill
 function skillFx(k,p,extra){(G.sfx||(G.sfx=[])).push(Object.assign({k,x:p.x,y:p.y,t:0,team:p.team,p},extra||{}));}
 function skillChime(up){if(!sfx.ok())return;try{const t=AC.currentTime;for(let i=0;i<4;i++){const o=AC.createOscillator(),g=AC.createGain();o.type='triangle';
@@ -2721,7 +2724,7 @@ function useSkill(p,cpu){
     case 'brainwave':ok=car===p&&P.canPass&&armsOf(p)>0;if(ok){p.perfectThrow=true;skillFx('glow',p,{col:'#9fe8ff',dur:1.5});}break;
     case 'curse':{const q=nearestEnemy(p,7);ok=!!q;if(ok){q.stun=Math.max(q.stun,1.4);q.vx=q.vy=0;skillFx('curse',q,{dur:1.4});}}break;
     case 'fallapart':ok=car===p;if(ok){const arm=p.limbs.la?'la':p.limbs.ra?'ra':null;if(arm&&armsOf(p)>1)removeLimb(p,arm);p.slipT=1.6;p.burst=Math.max(p.burst,0.9);skillFx('burst',p,{col:'#c4dcab',dur:0.6});}break;
-    case 'sandstorm':for(const q of enemies(p))if(dist(p,q)<3.6){q.stumble=Math.max(q.stumble,1.4);q.noTackle=1.4;}skillFx('sand',p,{dur:1.6,follow:true});break;
+    case 'sandstorm':for(const q of enemies(p))if(dist(p,q)<3.6){q.stumble=Math.max(q.stumble,1.4);q.noTackle=1.4;}p.sandT=1.6;skillFx('sand',p,{dur:1.6,follow:true});break;
     case 'rubber':case 'unravel':p.reachT=2.6;skillFx(S.id==='rubber'?'arm':'band',p,{dur:2.6,follow:true});break;
     case 'gutbomb':{let n=0;for(const q of enemies(p))if(dist(p,q)<2.6){const dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy)||1;q.x+=dx/d*1.6;q.y+=dy/d*1.6;q.stun=Math.max(q.stun,0.9);n++;}
       ok=n>0;if(ok){skillFx('ring',p,{col:'#b4ff5a',dur:0.6});G.shake=Math.max(G.shake,5);playS('splat',0.7);}}break;
@@ -2733,7 +2736,7 @@ function useSkill(p,cpu){
         startDive(p,ang,true);skillFx('dash',p,{tx:p.x+Math.cos(ang)*4,ty:p.y+Math.sin(ang)*4,dur:0.45});G.ctrlHold=time+0.6;ok=true;break;}
       ok=!!car&&car.team!==p.team&&dist(p,car)<(S.id==='wrap'?4.2:3.4)&&dist(p,car)>0.6;
       if(ok){const dx=car.x-p.x,dy=car.y-p.y,d=Math.hypot(dx,dy);skillFx(S.id==='wrap'?'lasso':'dash',p,{tx:car.x,ty:car.y,dur:0.45});
-        if(S.id==='lunge'){p.x+=dx/d*(d-0.5);p.y+=dy/d*(d-0.5);}else{car.x-=dx/d*Math.min(1.5,d-0.6);car.y-=dy/d*Math.min(1.5,d-0.6);car.vx=car.vy=0;car.stumble=0.8;}
+        if(S.id==='lunge'){p.x+=dx/d*(d-0.5);p.y+=dy/d*(d-0.5);}else{car.x-=dx/d*Math.min(1.5,d-0.6);car.y-=dy/d*Math.min(1.5,d-0.6);car.vx=car.vy=0;car.stumble=0.8;if(car.sandT>0){car.sandT=0;skillFx('label',car,{dur:1.6,follow:true,name:'SPECIAL GETS THROUGH!',does:''});}}
         p.sure=S.id==='lunge';p.dive=0.35;if(S.id==='lunge')tryTackle(p,car);p.sure=false;}}break;}
   if(!ok){if(!cpu)hint(SIMPLE()?`${skName(S)}: not possible right now`:`${S.name}: ${S.tip}, not possible right now`);return false;}
   p.skillAt=G.playsDone;P.skillUsed[p.team]=1;G.teamSkillAt[p.team]=G.playsDone;
@@ -2742,7 +2745,7 @@ function useSkill(p,cpu){
   return true;}
 function hint(t){G.hintMsg={t,life:1.8};}
 function skillsTick(dt){
-  for(const tm of G.teams)for(const p of tm){if(p.reachT>0)p.reachT-=dt;if(p.slipT>0)p.slipT-=dt;if(p.noTackle>0)p.noTackle-=dt;}
+  for(const tm of G.teams)for(const p of tm){if(p.reachT>0)p.reachT-=dt;if(p.slipT>0)p.slipT-=dt;if(p.sandT>0)p.sandT-=dt;if(p.noTackle>0)p.noTackle-=dt;}
   if(G.sfx)G.sfx=G.sfx.filter(f=>(f.t+=dt)<f.dur);if(G.hintMsg&&(G.hintMsg.life-=dt)<=0)G.hintMsg=null;
   // the computer's skills
   const P=G.play,B=G.ball,cpuT=1-G.userTeam;if(G.userTeam<0)return skillsAI(0,dt),skillsAI(1,dt);skillsAI(cpuT,dt);}
@@ -2860,7 +2863,24 @@ function updatePCBar(){const bar=$('pcbar');const show=!touchOn&&!!G&&(mode==='l
   $('pkAct').querySelector('span').textContent=SIMPLE()&&canThrow?'throw':off?'stiff arm':'dive';$('pkSw').style.display=SIMPLE()?'none':'flex';$('pkAct').classList.toggle('off',off&&!isCar);
   $('pkBurst').classList.toggle('off',!!(c&&c.burstUsed));
   $('pkSkill').querySelector('span').textContent=S?(sl?`${skName(S)} (${sl})`:skName(S)):'skill';$('pkSkill').classList.toggle('off',!S||sl>0);$('pkSkill').title=S?S.tip:'';$('pkSw').querySelector('span').textContent=off?'take over':'switch';}
-$('wrap').addEventListener('pointerdown',()=>{if(mode==='claw')clawEnd();else if(mode==='half')hsSkip();else if(mode==='finale')finSkip();else if(mode==='ceremony')cerSkip();else if(mode==='punt')puntSkip();else if(mode==='entrance')entSkip();else if(mode==='dead'&&G&&G.eat)skipEat();},true);
+// ===== hold to skip: a show is skipped only by holding the skip box (or Space / Enter) until it fills, about 1 s; letting go early drains it =====
+const HOLD={v:0,ptr:false,key:false,need:false,mode:null,id:null},HOLD_T=1.0,HOLD_BOX={w:260,h:64};
+function skipFn(){if(!G)return null;return mode==='claw'?clawEnd:mode==='half'?hsSkip:mode==='finale'?finSkip:mode==='ceremony'?cerSkip:mode==='punt'?puntSkip:mode==='entrance'?entSkip:(mode==='dead'&&G.eat)?skipEat:null;}
+function holdRect(){return {x:W-HOLD_BOX.w-18,y:HUD+16,w:HOLD_BOX.w,h:HOLD_BOX.h};}   // top right, under the scoreboard, clear of banners and credits
+function holdTick(dt){const f=skipFn(),down=HOLD.ptr||HOLD.key,k=f?mode+(mode==='half'?HS.ph:''):null;
+  if(k!==HOLD.mode){HOLD.mode=k;HOLD.v=0;HOLD.need=down;}   // a key or finger already down when the show starts doesn't count
+  if(!f){HOLD.v=0;return;}if(!down)HOLD.need=false;
+  if(down&&!HOLD.need){HOLD.v+=dt/HOLD_T;if(HOLD.v>=1){HOLD.v=0;HOLD.need=true;f();}}else HOLD.v=Math.max(0,HOLD.v-dt*2.5);}
+function drawHold(){if(!skipFn())return;const r=holdRect(),v=Math.min(1,HOLD.v);ctx.save();ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
+  ctx.globalAlpha=0.92;ctx.fillStyle='#10200b';ctx.fillRect(r.x,r.y,r.w,r.h);ctx.globalAlpha=1;
+  if(v>0){ctx.fillStyle='#9dff57';ctx.fillRect(r.x,r.y,r.w*v,r.h);}
+  ctx.strokeStyle='#9dff57';ctx.lineWidth=3;ctx.strokeRect(r.x,r.y,r.w,r.h);
+  ctx.font='28px Bangers, Arial';ctx.textAlign='center';ctx.textBaseline='middle';const lb=touchOn?'HOLD TO SKIP':'HOLD TO SKIP (SPACE)',tw=ctx.measureText(lb).width;if(tw>r.w-24)ctx.font=Math.floor(28*(r.w-24)/tw)+'px Bangers, Arial';
+  ctx.lineWidth=5;ctx.lineJoin='round';ctx.strokeStyle='#0a0f08';ctx.strokeText(lb,r.x+r.w/2,r.y+r.h/2+1);ctx.fillStyle='#f2f7ea';ctx.fillText(lb,r.x+r.w/2,r.y+r.h/2+1);ctx.restore();}
+$('wrap').addEventListener('pointerdown',e=>{if(!skipFn())return;const p=toGame(e.clientX,e.clientY),r=holdRect(),m=24;
+  if(p.x>=r.x-m&&p.x<=r.x+r.w+m&&p.y>=r.y-m&&p.y<=r.y+r.h+m){HOLD.ptr=true;HOLD.id=e.pointerId;}},true);
+for(const ev of ['pointerup','pointercancel'])addEventListener(ev,e=>{if(HOLD.id==null||e.pointerId===HOLD.id){HOLD.ptr=false;HOLD.id=null;}});
+addEventListener('blur',()=>{HOLD.ptr=HOLD.key=false;});
 {const mb=$('menuBtn');const go=e=>{e.preventDefault();e.stopPropagation();audioInit();pauseGame();};mb.addEventListener('pointerdown',go);mb.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});}
 function menuBtnUpdate(){const on=!!G&&['playcall','presnap','live','dead'].includes(mode);const mb=$('menuBtn');if(mb.style.display!==(on?'block':'none'))mb.style.display=on?'block':'none';}
 document.addEventListener('touchmove',e=>{if(!e.target.closest||!e.target.closest('.panel'))e.preventDefault();},{passive:false});
@@ -2895,7 +2915,7 @@ document.addEventListener('visibilitychange',()=>{
   if(document.hidden){if(G&&['playcall','presnap','live','dead'].includes(mode))pauseGame();if(G&&G.snap)saveNow();try{if(music.el)music.el.pause();}catch(e){}try{if(AC&&AC.state==='running')AC.suspend();}catch(e){}}
   else{try{if(AC&&AC.state==='suspended'&&settings.sound)AC.resume();}catch(e){}}});
 function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
-  try{update(dt);draw();updateTouchUI();ambUpdate();musicUpdate();djUpdate();menuBtnUpdate();updatePCBar();cheerUpdate();fieldCheerUpdate();errN=0;}catch(e){console.error(e);if(++errN>=30)showCrash(e);}
+  try{update(dt);draw();drawHold();updateTouchUI();ambUpdate();musicUpdate();djUpdate();menuBtnUpdate();updatePCBar();cheerUpdate();fieldCheerUpdate();errN=0;}catch(e){console.error(e);if(++errN>=30)showCrash(e);}
   for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};

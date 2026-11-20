@@ -2,7 +2,7 @@
 // After the final whistle (and after Dead Time, when it happens) the winners take the stage. Three glamorous Medusas
 // (sunglasses on, for everyone's safety) hand out awards; one forgets the sunglasses and her winner turns to stone.
 // Then the big trophy, confetti and fireworks, to our own closing anthem, while joke credits and the real credits roll.
-// A tie skips the show. Tap or any key skips it. Runs inside index.html (uses its globals: ctx, W, H, G, TEAMS, playS...).
+// A tie skips the show. Holding the skip box skips it. Runs inside index.html (uses its globals: ctx, W, H, G, TEAMS, playS...).
 const CER_LEN=32.5;
 const CER_AWARDS=[
   ['MOST LIMBS STILL ATTACHED','Counted twice. Still surprising.'],
@@ -129,8 +129,7 @@ function cerDraw(){
     else{ctx.rotate(c.rot);ctx.fillStyle=c.c;ctx.fillRect(-4,-2,8,4);}ctx.restore();}
   cerCredits(t,S);
   if(t<0.6){ctx.fillStyle=`rgba(0,0,0,${1-t/0.6})`;ctx.fillRect(0,0,W,H);}
-  if(t>CER_LEN-1.2){ctx.fillStyle=`rgba(0,0,0,${Math.min(1,(t-(CER_LEN-1.2))/1.2)})`;ctx.fillRect(0,0,W,H);}
-  ctx.save();ctx.font='16px Roboto Condensed, Arial';ctx.textAlign='center';ctx.fillStyle='rgba(255,255,255,0.55)';ctx.fillText('tap or press any key to skip',W/2,H-18);ctx.restore();}
+  if(t>CER_LEN-1.2){ctx.fillStyle=`rgba(0,0,0,${Math.min(1,(t-(CER_LEN-1.2))/1.2)})`;ctx.fillRect(0,0,W,H);}}
 
 function cerSpots(t,S){ctx.save();ctx.globalCompositeOperation='lighter';
   for(let i=0;i<3;i++){const sx=[90,W/2,W-90][i],aim=W/2+Math.sin(t*0.7+i*2.1)*230;

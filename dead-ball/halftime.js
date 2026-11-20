@@ -4,7 +4,7 @@
 // two pennant poles and two coffin cannons. Zombie voices groan the lyrics; subtitles show what they are singing.
 // Fireworks close the song unless it was skipped. Then the band and squad leave the field, bats carry the set away,
 // the players run back on, and the second half starts once every halftime piece is gone.
-// A tap (or any key) skips the song; a second tap skips the exit too.
+// Holding the skip box skips the song; holding it again skips the exit too.
 // Runs after index.html's main script and uses its globals (ctx, W, H, HUD, G, time, AC, master, settings, ...).
 
 const HT={data:null,song:null,raw:null,buf:null,dec:false};
@@ -152,9 +152,6 @@ function hsDraw(){
   if(HS.ph==='exit')hsDrawBats(ex);
   hsDrawConf();
   if(HS.ph==='show'&&T&&settings.subs!==false)hsCaption(t);
-  // skip hint
-  ctx.save();ctx.font='28px Bangers, Arial';ctx.textAlign='right';ctx.fillStyle='rgba(255,255,255,0.75)';
-  if(!(HS.card>0))ctx.fillText(HS.ph==='show'?'TAP TO SKIP':'TAP TO START THE 2ND HALF',W-16,H-14);ctx.restore();
   if(HS.card>0)hsDrawCard();
 }
 // the HALFTIME title card: slams in, shows the score and the act, then fades as the band marches on
@@ -178,7 +175,6 @@ function hsDrawCard(){
   ctx.font='30px Bangers, Arial';ctx.fillStyle='rgba(255,255,255,0.85)';ctx.textAlign='center';
   ctx.fillText(HS.s?'THE MARCHING ROT PRESENTS':'THE BAND IS STILL DIGGING ITSELF OUT',W/2,cy+200);
   if(HS.s){ctx.font='40px Bangers, Arial';ctx.lineWidth=6;ctx.strokeStyle='#120a04';ctx.strokeText(`"${HS.s.title.toUpperCase()}"`,W/2,cy+246);ctx.fillStyle='#ffe14a';ctx.fillText(`"${HS.s.title.toUpperCase()}"`,W/2,cy+246);}
-  ctx.font='28px Bangers, Arial';ctx.textAlign='right';ctx.fillStyle='rgba(255,255,255,0.75)';ctx.fillText('TAP TO START THE SHOW',W-16,H-14);
   ctx.restore();
 }
 function hsSpots(t,h){ctx.save();ctx.globalCompositeOperation='lighter';
