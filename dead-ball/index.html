@@ -256,7 +256,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.12.8';
+const VERSION='0.12.9';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -380,7 +380,7 @@ function audioInit(){annUnlock();
 function noiseBuf(dur){const n=Math.max(1,Math.floor(AC.sampleRate*dur)),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;return b;}
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec);}
 // ===== recorded sound clips (sounds/*.mp3); synthesized sounds are the fallback =====
-const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,chew:4,swallow:2,brains:1,laugh:1,quip:6,halfq:4,ooh:2,aww:2,boo:2,yeah:2,eww:2,gogo:1,chant_brains:1,chant_def:1,laughc:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0},raw:{},buf:{},bags:{},last:{}};
+const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,chew:4,swallow:2,brains:1,laugh:1,quip:6,halfq:4,ooh:2,aww:2,boo:2,yeah:2,eww:2,gogo:1,chant_brains:1,chant_def:1,laughc:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0,ghost:5},raw:{},buf:{},bags:{},last:{}};
 function sndNames(){const L=[];for(const k in SND.groups){const n=SND.groups[k];if(n)for(let i=1;i<=n;i++)L.push(k+i);else L.push(k);}return L;}
 for(const n of sndNames())fetch('sounds/'+n+'.mp3').then(r=>r.ok?r.arrayBuffer():null).then(b=>{if(b){SND.raw[n]=b;decodeSnd(n);}}).catch(()=>{});
 function decodeSnd(n){if(!AC||!SND.raw[n]||SND.buf[n])return;const b=SND.raw[n];SND.raw[n]=null;
@@ -955,6 +955,7 @@ function onKey(c){
   if(mode==='half'){hsSkip();return;}
   if(mode==='finale'){finSkip();return;}
   if(mode==='punt'){puntSkip();return;}
+  if(mode==='entrance'){entSkip();return;}
   if(mode==='dead'&&G&&G.eat){skipEat();return;}
   if(['title','pause','over','exit'].includes(mode)){if(mode==='pause'&&c==='Escape'){resumeGame();return;}activeMenu&&activeMenu.key(c);return;}
   if(mode==='settings'){if(c==='Escape'||c==='Backspace')closeSettings();else activeMenu&&activeMenu.key(c);return;}
@@ -1016,8 +1017,26 @@ function startGame(){screenLeave();dj.gap=false;lastBrawl=-99;
   SS=18;camCX=35;camCY=MID;viewCX=35;viewCY=MID;showOverlay(null);
   annStop();announce('Welcome to ROTBALL! The Graveyard Shift get the ball first.',3);sfx.cheer();
   G.coach=settings.tips?{off:0,def:0,done:false}:null;
-  startPossession(0,35);toPlayCall();
+  startPossession(0,35);startEntrance();
 }
+// ===== kickoff entrance: both teams run onto the field from their own ends before the first play call (tap or any key skips) =====
+function startEntrance(){
+  G.play={off:G.poss,def:1-G.poss,offCall:null,defCall:null,time:0,qb:null,carrier:null,run:false,canPass:false,handed:false,thrown:false,ended:false,recv:{},drop:4};
+  setupFormation();applyView();
+  const vl=FH/SS,lo=viewCX-vl/2-2,hi=viewCX+vl/2+2;
+  for(const t of [0,1])G.teams[t].forEach((p,i)=>{p.ent={tx:p.x,ty:p.y,tf:p.face,d:0.15+i*0.08+Math.random()*0.12};
+    p.x=t===0?lo-(i%3)*1.3:hi+(i%3)*1.3;p.y=MID+((i%4)-1.5)*1.7+rand(-0.5,0.5);p.vx=p.vy=0;p.face=t===0?0:Math.PI;});
+  G.ent={t:0,cx:camCX,ss:SS,done:false,hold:0};mode='entrance';showOverlay(null);playS('cheer_small',0.7);}
+function entUpdate(dt){const E=G.ent;if(!E)return;E.t+=dt;let all=true;
+  for(const p of [...G.teams[0],...G.teams[1]]){const e=p.ent;if(!e||p.out)continue;
+    if(E.t<e.d){all=false;continue;}
+    const dx=e.tx-p.x,dy=e.ty-p.y,d=Math.hypot(dx,dy);
+    if(d>0.12){all=false;const sp=Math.min(12,d*3.5+3),st=Math.min(d,sp*dt);p.vx=dx/d*sp;p.vy=dy/d*sp;p.x+=dx/d*st;p.y+=dy/d*st;p.face=Math.atan2(dy,dx);p.phase+=sp*dt*4;}
+    else{p.x=e.tx;p.y=e.ty;p.vx=p.vy=0;p.face=e.tf;}}
+  if(all&&!E.done){E.done=true;E.hold=0.45;}
+  if(E.done){E.hold-=dt;if(E.hold<=0)entEnd();}}
+function entEnd(){if(mode!=='entrance')return;for(const p of [...G.teams[0],...G.teams[1]]){if(p.ent){p.x=p.ent.tx;p.y=p.ent.ty;p.face=p.ent.tf;p.ent=null;}p.vx=p.vy=0;}G.ent=null;toPlayCall();}
+function entSkip(){if(G&&G.ent&&mode==='entrance'&&G.ent.t>0.3)entEnd();}
 function startPossession(t,x){
   if(inOwnEZ(t,x))x=own25(t);
   x=clamp(x,11,109);G.poss=t;G.los=x;G.stage=0;G.crossed=pastMid(t,x);
@@ -1624,30 +1643,49 @@ function puntDraw(){const U=G.punt;if(!U)return;const B=puntBrain(),T=puntTimes(
   if(U.t>=T.e-0.05){const s=U.t-T.e;if(s<0.5){ctx.fillStyle='rgba(205,120,140,0.6)';ctx.beginPath();ctx.ellipse(SX(U.ly),SY(U.land),SS*(0.5+s*3),SS*(0.3+s*1.6),0,0,7);ctx.fill();}}
   const r=SS*0.45*(1+g*5.2);   // it looms closer to the camera as it climbs: bigger, and grosser
   const sx=gx,sy=gy-hpx*(1-g*0.55);
-  ctx.save();ctx.translate(sx,sy);if(B.k!=null)ctx.rotate(Math.sin(U.t*2.2)*0.35*(0.3+g));const pul=1+0.05*g*Math.sin(U.t*14);ctx.scale(pul,pul);ctx.translate(-sx,-sy);
-  if(g>0.35)brainDangles(sx,sy,r,g,U.t);
-  drawBrain(sx,sy,G.stage,r);
-  if(g>0.12)brainVeins(sx,sy,r,g);
+  ctx.save();ctx.translate(sx,sy);if(B.k!=null)ctx.rotate(Math.sin(U.t*2.2)*0.16);const pul=1+0.05*g*Math.sin(U.t*14);ctx.scale(pul,pul);ctx.translate(-sx,-sy);
+  drawRotBrain(sx,sy,r*0.9);
   ctx.restore();
   if(g>0.5){const n=Math.round(g*8);for(let i=0;i<n;i++){const a=U.t*(4+i*0.7)+i*1.7,rr=r*(1.3+0.25*Math.sin(U.t*9+i));ctx.fillStyle='#111';ctx.beginPath();ctx.arc(sx+Math.cos(a)*rr,sy+Math.sin(a)*rr*0.75,1.6+g*1.4,0,7);ctx.fill();}}   // flies keep up with it
   if(g>0.45){for(let i=0;i<5;i++){const ph=(U.t*1.3+i*0.21)%1,dx=Math.sin(i*7.3)*r*0.6;ctx.globalAlpha=(1-ph)*0.9;ctx.fillStyle=i%2?'#9fbf4a':'#c3122c';ctx.beginPath();ctx.ellipse(sx+dx,sy+r*0.7+ph*r*1.8,2+g*3,3+g*5,0,0,7);ctx.fill();}ctx.globalAlpha=1;}   // slime and blood dripping off it
 }
-function brainVeins(x,y,r,g){ctx.save();ctx.translate(x,y);ctx.globalAlpha=Math.min(1,(g-0.12)*3);ctx.strokeStyle='#b0102a';ctx.lineCap='round';
-  const V=[[-0.8,-0.2,-0.4,-0.5,0.1,-0.35],[0.7,-0.4,0.3,-0.1,0.5,0.3],[-0.5,0.45,-0.1,0.2,0.3,0.5],[-0.2,-0.6,0.15,-0.7,0.45,-0.5]];
-  for(const [a,b,c,d,e,f] of V){ctx.lineWidth=Math.max(1,r*0.028);ctx.beginPath();ctx.moveTo(a*r,b*r);ctx.quadraticCurveTo(c*r,d*r,e*r,f*r);ctx.stroke();
-    if(g>0.5){ctx.lineWidth=Math.max(0.8,r*0.025);ctx.beginPath();ctx.moveTo(c*r,d*r);ctx.lineTo((c+0.15)*r,(d+0.18)*r);ctx.stroke();}}
-  if(g>0.3){ctx.globalAlpha=0.55*Math.min(1,(g-0.3)*3);ctx.fillStyle='rgba(255,255,255,0.8)';ctx.beginPath();ctx.ellipse(-r*0.35,-r*0.4,r*0.22,r*0.08,-0.4,0,7);ctx.fill();}   // wet shine
-  ctx.restore();}
-function brainDangles(x,y,r,g,t){ctx.save();ctx.translate(x,y);ctx.lineCap='round';   // stringy bits and a dangling eyeball, swinging as it tumbles
-  const k=Math.min(1,(g-0.35)*2.5);
-  for(let i=0;i<3;i++){const bx=(-0.45+i*0.4)*r,sw=Math.sin(t*6+i*2)*r*0.25,L=r*(i%2?0.85:0.5)*k;ctx.strokeStyle='#8a1a2a';ctx.lineWidth=Math.max(1.5,r*0.08);
-    ctx.beginPath();ctx.moveTo(bx,r*0.55);ctx.quadraticCurveTo(bx+sw*0.5,r*0.55+L*0.6,bx+sw,r*0.55+L);ctx.stroke();ctx.fillStyle='#d06a82';ctx.beginPath();ctx.arc(bx+sw,r*0.55+L,Math.max(1.5,r*0.07),0,7);ctx.fill();}
-  if(g>0.6){const e=Math.min(1,(g-0.6)*4),sw=Math.sin(t*4.5)*r*0.35,ex=r*0.55+sw,ey=r*(0.6+0.9*e);
-    ctx.strokeStyle='#c96a74';ctx.lineWidth=Math.max(1.5,r*0.06);ctx.beginPath();ctx.moveTo(r*0.4,r*0.5);ctx.quadraticCurveTo(r*0.6,ey*0.7,ex,ey);ctx.stroke();
-    ctx.fillStyle='#f4efe2';ctx.strokeStyle='#1b1a17';ctx.lineWidth=Math.max(1,r*0.03);ctx.beginPath();ctx.arc(ex,ey,r*0.2,0,7);ctx.fill();ctx.stroke();
-    ctx.strokeStyle='#d0303a';ctx.lineWidth=Math.max(0.6,r*0.015);for(let i=0;i<4;i++){const a=i*1.6;ctx.beginPath();ctx.moveTo(ex+Math.cos(a)*r*0.19,ey+Math.sin(a)*r*0.19);ctx.lineTo(ex+Math.cos(a)*r*0.09,ey+Math.sin(a)*r*0.09);ctx.stroke();}
-    const lx=Math.sin(t*3)*r*0.06;ctx.fillStyle='#4a8a3a';ctx.beginPath();ctx.arc(ex+lx,ey+r*0.04,r*0.09,0,7);ctx.fill();ctx.fillStyle='#111';ctx.beginPath();ctx.arc(ex+lx,ey+r*0.04,r*0.045,0,7);ctx.fill();}   // a bloodshot eyeball on a string
-  ctx.restore();}
+// The Head Punt brain: a clearly drawn rotten brain seen from the side, with three small, obvious bite marks (each well under 5% of it)
+const ROT_BITES=[-2.0,-0.8,2.5];
+function rotSil(th,r){const c=Math.cos(th),s=Math.sin(th),ry=s>0?0.7:0.92;return r/Math.hypot(c/1.25,s/ry)*(0.965+0.07*Math.pow(Math.abs(Math.sin(th*6)),0.7));}   // lumpy lobes all round, like a real brain
+function rotBrainShape(r){const cs=[];
+  for(const a of ROT_BITES){const d=rotSil(a,r)+r*0.03,cx=Math.cos(a)*d,cy=Math.sin(a)*d;cs.push([cx,cy,r*0.22]);
+    for(let j=0;j<6;j++){const b=a+Math.PI+(j-2.5)*0.36;cs.push([cx+Math.cos(b)*r*0.22,cy+Math.sin(b)*r*0.22,r*0.07]);}}   // the main bite plus a row of tooth marks
+  const N=260,pts=[];
+  for(let k=0;k<N;k++){const th=k/N*Math.PI*2,ux=Math.cos(th),uy=Math.sin(th);let rho=rotSil(th,r),bit=false;
+    for(const [cx,cy,cr] of cs){const b=ux*cx+uy*cy,q=cr*cr-(cx*cx+cy*cy-b*b);if(q<=0)continue;const t=b-Math.sqrt(q);if(t>0&&t<rho){rho=t;bit=true;}}
+    pts.push([ux*rho,uy*rho,bit]);}
+  return {pts,cs};}
+function drawRotBrain(x,y,r){
+  ctx.save();ctx.translate(x,y);ctx.lineCap='round';ctx.lineJoin='round';
+  const {pts,cs}=rotBrainShape(r),inB=(px,py,m)=>cs.some(c=>Math.hypot(px-c[0],py-c[1])<c[2]+m),lw=k=>Math.max(1,r*k);
+  ctx.strokeStyle='#4e1f2a';ctx.lineWidth=lw(0.05);
+  ctx.fillStyle='#9c6a66';ctx.beginPath();ctx.moveTo(r*0.18,r*0.4);ctx.quadraticCurveTo(r*0.22,r*0.95,r*0.32,r*1.12);ctx.lineTo(r*0.52,r*1.08);ctx.quadraticCurveTo(r*0.44,r*0.8,r*0.5,r*0.4);ctx.closePath();ctx.fill();ctx.stroke();   // brain stem
+  ctx.fillStyle='#a5636d';ctx.beginPath();ctx.ellipse(r*0.72,r*0.5,r*0.45,r*0.28,-0.15,0,7);ctx.fill();ctx.stroke();   // cerebellum, with its fine stripes
+  ctx.lineWidth=lw(0.03);for(let i=1;i<=3;i++){ctx.beginPath();ctx.ellipse(r*0.72,r*0.5,r*0.45*(1-i*0.22),r*0.28*(1-i*0.22),-0.15,0.15,Math.PI-0.15);ctx.stroke();}
+  const g=ctx.createRadialGradient(-r*0.3,-r*0.35,r*0.1,0,0,r*1.3);g.addColorStop(0,'#e3aab0');g.addColorStop(0.6,'#c07a83');g.addColorStop(1,'#8f5560');
+  ctx.fillStyle=g;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fill();
+  for(const [px,py,pr] of [[-0.6,-0.2,0.26],[0.45,-0.45,0.2],[0.1,0.22,0.2],[-0.15,-0.6,0.15],[0.8,0.02,0.16]]){if(inB(px*r,py*r,pr*r))continue;ctx.fillStyle='rgba(118,140,62,0.55)';ctx.beginPath();ctx.arc(px*r,py*r,pr*r,0,7);ctx.fill();}   // green rot
+  for(const [px,py,pr] of [[-0.45,0.1,0.07],[0.3,-0.15,0.06],[0.62,-0.3,0.05],[-0.85,-0.3,0.05]]){ctx.fillStyle='rgba(70,40,28,0.55)';ctx.beginPath();ctx.arc(px*r,py*r,pr*r,0,7);ctx.fill();}   // dark rotten spots
+  const line=(P,dx,dy)=>{let on=false;ctx.beginPath();for(const [px0,py0] of P){const px=px0+dx,py=py0+dy;if(inB(px,py,r*0.05)){on=false;continue;}if(on)ctx.lineTo(px,py);else{ctx.moveTo(px,py);on=true;}}ctx.stroke();};
+  const curve=(x0,y0,cx,cy,x1,y1)=>{const P=[];for(let i=0;i<=12;i++){const t=i/12,u=1-t;P.push([(u*u*x0+2*u*t*cx+t*t*x1)*r,(u*u*y0+2*u*t*cy+t*t*y1)*r]);}return P;};
+  const folds=[];
+  for(let k=0;k<12;k++){const th=k*Math.PI/6,R0=rotSil(th,r)/r*0.93,L=0.3+0.12*((k*7)%3),sg=k%2?1:-1,ux=Math.cos(th),uy=Math.sin(th);   // a fold runs in from each crease between lobes and hooks over
+    const x0=ux*R0,y0=uy*R0,x1=ux*(R0-L)-uy*sg*0.12,y1=uy*(R0-L)+ux*sg*0.12;folds.push(curve(x0,y0,(x0+x1)/2-uy*sg*0.14,(y0+y1)/2+ux*sg*0.14,x1,y1));}
+  folds.push(curve(-0.7,-0.25,-0.45,-0.5,-0.2,-0.3),curve(-0.2,-0.3,0.05,-0.1,-0.1,0.1),curve(0.35,-0.5,0.6,-0.3,0.4,-0.1),curve(0.4,-0.1,0.2,0.05,0.35,0.15),curve(-0.55,0.05,-0.3,0.15,-0.35,-0.05));   // squiggles in the middle
+  ctx.strokeStyle='rgba(255,226,228,0.5)';ctx.lineWidth=lw(0.025);for(const P of folds)line(P,-r*0.03,-r*0.03);   // the light side of each fold
+  ctx.strokeStyle='#6a2c3a';ctx.lineWidth=lw(0.05);for(const P of folds)line(P,0,0);
+  ctx.lineWidth=lw(0.07);ctx.beginPath();ctx.moveTo(-r*0.6,r*0.32);ctx.quadraticCurveTo(0,r*0.3,r*0.5,0);ctx.stroke();   // the big side fissure
+  ctx.lineWidth=lw(0.05);ctx.beginPath();ctx.moveTo(-r*0.05,-r*0.82);ctx.quadraticCurveTo(r*0.15,-r*0.4,r*0.1,-r*0.05);ctx.stroke();
+  ctx.strokeStyle='#5a2230';ctx.lineWidth=lw(0.06);ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
+  for(const [c,w] of [['#b3122c',0.16],['#e04a5a',0.06],['#5e0a18',0.03]]){ctx.strokeStyle=c;ctx.lineWidth=lw(w);ctx.beginPath();   // raw red edges where the teeth went in
+    for(let k=0;k<pts.length;k++){const a=pts[k],b=pts[(k+1)%pts.length];if(a[2]&&b[2]){ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);}}ctx.stroke();}
+  ctx.globalAlpha=0.4;ctx.strokeStyle='#fff3f3';ctx.lineWidth=lw(0.05);ctx.beginPath();ctx.arc(-r*0.3,-r*0.3,r*0.5,Math.PI*1.1,Math.PI*1.45);ctx.stroke();ctx.globalAlpha=1;   // wet shine
+  ctx.lineCap='butt';ctx.lineJoin='miter';ctx.restore();}
 function advance(){
   if(G.ot&&G.score[0]!==G.score[1])return finStart(G.score[0]>G.score[1]?0:1);   // Dead Time: the first score wins, and the losers die on the field
   if(G.clock<=0){
@@ -1842,6 +1880,7 @@ function update(dt){
   else if(mode==='live'){clawRecord(dt);updateLive(dt);const B=G.ball;if(B.state==='held'&&B.carrier)G.play.lastCarrier=B.carrier;}
   else if(mode==='finale'){finUpdate(dt);}
   else if(mode==='punt'){puntUpdate(dt);}
+  else if(mode==='entrance'){entUpdate(dt);}
   else if(mode==='dead'){
     for(const p of [...G.teams[0],...G.teams[1]]){if(p.brawling)continue;p.vx*=Math.pow(0.05,dt);p.vy*=Math.pow(0.05,dt);p.x+=p.vx*dt;p.y+=p.vy*dt;p.stun=Math.max(0,p.stun-dt);}
     for(const p of [...G.teams[0],...G.teams[1]])if(p.dance>0){p.dance-=dt;p.danceT+=dt;p.phase+=dt*10;if(p.dance<=0)p.dance=0;}
@@ -1886,6 +1925,7 @@ function applyView(){const vl=FH/SS,vw=(W-2*SW)/SS;viewCX=clamp(camCX,vl/2-3,123
 function focusCam(x,y,dur,ss){if(G)G.focus={x,y,until:time+dur,ss};}
 function camDirector(){
   if(mode==='finale'&&G.fin)return G.fin.cam;
+  if(mode==='entrance'&&G.ent)return {x:G.ent.cx,y:MID,ss:G.ent.ss};
   if(mode==='punt'&&G.punt){const U=G.punt,B=puntBrain(),fl=U.t>puntTimes().d;return {x:fl?B.x:(G.los+U.qx)/2,y:fl?B.y:MID,ss:fl?SSMIN*1.25:20,fast:!fl};}
   if(mode==='dead'&&(G.eat||G.chomp)){const S=G.eat||G.chomp;return {x:S.x+0.8,y:S.y,ss:G.eat?25:23,fast:true};}   // lean in on the bite
   if(G.focus&&time<G.focus.until&&(mode==='dead'||mode==='live')){const F=G.focus;const A=G.abducts[0];
@@ -2006,7 +2046,8 @@ function eatTick(dt){const E=G.eat;if(!E)return;E.t+=dt;const t=E.t;
   if(t>EAT_GATHER&&t<EAT_SWALLOW-0.15){E.nx-=dt;if(E.nx<=0){E.nx=rand(0.26,0.42);if(Math.random()<0.45)sfx.chomp(rand(0.4,0.6));else playS('chew',rand(0.45,0.62));chunkBurst(E.x,E.y,2,0.3);}}
   if(t>=EAT_SWALLOW&&!E.swallowed){E.swallowed=true;sfx.swallow(0.95);}
   if(t>=EAT_GHOST){for(const p of E.eaters)if(p.feed){p.feed=null;p.face=Math.atan2(E.y-p.y,E.x-p.x);}   // dinner's over: they get up
-    if(!E.placed&&t>=EAT_GHOST+1.15){E.placed=true;sfx.tone&&sfx.tone('sine',880,1320,0.25,0.08);}
+    if(!E.wail){E.wail=true;playS('ghost',0.9);}
+    if(!E.placed&&t>=EAT_GHOST+1.15)E.placed=true;
     E.mt=(E.mt||0)-dt;if(E.mt<=0&&t<EAT_END-0.1){E.mt=0.035;const g=ghostPos(E,t);E.mist.push({x:g.x,y:g.y,z:g.z,b:t,r:rand(0.45,0.8)});}}}
 function skipEat(){if(G&&G.eat&&mode==='dead'&&G.timer>0.05){if(!G.eat.swallowed){G.eat.swallowed=true;sfx.swallow(0.8);}G.timer=0.05;G.btip=null;}}
 function endEat(){const E=G.eat;if(!E)return;for(const p of E.eaters)p.feed=null;G.eat=null;}
@@ -2810,7 +2851,7 @@ function updatePCBar(){const bar=$('pcbar');const show=!touchOn&&!!G&&(mode==='l
   $('pkAct').querySelector('span').textContent=SIMPLE()&&canThrow?'throw':off?'stiff arm':'dive';$('pkSw').style.display=SIMPLE()?'none':'flex';$('pkAct').classList.toggle('off',off&&!isCar);
   $('pkBurst').classList.toggle('off',!!(c&&c.burstUsed));
   $('pkSkill').querySelector('span').textContent=S?(sl?`${skName(S)} (${sl})`:skName(S)):'skill';$('pkSkill').classList.toggle('off',!S||sl>0);$('pkSkill').title=S?S.tip:'';$('pkSw').querySelector('span').textContent=off?'take over':'switch';}
-$('wrap').addEventListener('pointerdown',()=>{if(mode==='claw')clawEnd();else if(mode==='half')hsSkip();else if(mode==='finale')finSkip();else if(mode==='punt')puntSkip();else if(mode==='dead'&&G&&G.eat)skipEat();},true);
+$('wrap').addEventListener('pointerdown',()=>{if(mode==='claw')clawEnd();else if(mode==='half')hsSkip();else if(mode==='finale')finSkip();else if(mode==='punt')puntSkip();else if(mode==='entrance')entSkip();else if(mode==='dead'&&G&&G.eat)skipEat();},true);
 {const mb=$('menuBtn');const go=e=>{e.preventDefault();e.stopPropagation();audioInit();pauseGame();};mb.addEventListener('pointerdown',go);mb.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});}
 function menuBtnUpdate(){const on=!!G&&['playcall','presnap','live','dead'].includes(mode);const mb=$('menuBtn');if(mb.style.display!==(on?'block':'none'))mb.style.display=on?'block':'none';}
 document.addEventListener('touchmove',e=>{if(!e.target.closest||!e.target.closest('.panel'))e.preventDefault();},{passive:false});

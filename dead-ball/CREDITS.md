@@ -57,6 +57,7 @@ Generated with the Kokoro text-to-speech model (Apache 2.0). Re-encoded to 32 kb
 | `quip1-6`, `halfq1-4`, `brains1`, `chant_brains1`, `chant_def1`, `gogo1`, `yeah1-2`, `boo1-2`, `ooh1-2`, `aww1-2`, `eww1-2`, `laughc1`, `laugh1` | Unknown | Source not recorded: find the source or replace before a paid release |
 
 | `chew1-4`, `swallow1-2` | Original, made for Rotball | Synthesized from scratch by `tools/make_sfx.py` (no samples) |
+| `ghost1-5` | Original, made for Rotball | Synthesized from scratch by `tools/make_ghost.py` (no samples) |
 
 The referee whistle and the synthesized sounds in `index.html` are original.
 

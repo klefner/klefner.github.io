@@ -30,7 +30,7 @@ const GAMES = [
     description:
       'Zombie football with a rotting brain for a ball: gain enough yards or a zombie takes a bite, and three bites ' +
       'and it\'s eaten. Tackles knock limbs off, and there\'s a zombie halftime show. Keyboard on PC, touch controls on iPhone.',
-    screenshot: 'assets/dead-ball-screenshot.png?v=0.12.8',
+    screenshot: 'assets/dead-ball-screenshot.png?v=0.12.9',
     url: 'https://klefner.github.io/dead-ball/',
     accent: '#9dff57',
   },
