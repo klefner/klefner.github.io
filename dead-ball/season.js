@@ -124,7 +124,8 @@ function seasonCSS(){if(document.getElementById('seasonCSS'))return;const s=docu
 .sn-team .lb{font-size:18px;opacity:.85}
 .sn-vs{align-self:center;font-family:'Creepster';font-size:34px;color:#9dff57}
 .sn-verdict{text-align:center;font-size:24px;color:#dbe6cf;margin-bottom:12px}
-.sn-tbl{width:100%;border-collapse:collapse;font-size:21px;margin-bottom:8px}
+.sn-tbl{width:100%;border-collapse:collapse;font-size:21px;margin-bottom:8px;table-layout:fixed}
+.sn-tbl th:nth-child(2),.sn-tbl th:nth-child(3){width:46px}.sn-tbl th:nth-child(4){width:72px}.sn-tbl th:nth-child(5){width:92px}
 .sn-tbl th{font-family:'Bangers';letter-spacing:1px;color:#f3c34b;font-weight:normal;text-align:right;padding:2px 6px;font-size:22px}
 .sn-tbl th:first-child,.sn-tbl td:first-child{text-align:left}
 .sn-tbl td{padding:3px 6px;text-align:right;border-top:1px solid #2a3a20;color:#dbe6cf}
