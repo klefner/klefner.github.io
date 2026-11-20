@@ -258,6 +258,8 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 </div>
 </div>
 
+<script>// Testing aid: add ?debug to the address to list any script errors on screen.
+window.__errs=[];addEventListener('error',e=>{__errs.push((e.message||'error')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);if(/[?&]debug/.test(location.search)){let d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#300;color:#fbb;font:12px monospace;padding:4px;max-height:30%;overflow:auto';document.body.appendChild(d);}d.textContent=__errs.join('\n');}});</script>
 <script src="models.js?v=0.13.3"></script>
 <script>
 const VERSION='0.13.3';
