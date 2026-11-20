@@ -129,8 +129,11 @@ function careerNew(){CAREER=null;
 // Older careers: round 1 had no stats, round 2 had levels 1 to 6 on a separate sheet. Both move to the zombie roster with skulls.
 function careerMigrate(c){const u=c.teams[0];
   if(!u.squad){const prev=CAREER;CAREER=c;u.squad=squadFrom(u.roster||TEAMS_HOME.players,u.stats);u.bench=[zNew(lgPick(['fresh','line']),{frail:1,num:90})];CAREER=prev;delete u.roster;delete u.stats;}
+  // Older saves lost the classic women's looks (Moanin' Mo, Mothball); give them back by name.
+  for(const z of u.squad.concat(u.bench||[])){const h=TEAMS_HOME.players.find(p=>p[0]===z.name&&p[2]);if(h&&z.look&&!z.look.hair)Object.assign(z.look,h[2]);}
   for(const t of c.teams){if(t.id===0)continue;const sp=LEAGUE[t.id].sp;
-    if(t.roster)t.roster.forEach(p=>{if(!p[2])p[2]=lgLook(sp,Math.random()<0.3);});
+    if(t.roster)t.roster.forEach(p=>{const h=t.id===1&&TEAMS_AWAY.players.find(q=>q[0]===p[0]&&q[2]);
+      if(!p[2])p[2]=h?Object.assign(lgLook(sp,true),h[2]):lgLook(sp,Math.random()<0.3);else if(h&&!p[2].hair)Object.assign(p[2],h[2]);});
     if(!t.bench)t.bench=lgBench(sp,(GMS[t.gm]||GMS.tinkerer).bench,t.roster);}
   if(c.capSeen==null)c.capSeen=skullCap(c.spent);u.power=teamPower(u);}
 function careerLoad(){if(CAREER)return CAREER;const c=store.get(CAREER_KEY,null);if(c&&c.v===CAREER_V&&c.teams&&c.teams.length===12){careerMigrate(c);CAREER=c;}return CAREER;}
