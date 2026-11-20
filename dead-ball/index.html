@@ -256,7 +256,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.12.13';
+const VERSION='0.13.0';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -405,7 +405,7 @@ function playS(group,vol=1,rate=null,delay=0,fx=null){
 let amb=null;
 const CROWD={hype:[0,0],live:[0,0],gap:false};
 const sidePan=t=>t==null?0:(t===0?-0.8:0.8);
-function ambUpdate(){const want=((!!G&&['playcall','presnap','live','dead','half'].includes(mode))||mode==='title'||((mode==='howto'||mode==='settings')&&!G))&&sfx.ok();
+function ambUpdate(){const want=((!!G&&['playcall','presnap','live','dead','half'].includes(mode))||mode==='title'||mode==='season'||((mode==='howto'||mode==='settings')&&!G))&&sfx.ok();
   if(want&&!amb&&SND.buf.crowd_amb){try{amb={};for(const t of [0,1]){const s=AC.createBufferSource();s.buffer=SND.buf.crowd_amb;s.loop=true;s.playbackRate.value=t?1.04:0.97;
       const g=AC.createGain();g.gain.value=0;let out=s;if(AC.createStereoPanner){const pn=AC.createStereoPanner();pn.pan.value=sidePan(t);s.connect(pn);out=pn;}
       out.connect(g);g.connect(master);s.start(0,t*7.3);amb[t]={s,g,lv:-1};}}catch(e){amb=null;}}
@@ -826,7 +826,7 @@ if(!settings.music||(settings.music!=='off'&&!TRACKS.some(t=>t.id===settings.mus
 const music={el:null,g:null,tok:0,duck:false};
 function musicLevel(){if(mode==='live'||mode==='pause'||mode==='half'||mode==='entrance'||mode==='ceremony')return 0;   // the walk-out anthem has the stage to itself
               // never during a live play
-  const base=(mode==='title'||mode==='half'||mode==='over'||((mode==='howto'||mode==='settings')&&!G))?0.5:0.3;return music.duck?base*0.36:base;}
+  const base=(mode==='title'||mode==='season'||mode==='half'||mode==='over'||((mode==='howto'||mode==='settings')&&!G))?0.5:0.3;return music.duck?base*0.36:base;}
 function musicUpdate(){if(!music.g||!AC)return;const v=musicLevel();if(v===music.lv)return;
   music.lv=v;try{music.g.gain.setTargetAtTime(v,AC.currentTime,v===0?0.12:0.6);}catch(e){}}
 function musicPlay(){if(!AC||!settings.sound||settings.music==='off')return musicStop();
@@ -892,7 +892,8 @@ function djUpdate(){            // start a new cue each time the ball goes dead;
   if(mode==='playcall'&&!CROWD.gap){CROWD.gap=true;cheerStart();}if(mode==='live')CROWD.gap=false;
   if(mode==='live'&&dj.gap){dj.gap=false;setTimeout(()=>{if(mode==='live'){djClear();if(music.el)music.el.pause();}},500);}}
 const titleMenu=new Menu($('titleMenu'),[
-  {label:'Play',act:()=>startGame()},
+  {label:'Quick Game',sub:'one game, no strings attached',act:()=>{leagueReset();startGame();}},
+  {label:'Season',get sub(){return typeof seasonLabel==='function'?seasonLabel():'';},act:()=>seasonOpen()},
   {label:'Continue',get hidden(){return !hasSave();},get sub(){return saveLabel();},act:()=>continueGame()},
   {label:'How to Play',act:()=>showHowTo()},
   {label:'Settings',act:()=>showSettings()},
@@ -916,7 +917,7 @@ const pauseMenu=new Menu($('pauseMenu'),[
   {label:'Settings',act:()=>showSettings()},
   {label:'How to Play',act:()=>showHowTo()},
   {label:'Save & Quit to Title',sub:'continue later from the last play call',act:()=>saveAndQuit()},
-  {label:'New Game',act:()=>{clearSave();startGame();}},
+  {label:'New Game',get sub(){try{return G&&G.season?'replay this week\'s game from the kickoff':'';}catch(e){return '';}},act:()=>{clearSave();if(G&&G.season)seasonPlay();else startGame();}},
   {label:'Quit without Saving',act:()=>toTitle()}]);
 const overMenu=new Menu($('overMenu'),[{label:'Play Again',act:()=>startGame()},{label:'Main Menu',act:()=>toTitle()}]);
 const exitMenu=new Menu($('exitMenu'),[{label:'Back to Title',act:()=>toTitle()}]);
@@ -954,7 +955,8 @@ function resumeGame(){mode=prevMode;for(const k in keys)keys[k]=false;if(mode===
 
 function onKey(c){
   if(skipFn())return;   // skippable shows are skipped only by holding the skip box (see HOLD below), never by a key press
-  if(['title','pause','over','exit'].includes(mode)){if(mode==='pause'&&c==='Escape'){resumeGame();return;}activeMenu&&activeMenu.key(c);return;}
+  if(mode==='season'&&(c==='Escape'||c==='Backspace')){seasonEsc();return;}
+  if(['title','pause','over','exit','season'].includes(mode)){if(mode==='pause'&&c==='Escape'){resumeGame();return;}activeMenu&&activeMenu.key(c);return;}
   if(mode==='settings'){if(c==='Escape'||c==='Backspace')closeSettings();else activeMenu&&activeMenu.key(c);return;}
   if(mode==='keys'){if(c==='Escape'||c==='Backspace')closeKeys();else keysMenu.key(c);return;}
   if(mode==='howto'){if(c==='Escape'||c==='Enter'||c==='Backspace')closeHowTo();
@@ -986,7 +988,7 @@ function newG(){return {field:typeof fieldSeedNew==='function'?fieldSeedNew():0,
      teams:[0,1].map(t=>ROSTER.map((r,i)=>makePlayer(t,i))),debris:[],splats:[],parts:[],ticker:[],big:null,
      ctrl:null,play:null,ball:null,timer:0,after:null,hut:false,res:null,stats:{yards:[0,0],limbs:[0,0],bigHits:0,kos:0},abducts:[],shake:0};}
 function snapshot(){const cm=G.cm?Object.assign({},G.cm,{used:[...G.cm.used]}):null;
-  return {v:VERSION,sv:SAVE_V,field:G.field,periods:G.periods,at:Date.now(),diff:settings.diff,score:G.score.slice(),quarter:G.quarter,clock:G.clock,ot:!!G.ot,poss:G.poss,los:G.los,stage:G.stage,crossed:G.crossed,
+  return {v:VERSION,sv:SAVE_V,names:[TEAMS[0].name,TEAMS[1].name],season:G.season&&!G.season.booked?{season:G.season.season,week:G.season.week,opp:G.season.opp,home:G.season.home}:null,field:G.field,periods:G.periods,at:Date.now(),diff:settings.diff,score:G.score.slice(),quarter:G.quarter,clock:G.clock,ot:!!G.ot,poss:G.poss,los:G.los,stage:G.stage,crossed:G.crossed,
     userTeam:G.userTeam,playsDone:G.playsDone,stats:JSON.parse(JSON.stringify(G.stats)),cm:cm&&JSON.parse(JSON.stringify(cm)),
     players:G.teams.map(tm=>tm.map(p=>({limbs:Object.assign({},p.limbs),out:p.out,ko:!!p.ko,spd:p.spd}))),
     debris:G.debris.filter(d=>!d.sink).slice(-60).map(d=>Object.assign({},d,{vx:0,vy:0,vz:0,z:0})),splats:G.splats.slice(-160)};}
@@ -994,9 +996,10 @@ function saveNow(){if(G&&G.snap){store.set(SAVE_KEY,G.snap);G.savedAt=G.playsDon
 function hasSave(){return !!store.get(SAVE_KEY,null);}
 function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
 function saveLabel(){const S=store.get(SAVE_KEY,null);if(!S)return 'no saved game yet';const m=Math.floor(S.clock/60),sec=String(Math.floor(S.clock%60)).padStart(2,'0');
-  return `${(S.periods||4)===2?'H':'Q'}${S.quarter} ${m}:${sec} · ${TEAMS[0].name} ${S.score[0]} – ${S.score[1]} ${TEAMS[1].name}`;}
+  return `${(S.periods||4)===2?'H':'Q'}${S.quarter} ${m}:${sec} · ${(S.names||[])[0]||'Graveyard Shift'} ${S.score[0]} – ${S.score[1]} ${(S.names||[])[1]||'Moldy Mummies'}${S.season?' · Season':''}`;}
 function continueGame(){const S=store.get(SAVE_KEY,null);if(!S)return;screenLeave();dj.gap=false;
-  G=newG();Object.assign(G,{score:S.score,quarter:S.quarter,clock:S.clock,userTeam:S.userTeam,playsDone:S.playsDone||0,stats:S.stats||G.stats,
+  if(S.season&&typeof leagueApply==='function')leagueApply(S.season.opp);else if(typeof leagueReset==='function')leagueReset();
+  G=newG();if(S.season)G.season=Object.assign({},S.season);Object.assign(G,{score:S.score,quarter:S.quarter,clock:S.clock,userTeam:S.userTeam,playsDone:S.playsDone||0,stats:S.stats||G.stats,
     debris:S.debris||[],splats:S.splats||[]});if(S.field!=null)G.field=S.field;
   if(S.cm){G.cm=Object.assign(S.cm,{used:new Set(S.cm.used||[])});}
   S.players.forEach((tm,t)=>tm.forEach((q,i)=>{const p=G.teams[t][i];p.limbs=q.limbs;p.out=q.out;p.ko=q.ko;p.spd=q.spd;}));
@@ -1874,7 +1877,7 @@ function updateDemo(dt){demoT+=dt;for(const p of demo){if(Math.hypot(p.gx-p.x,p.
 // ===== update =====
 function update(dt){
   time+=dt;
-  if(mode==='title'||mode==='exit'||((mode==='howto'||mode==='settings')&&!G))updateDemo(dt);
+  if(mode==='title'||mode==='exit'||mode==='season'||((mode==='howto'||mode==='settings')&&!G))updateDemo(dt);
   if(!G)return;
   holdTick(dt);
   if(mode==='half'){hsUpdate(dt);return;}
@@ -2157,7 +2160,8 @@ function danceHand(R,s,size,body){            // where a hand is in screen space
   const t=J.tilt||0,ry=hy-hip,X=hx*Math.cos(t)-ry*Math.sin(t)+(J.hx||0),Y=hx*Math.sin(t)+ry*Math.cos(t)+hip-(J.air||0);
   return [(sd&&R.flip?-X:X)*k,Y*k];}
 const BODY_OF=['qb','rb','wr','wr','line','line','line'];
-const STYLE_OF=t=>t===0?ZSTYLE.zombie:ZSTYLE.mummy;
+const TEAM_STYLE=[null,null];   // a Season opponent's own look; null = the classic Graveyard Shift and Moldy Mummies
+const STYLE_OF=t=>TEAM_STYLE[t]||(t===0?ZSTYLE.zombie:ZSTYLE.mummy);
 function viewOf(p){                       // pick front/back/side from where he's heading; held briefly so it never flickers
   const sp=Math.hypot(p.vx,p.vy);let sx,sy;if(sp>0.6){sx=p.vy;sy=-p.vx;}else{sx=Math.sin(p.face);sy=-Math.cos(p.face);}
   let v=Math.abs(sy)>=Math.abs(sx)*0.75?(sy<0?'back':'front'):'side',fl=sx<0;
@@ -2702,7 +2706,7 @@ const SKILL_LINE={brainwave:'Brain Wave! That throw is guided by pure thought!',
   gutbomb:'Gut bomb! Nobody wants to be in front of that!',lunge:'Horde lunge! He launched himself!',curse:"The curse of the Pharaoh! He's frozen solid!",
   sandstorm:'Sandstorm! Nobody can see a thing!',unravel:'He unraveled himself to make the catch!',entomb:"Entombed! That rusher isn't going anywhere!",wrap:'Wrap tackle! Bandaged up like a birthday present!'};
 const SKILL_CD=3;
-function skillOf(p){if(!G||!G.play)return null;const sp=p.team===0?'zombie':'mummy';return SKILLS[sp][p.team===G.play.off?(BODY_OF[p.idx]||'qb'):'def'];}
+function skillOf(p){if(!G||!G.play)return null;const sp=STYLE_OF(p.team).species;return SKILLS[sp][p.team===G.play.off?(BODY_OF[p.idx]||'qb'):'def'];}
 function skillLeft(p){return Math.max(0,SKILL_CD-(G.playsDone-(p.skillAt==null?-99:p.skillAt)));}   // plays until ready
 function enemies(p){return G.teams[1-p.team].filter(q=>!q.out);}
 function nearestEnemy(p,max){let b=null,bd=max||1e9;for(const q of enemies(p)){const d=dist(p,q);if(d<bd){bd=d;b=q;}}return b;}
@@ -2927,5 +2931,6 @@ window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},star
 <script src="field.js"></script>
 <script src="halftime.js"></script>
 <script src="ceremony.js"></script>
+<script src="season.js"></script>
 </body>
 </html>
