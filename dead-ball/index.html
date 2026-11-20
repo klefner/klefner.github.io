@@ -256,7 +256,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script src="models.js"></script>
 <script>
-const VERSION='0.12.10';
+const VERSION='0.12.11';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -380,7 +380,7 @@ function audioInit(){annUnlock();
 function noiseBuf(dur){const n=Math.max(1,Math.floor(AC.sampleRate*dur)),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;return b;}
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec);}
 // ===== recorded sound clips (sounds/*.mp3); synthesized sounds are the fallback =====
-const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,chew:4,swallow:2,brains:1,laugh:1,quip:6,halfq:4,ooh:2,aww:2,boo:2,yeah:2,eww:2,gogo:1,chant_brains:1,chant_def:1,laughc:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0,ghost:5,anthem:0},raw:{},buf:{},bags:{},last:{}};
+const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,chew:4,swallow:2,brains:1,laugh:1,quip:6,halfq:4,ooh:2,aww:2,boo:2,yeah:2,eww:2,gogo:1,chant_brains:1,chant_def:1,laughc:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0,ghost:5,anthem:0,finale:0},raw:{},buf:{},bags:{},last:{}};
 function sndNames(){const L=[];for(const k in SND.groups){const n=SND.groups[k];if(n)for(let i=1;i<=n;i++)L.push(k+i);else L.push(k);}return L;}
 for(const n of sndNames())fetch('sounds/'+n+'.mp3').then(r=>r.ok?r.arrayBuffer():null).then(b=>{if(b){SND.raw[n]=b;decodeSnd(n);}}).catch(()=>{});
 function decodeSnd(n){if(!AC||!SND.raw[n]||SND.buf[n])return;const b=SND.raw[n];SND.raw[n]=null;
@@ -823,7 +823,7 @@ function toggleSound(){settings.sound=!settings.sound;if(!settings.sound)musicSt
 const TRACKS=[{id:'march',name:"Zombies' March"},{id:'hullabaloo',name:'Halloween Hullabaloo'},{id:'hallow',name:'Hallow Quest'},{id:'surf',name:'Graveyard Surf'},{id:'crusher',name:'Bone Crusher'}];
 if(!settings.music||(settings.music!=='off'&&!TRACKS.some(t=>t.id===settings.music)))settings.music='march';
 const music={el:null,g:null,tok:0,duck:false};
-function musicLevel(){if(mode==='live'||mode==='pause'||mode==='half'||mode==='entrance')return 0;   // the walk-out anthem has the stage to itself
+function musicLevel(){if(mode==='live'||mode==='pause'||mode==='half'||mode==='entrance'||mode==='ceremony')return 0;   // the walk-out anthem has the stage to itself
               // never during a live play
   const base=(mode==='title'||mode==='half'||mode==='over'||((mode==='howto'||mode==='settings')&&!G))?0.5:0.3;return music.duck?base*0.36:base;}
 function musicUpdate(){if(!music.g||!AC)return;const v=musicLevel();if(v===music.lv)return;
@@ -955,6 +955,7 @@ function onKey(c){
   if(mode==='claw'){clawEnd();return;}
   if(mode==='half'){hsSkip();return;}
   if(mode==='finale'){finSkip();return;}
+  if(mode==='ceremony'){cerSkip();return;}
   if(mode==='punt'){puntSkip();return;}
   if(mode==='entrance'){entSkip();return;}
   if(mode==='dead'&&G&&G.eat){skipEat();return;}
@@ -1696,7 +1697,7 @@ function advance(){
   if(G.clock<=0){
     if(G.quarter===G.periods/2)return halftime();
     if(G.ot){G.clock=QLEN;toPlayCall();return;}          // still tied: Dead Time keeps going until someone scores
-    if(G.quarter>=G.periods)return G.score[0]===G.score[1]?startOT():gameOver();
+    if(G.quarter>=G.periods)return G.score[0]===G.score[1]?startOT():endCeremony();
     G.quarter++;G.clock=QLEN;announce(`End of the ${G.quarter===2?'1st':'3rd'} quarter.`,3);
   }
   toPlayCall();
@@ -1771,7 +1772,7 @@ function finUpdate(dt){
   if(F.batsOn){let up=true;for(const g of F.carry){if(F.t>g.at+0.9){g.lv+=dt*(700+g.lv*1.4);g.lift+=g.lv*dt;}if(g.lift<H+200)up=false;
       if(g.q){const q=g.q;if(q.z0==null)q.z0=q.z||0;q.vx=q.vy=q.vz=0;q.z=q.z0+g.lift/(SS*0.8);}}
     if(up&&F.carry.length||F.t>F.batAt+3.6)F.done=true;if(!F.carry.length&&F.t>F.batAt+0.5)F.done=true;}
-  if(F.done){G.debris=G.debris.filter(q=>!q.carried);for(const d of F.deaths)d.p.out=true;G.fin=null;gameOver();}
+  if(F.done){G.debris=G.debris.filter(q=>!q.carried);for(const d of F.deaths)d.p.out=true;G.fin=null;endCeremony();}
 }
 function finPos(g){   // screen spot the bats grab
   if(g.q){const q=g.q;return [SX(q.y),SY(q.x)-(q.z0!=null?q.z0:q.z||0)*SS*0.8];}
@@ -1877,6 +1878,7 @@ function update(dt){
   if(mode==='title'||mode==='exit'||((mode==='howto'||mode==='settings')&&!G))updateDemo(dt);
   if(!G)return;
   if(mode==='half'){hsUpdate(dt);return;}
+  if(mode==='ceremony'){cerUpdate(dt);return;}
   if(['pause','howto','settings','half','over'].includes(mode))return;
   if(mode==='claw'){clawUpdate(dt);for(const t of G.ticker)t.life-=dt;G.ticker=G.ticker.filter(t=>t.life>0);return;}
   if(mode==='playcall'&&(G.quarter===G.periods/2||G.quarter===G.periods)&&G.clock<=45&&G.clock>0){G.clock=Math.max(0,G.clock-dt);}
@@ -2786,6 +2788,7 @@ function draw(){
   if(!G){drawField([]);const ps=demo.slice().sort((a,b)=>b.x-a.x);for(const p of ps)drawPlayer(p);ctx.fillStyle='#0d120b';ctx.fillRect(0,0,W,HUD);return;}
   if(mode==='half'){viewCX=60;viewCY=MID;SS=22;drawField(G.splats);hsDraw();if(sh)ctx.restore();drawHUD();return;}
   if(mode==='claw'){drawClaw();if(sh)ctx.restore();return;}
+  if(mode==='ceremony'){cerDraw();if(sh)ctx.restore();return;}
   drawField(G.splats);
   for(const d of G.debris)drawDebris(d);
   for(const q of G.parts)if(q.k==='goo'){ctx.globalAlpha=Math.min(1,q.life*2);ctx.fillStyle=q.c;ctx.beginPath();ctx.arc(SX(q.y),SY(q.x),q.r*SS,0,7);ctx.fill();}
@@ -2857,7 +2860,7 @@ function updatePCBar(){const bar=$('pcbar');const show=!touchOn&&!!G&&(mode==='l
   $('pkAct').querySelector('span').textContent=SIMPLE()&&canThrow?'throw':off?'stiff arm':'dive';$('pkSw').style.display=SIMPLE()?'none':'flex';$('pkAct').classList.toggle('off',off&&!isCar);
   $('pkBurst').classList.toggle('off',!!(c&&c.burstUsed));
   $('pkSkill').querySelector('span').textContent=S?(sl?`${skName(S)} (${sl})`:skName(S)):'skill';$('pkSkill').classList.toggle('off',!S||sl>0);$('pkSkill').title=S?S.tip:'';$('pkSw').querySelector('span').textContent=off?'take over':'switch';}
-$('wrap').addEventListener('pointerdown',()=>{if(mode==='claw')clawEnd();else if(mode==='half')hsSkip();else if(mode==='finale')finSkip();else if(mode==='punt')puntSkip();else if(mode==='entrance')entSkip();else if(mode==='dead'&&G&&G.eat)skipEat();},true);
+$('wrap').addEventListener('pointerdown',()=>{if(mode==='claw')clawEnd();else if(mode==='half')hsSkip();else if(mode==='finale')finSkip();else if(mode==='ceremony')cerSkip();else if(mode==='punt')puntSkip();else if(mode==='entrance')entSkip();else if(mode==='dead'&&G&&G.eat)skipEat();},true);
 {const mb=$('menuBtn');const go=e=>{e.preventDefault();e.stopPropagation();audioInit();pauseGame();};mb.addEventListener('pointerdown',go);mb.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});}
 function menuBtnUpdate(){const on=!!G&&['playcall','presnap','live','dead'].includes(mode);const mb=$('menuBtn');if(mb.style.display!==(on?'block':'none'))mb.style.display=on?'block':'none';}
 document.addEventListener('touchmove',e=>{if(!e.target.closest||!e.target.closest('.panel'))e.preventDefault();},{passive:false});
@@ -2899,5 +2902,6 @@ window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},star
 </script>
 <script src="field.js"></script>
 <script src="halftime.js"></script>
+<script src="ceremony.js"></script>
 </body>
 </html>
