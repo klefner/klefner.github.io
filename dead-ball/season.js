@@ -6,6 +6,7 @@
 const CAREER_KEY='rotball_career',CAREER_V=1;
 const DIVS=['Crypt Division','Bog Division'];
 // Team 0 is always yours. Moldy Mummies keep their old colors and sit in your division, so the old rivalry carries on.
+// Colors stay clear of the turf green and of the Shift's purple, so every opponent stands out on the field.
 const LEAGUE=[
   {name:'Graveyard Shift',div:0,sp:'zombie',jersey:'#6a2c9c',trim:'#f3c34b'},
   {name:'Moldy Mummies',div:0,sp:'mummy',jersey:'#c25a26',trim:'#efe6cf',gm:'hoarder'},
@@ -13,11 +14,11 @@ const LEAGUE=[
   {name:'Wailing Banshees',div:0,sp:'zombie',jersey:'#1f7a7a',trim:'#e6f2ef',gm:'trainer'},
   {name:'Tombstone Tumblers',div:0,sp:'zombie',jersey:'#555b63',trim:'#f2d14a',gm:'tinkerer'},
   {name:'Crypt Creepers',div:0,sp:'mummy',jersey:'#7a1424',trim:'#e8d6a0',gm:'gambler'},
-  {name:'Swamp Stinkers',div:1,sp:'zombie',jersey:'#4c6b1e',trim:'#e0d84a',gm:'patcher'},
+  {name:'Swamp Stinkers',div:1,sp:'zombie',jersey:'#6e5a24',trim:'#c8e04a',gm:'patcher'},
   {name:'Marrow Munchers',div:1,sp:'zombie',jersey:'#8a1f5c',trim:'#f2e6ea',gm:'spender'},
   {name:'Night Shamblers',div:1,sp:'zombie',jersey:'#1b2048',trim:'#9fc2ff',gm:'trainer'},
   {name:'Pumpkin Rotters',div:1,sp:'zombie',jersey:'#d4731a',trim:'#2a1a10',gm:'gambler'},
-  {name:'Ghoul Patrol',div:1,sp:'mummy',jersey:'#3d2a5c',trim:'#9dff57',gm:'hoarder'},
+  {name:'Ghoul Patrol',div:1,sp:'mummy',jersey:'#26262c',trim:'#9dff57',gm:'hoarder'},
   {name:'Coffin Dodgers',div:1,sp:'mummy',jersey:'#6b4426',trim:'#f0c896',gm:'patcher'}];
 // What each General Manager does with his Bones every week: share spent, Power per Bone, and a quirk.
 const GMS={
