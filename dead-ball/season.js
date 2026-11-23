@@ -61,7 +61,9 @@ const zPenalty=z=>zDmg(z)+zInjPow(z)+(z.kept?KEEP_POW:0);
 function zPower(z){return Math.max(1,Math.min(100,Math.round(30+13*zAvg(z)-(z.frail?12:0)-zPenalty(z))));}
 function zEff(z,k){const s=z.st[k];return (s==null?-1.5:s)-(z.frail?0.9:0)-zPenalty(z)/13;}   // a non-Brainiac forced to throw is a bad passer
 // Team Power: the average Player Power of your seven starters, with the quarterback counting one and a half times.
-function teamPower(t){let n=0,sum=0;t.squad.forEach((z,i)=>{const w=i===0?1.5:1;sum+=zPower(z)*w;n+=w;});return Math.round(sum/n);}
+function teamPower(t){let n=0,sum=0;t.squad.forEach((z,i)=>{const w=i===0?1.5:1;sum+=zPower(z)*w;n+=w;});return Math.min(100,Math.round(sum/n)+(t.plays?t.plays.length:0));}   // each trick play adds 1
+// Trick plays open at Crypt rank 2 (1,000 Bones spent). Rivals buy them too: the Tinkerer first, the others now and then.
+const TRICK_SHOP=[{id:'rigor',price:300},{id:'fakepunt',price:450}],TRICK_RANK=2;
 const yourPower=teamPower;
 function zValue(z){let v=z.frail?25:40;for(const S of zKeys(z))for(let i=0;i<z.st[S.k];i++)v+=TRAIN_COST[i];return v;}
 const refundOf=z=>Math.round(zValue(z)*0.2);
@@ -164,6 +166,8 @@ function lgApply(r){const T=CAREER.teams,H=T[r.h],A=T[r.a],hw=r.hs>r.as;
 function lgGM(t){if(t.id===0)return;const G0=GMS[t.gm]||GMS.tinkerer;let spend=0,eff=G0.eff;
   if(G0.save){if(t.bones>=G0.save)spend=t.bones;}else spend=Math.floor(t.bones*G0.share);
   if(G0.swing)eff=Math.random()<0.3?1.6:0.6;
+  const tp=t.spent>=CRYPT[TRICK_RANK-1][1]&&TRICK_SHOP.find(k=>!(t.plays||[]).includes(k.id));
+  if(tp&&t.bones>=tp.price&&(t.gm==='tinkerer'||Math.random()<0.08)){t.bones-=tp.price;t.spent+=tp.price;(t.plays||(t.plays=[])).push(tp.id);t.power=Math.min(99,t.power+1);}
   if(spend>0){t.bones-=spend;t.spent+=spend;t.power+=spend/120*eff*Math.max(0.05,1-t.power/110);}
   t.power-=lgRand(0,G0.tough?0.3:0.6);t.power=Math.max(5,Math.min(99,t.power));}
 function lgWeek(userResult){const c=CAREER,w=c.week,res=[];
@@ -260,6 +264,7 @@ function seasonStats(){if(!G||!G.season||!careerLoad())return;const u=userTeam()
   G.teams[1].forEach(p=>{p.sk=oppSk(op.power);});
   G.season.benchList=[u.bench.map(z=>({name:z.name,num:z.num,look:z.look,sk:skOf(z),zid:z.id})),
     (op.bench||[]).map(b=>({name:b[0],num:b[1],look:b[2]||null,sk:oppSk(op.power,true)}))];
+  G.tricks=[(u.plays||[]).slice(),(op.plays||[]).slice()];   // each side's trick plays, for the play calls
   if(!G.season.used)G.season.used=[0,0];if(!G.season.cas)G.season.cas={died:{},inj:{}};
   if(CAREER.fired){const nm=CAREER.fired,g=G;G.season.fired=nm;const up=o=>{for(const k in o)o[k]*=FIRED_UP;};G.teams[0].forEach(p=>p.sk&&up(p.sk));G.season.benchList[0].forEach(b=>up(b.sk));
     setTimeout(()=>{if(G===g&&G.season)announce(`The ${TEAMS[0].name} are fired up! They play this one for ${nm}.`,3);},5200);}}
@@ -634,6 +639,7 @@ function seasonDraft(){const d=CAREER.draft,me=d.order.indexOf(0)+1;
     <div class="sn-line" style="margin-bottom:8px">Every team digs up one corpse, worst record first. You pick <b style="color:#f3c34b">${nth(me)}</b>, and it's free.</div>${d.picks.length?`<div class="sn-scores">${draftListHTML()}</div>`:''}<h2>Your pick</h2>`;
   SN.menu=snMenu('menu','seasonMenu',[...d.cls.map(z=>{const full=yardPlan(z).full;return {label:`<span class="sn-kind">${KINDS[z.kind].name}</span>${z.name}`,disabled:full,
       sub:`Power <b>${zPower(z)}</b> · ${statLine(z)} · ${yardPlanLine(z)}${(p=>p.letGo?` (${p.over.name} goes for ${refundOf(p.over)} Bones)`:'')(yardPlan(z))}`,act:()=>{draftPick(z.id);seasonOpen();}};}),
+    ...(CAREER.auto?[{label:'Let Auto-coach pick',sub:'takes the best body that fits',act:()=>{draftAuto();seasonOpen();}}]:[]),
     {label:`Trade the pick for ${draftTradeBones()} Bones`,act:()=>{draftPick(null);seasonOpen();}},
     {label:'Roster & Training',sub:'make room on the bench first',act:()=>seasonRoster()},{label:'Main Menu',act:()=>toTitle()}]);
   activeMenu=SN.menu;showOverlay('season');}

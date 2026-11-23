@@ -71,6 +71,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 .pchead .side{color:#9dff57}
 .pcsit{text-align:center;font-size:22px;line-height:1.35;padding:0 12px;color:#f3c34b;margin:2px 0 10px;text-shadow:0 1px 0 #000}
 .cards{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;width:680px}
+.card.trick{border-color:#8a6d1f}.card.trick.on{border-color:#ffd84a}
 .card{width:316px;box-sizing:border-box;background:rgba(18,27,14,.95);border:2px solid #34502a;border-radius:10px;padding:10px 12px;cursor:pointer;position:relative}
 .card.on{border-color:#9dff57;background:#21391a;box-shadow:0 0 16px rgba(157,255,87,.35);transform:translateY(-4px)}
 .card .k{position:absolute;top:8px;right:10px;font-family:'Bangers';font-size:28px;color:#f3c34b}
@@ -193,6 +194,8 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <p><b>The playoffs:</b> after week 12 the top four in each division go on. In the Wild Card round 1st hosts 4th and 2nd hosts 3rd, the winners meet in the Graveyard Championship, and the two division champions play the <b>Rot Bowl</b>. Playoff wins pay big: 150 Bones in the Wild Card, 250 in the Championship and 500 for the Rot Bowl. Miss out, or get knocked out, and you can watch the rest play out or skip straight to the winner. The Graveyard gets a fresh shelf before every playoff round.</p>
   <p><b>The Exhumation Draft:</b> between seasons every team digs up one corpse from a special draft class, worst record first, so bad teams get the best bodies. Your pick is free: it starts if it beats your weakest zombie at that spot, or joins the bench. With a full bench and nobody better, make room in Roster &amp; Training first, or trade the pick for Bones.</p>
   <p><b>The Scrapbook:</b> every season fills a scrapbook with your team's numbers against the teams you played, photos of your touchdowns, head-offs, eaten brains, halftime shows and The Rotties, and every result. When the season ends it goes on the shelf in <b>The Library</b>, where you can flip through any past season.</p>
+  <p><b>Trick plays:</b> once you've spent enough Bones around the Crypt, a playbook dealer sells trick plays. <b>Rigor Mortis</b>: one receiver drops dead at the snap, the defense forgets him, then he jumps up and runs deep. <b>Fake Head Punt</b>: the defense runs back for a punt that never comes. Trick plays you own show up with a gold border in your play calls. Rival teams buy them too, so watch for them.</p>
+  <p><b>Auto-coach:</b> rather just play? Turn on Auto-coach from the Season menu and it spends your Bones after every game: sewing zombies up, training the weakest starters, buying trick plays and signing a clear upgrade from the Graveyard.</p>
   <p><b>Roster &amp; Training:</b> each zombie has skulls in Speed, Hands, Bite and Grit (plus Arm for a quarterback). Every skull you buy really changes how that zombie runs, catches, tackles, holds together or throws, and raises that zombie's <b>Player Power</b>. Your seven starters' Power makes your <b>Team Power</b>, with the quarterback counting extra.</p>
   <p><b>The Graveyard:</b> walk the graveyard at night. It starts out a pleasant place and gets nastier as the season goes on. Every headstone carries the name of a fresh corpse. Hover a headstone (or tap it) to see that zombie's Power, skulls, price and where it would play, then double-click (or double-tap) the dirt in front of it to dig it up. It climbs out, the bats dress it in your uniform, and it starts if it beats your weakest zombie at its spot, or joins the bench if not. Brainiacs play QB and Safety, Fresh corpses play running back, receiver, linebacker and corner, and Shamblers play the lines. Up to three zombies sit on the bench, and when a starter is knocked out the next one comes in. With no bench left, your team plays a zombie short until halftime. Letting a zombie go pays back 20% of what it's worth.</p>
   <p><b>Timeouts and the Coffin Corner:</b> in a Season game, press <span class="kbd">Esc</span> between plays to call a timeout. Open <b>the Coffin Corner</b> to sit any zombie on the field down and send in one from the bench. A zombie you pull early keeps only the parts it has already lost, so it costs less to stitch up after the game, and you can send it back in later. A zombie that was knocked out can't come back until halftime. Timeouts are free and unlimited.</p>
@@ -277,9 +280,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script>// Testing aid: add ?debug to the address to list any script errors on screen.
 window.__errs=[];addEventListener('error',e=>{__errs.push((e.message||'error')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);if(/[?&]debug/.test(location.search)){let d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#300;color:#fbb;font:12px monospace;padding:4px;max-height:30%;overflow:auto';document.body.appendChild(d);}d.textContent=__errs.join('\n');}});</script>
-<script src="models.js?v=0.13.12"></script>
+<script src="models.js?v=0.13.13"></script>
 <script>
-const VERSION='0.13.12';
+const VERSION='0.13.13';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -327,6 +330,12 @@ const DEF_PLAYS=[
    svg:'<circle cx="24" cy="40" r="5" fill="#9dff57"/><circle cx="30" cy="26" r="5" fill="#ff7a5a"/><circle cx="60" cy="40" r="5" fill="#9dff57"/><circle cx="60" cy="26" r="5" fill="#ff7a5a"/><circle cx="96" cy="40" r="5" fill="#9dff57"/><circle cx="90" cy="26" r="5" fill="#ff7a5a"/>'}];
 const HEAD_PUNT={id:'headpunt',name:'Head Punt',d:'Give up the ball on purpose: your QB heads the brain 35 yards downfield. Avoids the third bite.',
    svg:'<circle cx="60" cy="50" r="5" fill="#9dff57"/><path d="M60 44 Q60 4 60 6" stroke="#ffd84a" stroke-width="3" stroke-dasharray="4 3" fill="none" marker-end="url(#a)"/><circle cx="60" cy="10" r="6" fill="#8dab78" stroke="#ffd84a" stroke-width="1.5"/>'};
+// Season trick plays, bought in the Playbook. Each one shows up in your play calls once you own it.
+const TRICK_PLAYS={
+  rigor:{id:'rigor',name:'Rigor Mortis',trick:1,d:'One receiver drops dead at the snap. The defense forgets him, then he jumps up and runs deep. Hold the brain until he does.',
+   svg:'<rect x="8" y="45" width="20" height="7" rx="3.5" fill="#9dff57"/><circle cx="30" cy="48" r="4" fill="#9dff57"/><path d="M20 42 L22 8" stroke="#9dff57" stroke-width="3" stroke-dasharray="5 3" fill="none" marker-end="url(#a)"/><path d="M60 54 L60 46" stroke="#f3c34b" stroke-width="3"/>'},
+  fakepunt:{id:'fakepunt',name:'Fake Head Punt',trick:1,d:'Line up for a Head Punt. The defense runs back to catch it, and your QB throws short instead.',
+   svg:'<circle cx="60" cy="50" r="5" fill="#9dff57"/><path d="M60 44 Q60 14 60 16" stroke="#ffd84a" stroke-width="2" stroke-dasharray="3 4" fill="none" opacity=".5"/><path d="M24 52 L24 42 L36 34" stroke="#9dff57" stroke-width="3" fill="none" marker-end="url(#a)"/><path d="M96 52 L96 42 L84 34" stroke="#9dff57" stroke-width="3" fill="none" marker-end="url(#a)"/><text x="60" y="13" font-size="11" fill="#ffd84a" text-anchor="middle" font-family="Arial" font-weight="bold">FAKE!</text>'}};
 const SVG_DEFS='<defs><marker id="a" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6z" fill="#9dff57"/></marker><marker id="b" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6z" fill="#ff7a5a"/></marker></defs>';
 const LINES={
   arm:['{n} is now short one arm.','That arm just landed in the third row!',"{n} won't be waving to the crowd anymore.",'Arm off! {n} keeps going anyway.'],
@@ -1028,7 +1037,7 @@ function onKey(c){
     else if(c==='ArrowDown')$('howto').querySelector('.panel').scrollTop+=60;else if(c==='ArrowUp')$('howto').querySelector('.panel').scrollTop-=60;return;}
   if(mode==='playcall'){
     if(c==='Escape'){pauseGame();return;}
-    const m=c.match(/^(Digit|Numpad)([1-5])$/);if(m){const i=+m[2]-1;if(i<pcCards.length)choosePlay(pcCards[i].id);return;}
+    const m=c.match(/^(Digit|Numpad)([1-9])$/);if(m){const i=+m[2]-1;if(i<pcCards.length)choosePlay(pcCards[i].id);return;}
     if(c==='ArrowLeft'||c==='KeyA'){pcSel=(pcSel+pcCards.length-1)%pcCards.length;markCards();sfx.blip();}
     if(c==='ArrowRight'||c==='KeyD'){pcSel=(pcSel+1)%pcCards.length;markCards();sfx.blip();}
     if(c==='Enter'||c==='NumpadEnter')choosePlay(pcCards[pcSel].id);
@@ -1126,11 +1135,11 @@ function setupFormation(){
   G.ball={state:'held',carrier:P.qb,x:P.qb.x,y:P.qb.y,h:0.6};
   P.carrier=P.qb;P.canPass=armsOf(P.qb)>0;
 }
-function cpuOffCall(){const w={dive:3,slant:3,screen:2,bomb:1.5};if(G.stage>=2){const toGo=dir(G.play.off)>0?110-G.los:G.los-10;if(toGo>55&&Math.random()<0.7)return 'headpunt';w.slant+=2;w.screen+=1;w.bomb=1;}
+function cpuOffCall(){const w={dive:3,slant:3,screen:2,bomb:1.5},T=(G.tricks&&G.tricks[G.play.off])||[];if(T.includes('rigor'))w.rigor=0.9;if(G.stage>=2){const toGo=dir(G.play.off)>0?110-G.los:G.los-10;if(toGo>55&&Math.random()<0.7)return T.includes('fakepunt')&&Math.random()<0.3?'fakepunt':'headpunt';w.slant+=2;w.screen+=1;w.bomb=1;}
   if(armsOf(G.play.qb)===0)return 'dive';return weighted(w);}
 function cpuDefCall(){return weighted({blitz:2.5,zone:3,man:3});}
 function toPlayCall(){
-  G.sfx=[];G.hintMsg=null;for(const tm of G.teams)for(const p of tm){p.perfectThrow=false;p.reachT=p.slipT=p.noTackle=p.sandT=0;}
+  G.sfx=[];G.hintMsg=null;for(const tm of G.teams)for(const p of tm){p.perfectThrow=false;p.reachT=p.slipT=p.noTackle=p.sandT=p.dead=p.bail=p.rigor=0;}
   if(G.brawl){G.brawl.a.brawling=G.brawl.b.brawling=false;G.brawl=null;}
   G.snap=snapshot();if(G.playsDone>0&&G.playsDone%3===0&&G.savedAt!==G.playsDone)saveNow();
   G.pendingCtrl=null;G.ctrlHold=0;G.aim=null;G.play={off:G.poss,def:1-G.poss,offCall:null,defCall:null,time:0,qb:null,carrier:null,run:false,canPass:false,handed:false,thrown:false,ended:false,recv:{},drop:4};
@@ -1139,12 +1148,13 @@ function toPlayCall(){
   if(userOff)P.defCall=cpuDefCall();else P.offCall=cpuOffCall();
   if(!userOff&&P.offCall==='headpunt'){headPunt();return;}
   if(coachOn()&&G.coach.def>=1&&G.coach.off>=2){G.coach.done=true;settings.tips=false;store.set('rotball_settings',settings);tick('Tips off. You can turn them back on in Settings.');}
-  pcCards=userOff?(G.stage>=2?OFF_PLAYS.concat([HEAD_PUNT]):OFF_PLAYS):DEF_PLAYS;pcSel=0;pcTimer=10;
+  const tricks=((G.tricks&&G.tricks[P.off])||[]).filter(k=>k!=='fakepunt'||G.stage>=2).map(k=>TRICK_PLAYS[k]).filter(Boolean);   // a fake punt only fools anyone when a real one is on the table
+  pcCards=userOff?OFF_PLAYS.concat(G.stage>=2?[HEAD_PUNT]:[],tricks):DEF_PLAYS;pcSel=0;pcTimer=10;
   $('pcSide').textContent=userOff?'OFFENSE':'DEFENSE';
   $('pcSit').innerHTML=`${TEAMS[P.off].name} ball on <b>${ballOn(P.off,G.los)}</b> &nbsp;·&nbsp; Bites: <b style="color:${STAGE_COL[G.stage]}">${G.stage} of 3</b> &nbsp;·&nbsp; gain <b>${biteYds()} yards</b> or the defense takes a bite`+(G.stage>=2&&userOff?' &nbsp;·&nbsp; <b style="color:#ffd84a">Head Punt available (5)</b>':'')+
     (userOff&&armsOf(P.qb)===0?' &nbsp;·&nbsp; <b style="color:#ff7a5a">Your QB has no arms. Run the ball!</b>':'');
   const cards=$('cards');cards.innerHTML='';
-  pcCards.forEach((c,i)=>{const d=document.createElement('div');d.className='card'+(i===pcSel?' on':'');
+  pcCards.forEach((c,i)=>{const d=document.createElement('div');d.className='card'+(c.trick?' trick':'')+(i===pcSel?' on':'');
     d.innerHTML=`<div class="k">${i+1}</div><div class="n">${c.name}</div><svg width="120" height="60" viewBox="0 0 120 60">${SVG_DEFS}<rect x="0" y="0" width="120" height="60" rx="6" fill="#1a2d14"/><line x1="0" y1="50" x2="120" y2="50" stroke="#4fb3ff" stroke-width="1.5" stroke-dasharray="4 3"/>${c.svg}</svg><div class="d">${c.d}</div>`;
     d.onmouseenter=()=>{pcSel=i;markCards();};d.onclick=()=>{audioInit();choosePlay(c.id);};cards.appendChild(d);});
   mode='playcall';showOverlay('playcall');
@@ -1161,13 +1171,15 @@ function assignPlay(){
   const P=G.play,off=P.off,def=P.def,f=dir(off),L=G.los,O=G.teams[off],Df=G.teams[def],qb=P.qb;
   const rb=O[1],w1=O[2],w2=O[3];const ok=p=>p&&!p.out&&p!==qb;
   for(const p of O)p.ai='block';
-  qb.ai='qb';P.drop={dive:2,slant:5,screen:4,bomb:7}[P.offCall]||4;
+  qb.ai='qb';P.drop={dive:2,slant:5,screen:4,bomb:7,rigor:7,fakepunt:3}[P.offCall]||4;
   const R=(p,pts,after)=>{if(!ok(p))return;p.ai='route';p.route=pts.map(([a,b])=>({x:p.x+f*a,y:clamp(p.y+b,1.5,FW-1.5)}));p.ri=0;p.after=after||'go';};
   switch(P.offCall){
     case 'dive':if(ok(rb)){rb.ai='route';rb.route=[{x:L-f*1.2,y:MID},{x:L+f*40,y:MID}];rb.ri=0;rb.after='go';}R(w1,[[5,0]],'block');R(w2,[[5,0]],'block');break;
     case 'slant':R(w1,[[4,0],[14,9],[40,13]]);R(w2,[[4,0],[14,-9],[40,-13]]);R(rb,[[3,-8],[18,-11]]);break;
     case 'screen':R(rb,[[0.5,9],[1,11]],'wait');R(w1,[[5,0]],'block');R(w2,[[5,0]],'block');break;
     case 'bomb':R(w1,[[10,0],[48,6]]);R(w2,[[10,0],[48,-6]]);break;
+    case 'rigor':R(w1,[[1,0],[26,0],[52,-4]]);if(ok(w1)){w1.ai='dead';w1.dead=1.35;w1.rigor=1;}R(w2,[[4,0],[14,-9],[40,-13]]);R(rb,[[3,-8],[18,-11]]);break;   // he lies still, then takes off deep
+    case 'fakepunt':R(w1,[[3,0],[8,7]]);R(w2,[[3,0],[8,-7]]);R(rb,[[1,-5],[7,-10]]);break;   // quick outs while the defense runs back for a punt
   }
   P.recv={KeyQ:ok(w1)?w1:null,KeyE:ok(w2)?w2:null,KeyV:ok(rb)?rb:null};
   for(const p of Df){p.ai='rush';p.mark=null;p.zone=null;p.delay=rand(0.08,0.3)*D().lag;}
@@ -1177,6 +1189,8 @@ function assignPlay(){
     case 'zone':lb.ai='zone';lb.zone={x:L+f*6,y:MID};c1.ai='zone';c1.zone={x:L+f*11,y:MID-12};c2.ai='zone';c2.zone={x:L+f*11,y:MID+12};s.ai='zone';s.zone={x:L+f*22,y:MID};break;
     case 'man':lb.ai='man';lb.mark=rb;c1.ai='man';c1.mark=w1;c2.ai='man';c2.mark=w2;s.ai='deep';break;
   }
+  if(P.offCall==='rigor'&&w1&&w1.dead>0)for(const p of Df)if(p.mark===w1){p.ai='zone';p.zone={x:L+f*7,y:MID};p.mark=null;}   // nobody covers a corpse
+  if(P.offCall==='fakepunt')for(const p of Df)p.bail=rand(0.9,1.25);   // everyone turns and runs back for the punt
   for(const p of Df)if(p.ai==='man'&&(!p.mark||p.mark.out||p.mark===qb)){p.ai='zone';p.zone={x:L+f*8,y:p.y};}
   if(off===G.userTeam)G.ctrl=qb;else G.ctrl=!lb.out?lb:Df.find(p=>!p.out);
 }
@@ -1334,8 +1348,11 @@ function defAI(d){
 function aiStep(p,dt){
   const P=G.play,B=G.ball;
   if(p.delay>0){steer(p,0,0,dt);return;}
-  let t;
-  if(B.state==='loose')t={x:B.x,y:B.y};
+  if(p.dead>0){p.dead-=dt;if(P.run||B.state!=='held'||B.carrier!==P.qb)p.dead=0;if(p.dead>0){steer(p,0,0,dt);return;}rigorUp(p);}   // Rigor Mortis: lies still until the moment comes
+  let t=null;
+  if(p.bail>0&&p.team===P.def){p.bail-=dt;if(P.run||B.state!=='held'||B.carrier!==P.qb)p.bail=0;if(p.bail>0)t={x:G.los+dir(P.off)*26,y:p.y*0.85+MID*0.15};else{p.tgt=null;p.rt=0;}}   // fooled by the fake punt
+  if(t){}
+  else if(B.state==='loose')t={x:B.x,y:B.y};
   else if(p.team===P.off)t=offAI(p);
   else{p.rt-=dt;if(p.rt<=0||!p.tgt){p.tgt=defAI(p);p.rt=rand(0.08,0.22)*(p.team===G.userTeam?1:D().lag);}t=p.tgt;
     const car=B.state==='held'?B.carrier:null;
@@ -1393,7 +1410,7 @@ function handleUser(dt){
 function pressureOn(p){let m=1e9;for(const d of G.teams[1-p.team])if(!d.out&&!d.blockedBy)m=Math.min(m,dist(d,p));return m;}
 function bestReceiver(qb){   // the receiver the simple THROW button picks: most open, with a nudge for depth
   const P=G.play;if(!P)return null;const f=dir(P.off);let best=null,bs=-1e9;
-  for(const k in P.recv){const r=P.recv[k];if(!r||r.out||armsOf(r)===0)continue;let open=1e9;for(const d of G.teams[P.def])if(!d.out)open=Math.min(open,dist(d,r));
+  for(const k in P.recv){const r=P.recv[k];if(!r||r.out||r.dead>0||armsOf(r)===0)continue;let open=1e9;for(const d of G.teams[P.def])if(!d.out)open=Math.min(open,dist(d,r));
     const s=Math.min(open,8)*1.2+f*(r.x-G.los)*0.12;if(s>bs){bs=s;best=r;}}
   return best;}
 function canUserThrow(){const P=G&&G.play,B=G&&G.ball,c=G&&G.ctrl;return !!(P&&c&&mode==='live'&&P.off===G.userTeam&&B.state==='held'&&B.carrier===c&&c===P.qb&&P.canPass);}
@@ -1413,12 +1430,13 @@ function throwTo(qb,r){
   for(const d of G.teams[P.def])if(!d.out)d.rt=(dist(d,{x:tx,y:ty})>4?rand(0.3,0.55):rand(0.05,0.15))*(d.team===G.userTeam?1:D().lag);
   if(P.def===G.userTeam&&SIMPLE()){const n=nearestTo(G.userTeam,{x:tx,y:ty});if(n)autoCtrl(n);}   // simple controls: jump to the defender nearest the throw
 }
+function rigorUp(p){p.dead=0;if(p.ai==='dead')p.ai='route';if(!p.rigor)return;p.rigor=0;p.burst=Math.max(p.burst,1.1);p.bubble={t:1.4,text:"I'M ALIVE!"};sfx.snarl&&sfx.snarl();tick(`${p.name} was only playing dead!`);}
 function cpuQB(dt){
   const P=G.play,qb=P.qb,f=dir(P.off),press=pressureOn(qb);
-  const readT=D().read*({slant:0.8,screen:0.6,bomb:1.5}[P.offCall]||1);
+  const readT=D().read*({slant:0.8,screen:0.6,bomb:1.5,rigor:2,fakepunt:0.5}[P.offCall]||1);
   if(P.time<readT&&press>2.4)return;
   let best=null,bs=-1e9,bo=0;
-  for(const k in P.recv){const r=P.recv[k];if(!r||r.out||armsOf(r)===0)continue;let open=1e9;for(const d of G.teams[P.def])if(!d.out)open=Math.min(open,dist(d,r));
+  for(const k in P.recv){const r=P.recv[k];if(!r||r.out||r.dead>0||armsOf(r)===0)continue;let open=1e9;for(const d of G.teams[P.def])if(!d.out)open=Math.min(open,dist(d,r));
     const s=Math.min(open,8)*1.2+f*(r.x-G.los)*0.12+(P.offCall==='screen'&&r===G.teams[P.off][1]?3:0);if(s>bs){bs=s;best=r;bo=open;}}
   if(!best){P.run=true;return;}
   if(bo>2.2||press<2.2||P.time>readT+1.4){if(qb.team!==G.userTeam&&skillOf(qb)&&skillOf(qb).id==='brainwave'&&skillLeft(qb)===0&&Math.random()<0.35)useSkill(qb,true);throwTo(qb,best);}
@@ -1565,7 +1583,7 @@ function drawBatEvent(){const P=G&&G.play,b=P&&P.bat;if(!b||b.ph==='wait'||b.ph=
 // ===== play flow =====
 function updateLive(dt){
   const P=G.play,B=G.ball,off=P.off,f=dir(off);annLive();skillsTick(dt);
-  P.time+=dt;G.clock=Math.max(0,G.clock-dt);
+  P.time+=dt;G.clock=Math.max(0,G.clock-dt);if(P.offCall==='fakepunt'&&!P.faked&&P.time>0.4){P.faked=1;big('FAKE!',1,'#ffd84a');sfx.cheer&&sfx.cheer();}
   const all=[...G.teams[0],...G.teams[1]].filter(p=>!p.out);
   for(const p of all){p.stun=Math.max(0,p.stun-dt);p.burst=Math.max(0,p.burst-dt);p.stiff=Math.max(0,p.stiff-dt);p.stiffCd=Math.max(0,p.stiffCd-dt);p.shedCd=Math.max(0,p.shedCd-dt);p.delay=Math.max(0,p.delay-dt);p.stumble=Math.max(0,p.stumble-dt);p.hustle=false;p.batT=Math.max(0,(p.batT||0)-dt);p.shoveT=Math.max(0,(p.shoveT||0)-dt);
     if(p!==G.ctrl&&p.stumble<=0&&Math.hypot(p.vx,p.vy)>2&&Math.random()<dt*(0.035+(2-legsOf(p))*0.05))p.stumble=rand(0.25,0.55);
@@ -2245,7 +2263,7 @@ function drawPlayer(p){
     const pu=time-(G.ctrlPop||-9);if(pu<0.35){const k=pu/0.35;ctx.globalAlpha=1-k;ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(x,y+1,size*(0.42+k*0.5),size*(0.13+k*0.16),0,0,7);ctx.stroke();ctx.globalAlpha=1;}}   // the ring pops when you're switched
   let [view,flip]=viewOf(p);let pose='run',diveRot=0;
   const carrier=G&&G.ball&&G.ball.state==='held'&&G.ball.carrier===p;
-  const down=(p.stun>0&&live&&!(p.batT>0))||p.tumble>0;
+  const down=(p.stun>0&&live&&!(p.batT>0))||p.tumble>0||p.dead>0;
   let feedRot=null,feedLift=false;
   if(p.feed&&G&&G.eat){pose='feed';view='side';flip=Math.sin(p.face)<0;const f=p.feed,cyc=(f.ph*0.18)%1;
     feedRot=0.95+0.16*Math.sin(f.ph);if(f.role==='lift'&&cyc<0.45){feedRot=0.3+0.08*Math.sin(f.ph*2);feedLift=true;}
@@ -3003,12 +3021,13 @@ function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
 </script>
-<script src="field.js?v=0.13.12"></script>
-<script src="halftime.js?v=0.13.12"></script>
-<script src="ceremony.js?v=0.13.12"></script>
-<script src="season.js?v=0.13.12"></script>
-<script src="yard.js?v=0.13.12"></script>
-<script src="altar.js?v=0.13.12"></script>
-<script src="book.js?v=0.13.12"></script>
+<script src="field.js?v=0.13.13"></script>
+<script src="halftime.js?v=0.13.13"></script>
+<script src="ceremony.js?v=0.13.13"></script>
+<script src="season.js?v=0.13.13"></script>
+<script src="yard.js?v=0.13.13"></script>
+<script src="altar.js?v=0.13.13"></script>
+<script src="book.js?v=0.13.13"></script>
+<script src="playbook.js?v=0.13.13"></script>
 </body>
 </html>
