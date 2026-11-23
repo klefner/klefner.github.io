@@ -187,6 +187,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <p>Pick <b>Season</b> on the title screen to coach the Graveyard Shift through a 12-team zombie league: 12 weekly games, standings in two divisions, and rival teams whose managers get stronger every week. Every game pays <b>Bones</b> (100 for a win, 30 for a loss, 10 per touchdown). Your career saves itself after every game.</p>
   <p><b>Roster &amp; Training:</b> each zombie has skulls in Speed, Hands, Bite and Grit (plus Arm for a quarterback). Every skull you buy really changes how that zombie runs, catches, tackles, holds together or throws, and raises that zombie's <b>Player Power</b>. Your seven starters' Power makes your <b>Team Power</b>, with the quarterback counting extra.</p>
   <p><b>The Graveyard:</b> fresh corpses dig their way up every week. Brainiacs play QB and Safety, Fresh corpses play running back, receiver, linebacker and corner, and Shamblers play the lines. Sign one to start (the starter moves to the bench) or to the bench. Up to three zombies sit on the bench, and when a starter is knocked out the next one comes in. With no bench left, your team plays a zombie short until halftime. Letting a zombie go pays back 20% of what it's worth.</p>
+  <p><b>Deaths, the Stitch Shop and lifespan:</b> a zombie knocked out in a game has died. It plays again next week, but each death costs a little Power for good. Parts that fly off stay off after the game and cost Power until <b>the Stitch Shop</b> sews them back on. Once your spending opens it, <b>the Witch Doctor</b> can erase the Power lost in a zombie's latest death. Every zombie also has a <b>lifespan</b>: deaths, stitches and each season wear it down, and better zombies last longer. When it runs out, you choose: <b>Keep</b> it (weaker, and no more training), retire it to <b>the Mausoleum</b>, your hall of fame, or <b>the Sacrifice</b>, which fires your team up for the next game.</p>
   <h2>Controls</h2>
   <table>
    <tr><th>Key</th><th>On offense</th><th>On defense</th></tr>
@@ -260,9 +261,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script>// Testing aid: add ?debug to the address to list any script errors on screen.
 window.__errs=[];addEventListener('error',e=>{__errs.push((e.message||'error')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);if(/[?&]debug/.test(location.search)){let d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#300;color:#fbb;font:12px monospace;padding:4px;max-height:30%;overflow:auto';document.body.appendChild(d);}d.textContent=__errs.join('\n');}});</script>
-<script src="models.js?v=0.13.3"></script>
+<script src="models.js?v=0.13.4"></script>
 <script>
-const VERSION='0.13.3';
+const VERSION='0.13.4';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -999,7 +1000,7 @@ function newG(){return {field:typeof fieldSeedNew==='function'?fieldSeedNew():0,
      teams:[0,1].map(t=>ROSTER.map((r,i)=>makePlayer(t,i))),debris:[],splats:[],parts:[],ticker:[],big:null,
      ctrl:null,play:null,ball:null,timer:0,after:null,hut:false,res:null,stats:{yards:[0,0],limbs:[0,0],bigHits:0,kos:0},abducts:[],shake:0};}
 function snapshot(){const cm=G.cm?Object.assign({},G.cm,{used:[...G.cm.used]}):null;
-  return {v:VERSION,sv:SAVE_V,names:[TEAMS[0].name,TEAMS[1].name],season:G.season&&!G.season.booked?{season:G.season.season,week:G.season.week,opp:G.season.opp,home:G.season.home,used:(G.season.used||[0,0]).slice()}:null,field:G.field,periods:G.periods,at:Date.now(),diff:settings.diff,score:G.score.slice(),quarter:G.quarter,clock:G.clock,ot:!!G.ot,poss:G.poss,los:G.los,stage:G.stage,crossed:G.crossed,
+  return {v:VERSION,sv:SAVE_V,names:[TEAMS[0].name,TEAMS[1].name],season:G.season&&!G.season.booked?{season:G.season.season,week:G.season.week,opp:G.season.opp,home:G.season.home,used:(G.season.used||[0,0]).slice(),cas:G.season.cas?JSON.parse(JSON.stringify(G.season.cas)):null}:null,field:G.field,periods:G.periods,at:Date.now(),diff:settings.diff,score:G.score.slice(),quarter:G.quarter,clock:G.clock,ot:!!G.ot,poss:G.poss,los:G.los,stage:G.stage,crossed:G.crossed,
     userTeam:G.userTeam,playsDone:G.playsDone,stats:JSON.parse(JSON.stringify(G.stats)),cm:cm&&JSON.parse(JSON.stringify(cm)),
     players:G.teams.map(tm=>tm.map(p=>({limbs:Object.assign({},p.limbs),out:p.out,ko:!!p.ko,spd:p.spd,sub:p.sub==null?-1:p.sub}))),
     debris:G.debris.filter(d=>!d.sink).slice(-60).map(d=>Object.assign({},d,{vx:0,vy:0,vz:0,z:0})),splats:G.splats.slice(-160)};}
@@ -2942,9 +2943,9 @@ function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
 </script>
-<script src="field.js?v=0.13.3"></script>
-<script src="halftime.js?v=0.13.3"></script>
-<script src="ceremony.js?v=0.13.3"></script>
-<script src="season.js?v=0.13.3"></script>
+<script src="field.js?v=0.13.4"></script>
+<script src="halftime.js?v=0.13.4"></script>
+<script src="ceremony.js?v=0.13.4"></script>
+<script src="season.js?v=0.13.4"></script>
 </body>
 </html>

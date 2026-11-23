@@ -4,7 +4,8 @@
 // Round 2 added your roster's stats (Speed, Hands, Bite, Grit, and Arm for the quarterback), training them with Bones, and Team Power from them.
 // Round 3: stats are skulls (0 to 5) with hidden Crypt Rank caps, Player Power, the Graveyard market (corpses fit to positions, with looks,
 // idle animations and quips), women zombies across the league, the bench that fills in when a starter goes down, and letting zombies go.
-// Later rounds add deaths and lifespan, send-offs, playoffs, the draft, twists and the Scrapbook.
+// Round 4: deaths that leave a lasting mark, injuries the Stitch Shop sews back on, the Witch Doctor, lifespan, and Keep, the Mausoleum or the Sacrifice.
+// Later rounds add send-offs, playoffs, the draft, twists and the Scrapbook.
 
 const CAREER_KEY='rotball_career',CAREER_V=1;
 const DIVS=['Crypt Division','Bog Division'];
@@ -50,8 +51,15 @@ const skFactor=s=>Math.max(0.86,Math.min(1.34,1+(s-0.3)*0.06));   // 0 skulls pl
 const zKeys=z=>STATS.filter(S=>z.st[S.k]!=null);
 function zAvg(z){const ks=zKeys(z);return ks.reduce((a,S)=>a+z.st[S.k],0)/ks.length;}
 // Player Power 1 to 100: 30 with no skulls, 95 with every skull; bench bodies (Z-team) are frail and play 12 points lower.
-function zPower(z){return Math.max(1,Math.min(100,Math.round(30+13*zAvg(z)-(z.frail?12:0))));}
-function zEff(z,k){const s=z.st[k];return (s==null?-1.5:s)-(z.frail?0.9:0);}   // a non-Brainiac forced to throw is a bad passer
+// Deaths, missing parts and being kept past the end all cost Power (tuned so a starter who dies about five times a season loses about 10).
+const DEATH_POW=2,LIMB_POW=3,HEAD_POW=10,KEEP_POW=15,PARTS=['la','ra','ll','rl','head'];
+const PART_NAME={la:'left arm',ra:'right arm',ll:'left leg',rl:'right leg',head:'head'};
+const zDmg=z=>(z.dmg||[]).reduce((a,b)=>a+b,0);
+const hurtKeys=z=>PARTS.filter(k=>z.hurt&&z.hurt[k]);
+const zInjPow=z=>hurtKeys(z).reduce((a,k)=>a+(k==='head'?HEAD_POW:LIMB_POW),0);
+const zPenalty=z=>zDmg(z)+zInjPow(z)+(z.kept?KEEP_POW:0);
+function zPower(z){return Math.max(1,Math.min(100,Math.round(30+13*zAvg(z)-(z.frail?12:0)-zPenalty(z))));}
+function zEff(z,k){const s=z.st[k];return (s==null?-1.5:s)-(z.frail?0.9:0)-zPenalty(z)/13;}   // a non-Brainiac forced to throw is a bad passer
 // Team Power: the average Player Power of your seven starters, with the quarterback counting one and a half times.
 function teamPower(t){let n=0,sum=0;t.squad.forEach((z,i)=>{const w=i===0?1.5:1;sum+=zPower(z)*w;n+=w;});return Math.round(sum/n);}
 const yourPower=teamPower;
@@ -167,6 +175,7 @@ function careerNextSeason(){const c=CAREER;
   c.history.push({season:c.season,champs:[0,1].map(d=>standings(d)[0].id),you:[userTeam().w,userTeam().l]});
   c.season++;c.week=0;c.results=[];c.schedule=lgSchedule();
   for(const t of c.teams){t.w=t.l=t.pf=t.pa=0;if(t.id!==0)t.power=Math.min(99,t.power+1);}   // the whole league gets a little stronger
+  for(const z of yourZombies())z.wear=(z.wear||0)+WEAR.season;lifeCheck();userTeam().power=teamPower(userTeam());   // a season of wear on your own zombies
   careerSave();}
 
 // ----- putting a league team on the field: name, roster, colors and species for the engine's team slot 1 -----
@@ -191,7 +200,9 @@ function seasonStats(){if(!G||!G.season||!careerLoad())return;const u=userTeam()
   G.teams[1].forEach(p=>{p.sk=oppSk(op.power);});
   G.season.benchList=[u.bench.map(z=>({name:z.name,num:z.num,look:z.look,sk:skOf(z),zid:z.id})),
     (op.bench||[]).map(b=>({name:b[0],num:b[1],look:b[2]||null,sk:oppSk(op.power,true)}))];
-  if(!G.season.used)G.season.used=[0,0];}
+  if(!G.season.used)G.season.used=[0,0];if(!G.season.cas)G.season.cas={died:{},inj:{}};
+  if(CAREER.fired){const nm=CAREER.fired,g=G;G.season.fired=nm;const up=o=>{for(const k in o)o[k]*=FIRED_UP;};G.teams[0].forEach(p=>p.sk&&up(p.sk));G.season.benchList[0].forEach(b=>up(b.sk));
+    setTimeout(()=>{if(G===g&&G.season)announce(`The ${TEAMS[0].name} are fired up! They play this one for ${nm}.`,3);},5200);}}
 function subApply(p,b,k){p.name=b.name;p.num=b.num;p.look=b.look;p.sk=b.sk;p.zid=b.zid;p.sub=k;}
 // Called by the engine for each knocked-out zombie at the start of a possession. True means "handled": a sub came in, or the slot plays empty.
 function seasonSubIn(p){const S=G.season;if(!S||!S.benchList)return false;const L=S.benchList[p.team],k=S.used[p.team];
@@ -207,7 +218,7 @@ function seasonRestore(Snap){const S=G.season;if(!S)return;if(Snap.season&&Snap.
   Snap.players.forEach((tm,t)=>tm.forEach((q,i)=>{const b=S.benchList&&q.sub>=0&&S.benchList[t][q.sub];if(b)subApply(G.teams[t][i],b,q.sub);}));}
 // ----- spending: training, signing from the Graveyard, letting zombies go, and moving them between the bench and the lineup -----
 function spend(c){CAREER.bones-=c;CAREER.spent+=c;}
-function train(z,k){const s=z.st[k],c=trainCost(s);if(c==null||s>=skullCap()||CAREER.bones<c)return false;
+function train(z,k){const s=z.st[k],c=trainCost(s);if(z.kept||c==null||s>=skullCap()||CAREER.bones<c)return false;
   spend(c);z.st[k]++;userTeam().power=teamPower(userTeam());careerSave();return true;}
 function zFind(id){const u=userTeam();let i=u.squad.findIndex(z=>z.id===id);if(i>=0)return {z:u.squad[i],where:'squad',i};i=u.bench.findIndex(z=>z.id===id);return i>=0?{z:u.bench[i],where:'bench',i}:null;}
 // Sign a corpse into a starting slot (the starter moves to the bench, or is let go if it's full) or straight onto the bench.
@@ -230,10 +241,51 @@ function yardFresh(){const c=CAREER,at=c.season*100+c.week;if(c.yard&&c.yard.at=
   for(let i=0;i<n;i++)list.push(zNew(i===0?'brain':i===1?'fresh':i===2?'line':lgPick(kinds),{cap}));
   list.push(zNew(lgPick(['fresh','line','brain']),{frail:1}));
   c.yard={at,list:list.sort(()=>Math.random()-0.5)};careerSave();return c.yard;}
+// ----- round 4: deaths, injuries, the Stitch Shop, the Witch Doctor and lifespan -----
+// A zombie knocked out in a game has "died": he plays next week, but each death takes a lasting bite of Power and some lifespan.
+// Parts lost in a game stay lost (halftime's quick patch-up only lasts the game) until the Stitch Shop sews them on, which also costs lifespan.
+const STITCH={limb:5,head:25},WEAR={death:2,limb:1,head:5,season:6},WD_BASE=75,ACCIDENT=0.04,FIRED_UP=1.05;
+const yourZombies=()=>{const u=userTeam();return u.squad.concat(u.bench);};
+function lifeMax(z){return Math.round((z.frail?20:50)+zValue(z)/25);}   // better zombies, and pricier ones, last longer
+const zLife=z=>Math.max(0,lifeMax(z)-(z.wear||0));
+function lifeWord(z){if(z.kept)return 'kept, running on spite';const f=zLife(z)/lifeMax(z);return f<=0?"time's up":f<0.3?'fading':f<0.65?'worn':'spry';}
+function lifeCheck(){const out=[];for(const z of yourZombies())if(!z.kept&&!z.end&&zLife(z)<=0){z.end=1;out.push(z);}return out;}
+const pendingEnd=()=>yourZombies().filter(z=>z.end&&!z.kept);
+function casLive(){return !!(G&&G.season)&&!['finale','ceremony','over','entrance','title','season','half'].includes(mode);}
+function careerAfterGame(S){const u=userTeam(),cas=S.cas||{died:{},inj:{}},rep=[];
+  const played=new Set(u.squad.map(z=>z.id).concat(S.benchList?S.benchList[0].slice(0,S.used?S.used[0]:0).map(b=>b.zid):[]));
+  for(const z of yourZombies()){if(!played.has(z.id))continue;z.games=(z.games||0)+1;z.best=Math.max(z.best||0,zPower(z));
+    const d=cas.died[z.id],inj=cas.inj[z.id],lost=inj?PARTS.filter(k=>inj[k]):[];let accident=false;
+    if(d){(z.dmg||(z.dmg=[])).push(DEATH_POW);z.deaths=(z.deaths||0)+1;z.wear=(z.wear||0)+WEAR.death;
+      if(lost.includes('head')&&Math.random()<ACCIDENT){z.wear=Math.max(z.wear,lifeMax(z));accident=true;}}
+    if(lost.length){z.hurt=z.hurt||{};lost.forEach(k=>z.hurt[k]=1);}
+    if(d||lost.length)rep.push({id:z.id,name:z.name,died:!!d,lost,accident});}
+  const ended=lifeCheck();ended.forEach(z=>{const r=rep.find(x=>x.id===z.id);if(r)r.ended=true;else rep.push({id:z.id,name:z.name,died:false,lost:[],ended:true});});
+  if(CAREER.fired)CAREER.fired=null;u.power=teamPower(u);return rep;}
+function stitchCost(z){return hurtKeys(z).reduce((a,k)=>a+(k==='head'?STITCH.head:STITCH.limb),0);}
+function stitchWear(z){return hurtKeys(z).reduce((a,k)=>a+(k==='head'?WEAR.head:WEAR.limb),0);}
+const stitchTotal=()=>yourZombies().reduce((a,z)=>a+stitchCost(z),0);
+function stitch(z,quiet){const c=stitchCost(z);if(!c||CAREER.bones<c)return false;spend(c);z.wear=(z.wear||0)+stitchWear(z);z.hurt={};lifeCheck();
+  if(!quiet){userTeam().power=teamPower(userTeam());careerSave();}return true;}
+function stitchAll(){const t=stitchTotal();if(!t||CAREER.bones<t)return false;for(const z of yourZombies())stitch(z,true);userTeam().power=teamPower(userTeam());careerSave();return true;}
+const wdOpen=()=>cryptRank(CAREER.spent||0)>=3;   // the Witch Doctor sets up once the Crypt reaches rank 3
+const wdCost=z=>WD_BASE*Math.pow(2,z.wd||0);
+function witch(z){if(!wdOpen()||!(z.dmg&&z.dmg.length))return false;const c=wdCost(z);if(CAREER.bones<c)return false;
+  spend(c);z.dmg.pop();z.wd=(z.wd||0)+1;userTeam().power=teamPower(userTeam());careerSave();return true;}
+// When a lifespan runs out the coach decides: keep him (much weaker, no more training), retire him to the Mausoleum, or the Sacrifice.
+function keepZ(z){z.kept=1;z.end=0;userTeam().power=teamPower(userTeam());careerSave();}
+function plaqueOf(z,how){return {name:z.name,num:z.num,kind:z.kind,look:z.look,best:Math.max(z.best||0,zPower(z)),st:Object.assign({},z.st),games:z.games||0,deaths:z.deaths||0,season:CAREER.season,week:CAREER.week+1,how};}
+// Take a zombie off the team. A starter's spot goes to a bench zombie of the same kind, or to a free Z-team walk-on.
+function removeZ(id){const u=userTeam(),f=zFind(id);if(!f)return null;let walkOn=null;
+  if(f.where==='bench')u.bench.splice(f.i,1);
+  else{const j=benchFor(f.i);if(j>=0)u.squad[f.i]=u.bench.splice(j,1)[0];else{u.squad[f.i]=null;walkOn=zNew(SLOT_KIND[f.i],{frail:1});walkOn.num=freeNum({squad:u.squad.filter(Boolean),bench:u.bench},walkOn.kind);u.squad[f.i]=walkOn;}}
+  u.power=teamPower(u);return {z:f.z,walkOn,slot:f.where==='squad'?f.i:-1};}
+function retireZ(id){const f=zFind(id);if(!f)return null;(CAREER.maus||(CAREER.maus=[])).push(plaqueOf(f.z,'retired'));const r=removeZ(id);careerSave();return r;}
+function sacrificeZ(id){const f=zFind(id);if(!f)return null;(CAREER.fallen||(CAREER.fallen=[])).push(plaqueOf(f.z,'sacrificed'));const r=removeZ(id);CAREER.fired=f.z.name;careerSave();return r;}
 function seasonBook(){if(!G||!G.season||G.season.booked||!careerLoad())return null;const S=G.season;S.booked=true;
   if(CAREER.season!==S.season||CAREER.week!==S.week)return null;   // this week was already played some other way
   const [a,b]=G.score,r=S.home?{h:0,a:S.opp,hs:a,as:b}:{h:S.opp,a:0,hs:b,as:a};
-  const before=CAREER.bones;const res=lgWeek(r);S.bones=CAREER.bones-before;S.tds=Math.floor(a/7);S.won=a>b;S.res=res;return S;}
+  const before=CAREER.bones;S.report=careerAfterGame(S);const res=lgWeek(r);S.bones=CAREER.bones-before;S.tds=Math.floor(a/7);S.won=a>b;S.res=res;return S;}
 
 // ----- screens -----
 function seasonCSS(){if(document.getElementById('seasonCSS'))return;const s=document.createElement('style');s.id='seasonCSS';s.textContent=`
@@ -290,19 +342,29 @@ function seasonOpen(){careerLoad();seasonDOM();leagueReset();annStop&&annStop();
       <div class="sn-card"><div class="sn-team" style="background:${LEAGUE[0].jersey};color:#fff"><div class="nm">${LEAGUE[0].name}</div><div class="pw">${Math.round(u.power)}</div><div class="lb">Team Power · ${recStr(u)}</div></div>
       <div class="sn-vs">${g.h===0?'VS':'AT'}</div>
       <div class="sn-team" style="background:${D.jersey};color:${D.trim}"><div class="nm">${D.name}</div><div class="pw">${Math.round(o.power)}</div><div class="lb">Team Power · ${recStr(o)}</div></div></div>
-      <div class="sn-verdict">${favored(u.power,o.power)} ${g.h===0?'Home game.':'Road game.'}</div>`;
-    SN.menu=snMenu('menu','seasonMenu',[{label:`Play Week ${CAREER.week+1}`,act:()=>seasonPlay()},{label:'Roster & Training',get sub(){return `Team Power ${Math.round(userTeam().power)} · ${CAREER.bones.toLocaleString()} Bones to spend`;},act:()=>seasonRoster()},
-      {label:'The Graveyard',get sub(){const n=yardFresh().list.length;return `${n} fresh corpse${n===1?'':'s'} this week`;},act:()=>seasonYard()},{label:'League Standings',act:()=>seasonStandings()},
-      {label:'Last Week\'s Scores',hidden:!CAREER.results.length,act:()=>seasonScores(CAREER.results.length-1)},{label:'Main Menu',act:()=>toTitle()}]);}
+      <div class="sn-verdict">${favored(u.power,o.power)} ${g.h===0?'Home game.':'Road game.'}</div>${wdNews()}`;
+    const due=pendingEnd()[0],parts=yourZombies().reduce((n,z)=>n+hurtKeys(z).length,0),wdz=yourZombies().filter(z=>z.dmg&&z.dmg.length).length;
+    SN.menu=snMenu('menu','seasonMenu',[
+      {label:`Play Week ${CAREER.week+1}`,disabled:!!due,sub:due?`decide about ${due.name} first`:'',act:()=>seasonPlay()},
+      {label:`Time's up for ${due?due.name:''}`,hidden:!due,sub:'keep, retire to the Mausoleum, or the Sacrifice',act:()=>seasonEndOf(due.id)},{label:'Roster & Training',get sub(){return `Team Power ${Math.round(userTeam().power)} · ${CAREER.bones.toLocaleString()} Bones to spend`;},act:()=>seasonRoster()},
+      {label:'The Graveyard',get sub(){const n=yardFresh().list.length;return `${n} fresh corpse${n===1?'':'s'} this week`;},act:()=>seasonYard()},
+      {label:'The Stitch Shop',sub:parts?`${parts} part${parts===1?'':'s'} to sew back on · ${stitchTotal()} Bones`:'everyone is in one piece',act:()=>seasonStitch()},
+      {label:'The Witch Doctor',hidden:!wdOpen(),sub:wdz?`${wdz} zombie${wdz===1?'':'s'} carry deaths she can erase`:'no deaths to erase right now',act:()=>seasonWitch()},
+      {label:'League Standings',act:()=>seasonStandings()},
+      {label:'Last Week\'s Scores',hidden:!CAREER.results.length,act:()=>seasonScores(CAREER.results.length-1)},
+      {label:'The Mausoleum',hidden:!((CAREER.maus||[]).length+(CAREER.fallen||[]).length),sub:'your hall of fame',act:()=>seasonMaus()},{label:'Main Menu',act:()=>toTitle()}]);}
   activeMenu=SN.menu;showOverlay('season');}
 function standingsHTML(){return [0,1].map(d=>`<h2>${DIVS[d]}</h2><table class="sn-tbl"><tr><th>Team</th><th>W</th><th>L</th><th>+/-</th><th>Power</th></tr>${
   standings(d).map(t=>`<tr class="${t.id===0?'you':''}"><td>${teamDot(t.id)}${LEAGUE[t.id].name}</td><td>${t.w}</td><td>${t.l}</td><td>${t.pf-t.pa>0?'+':''}${t.pf-t.pa}</td><td>${Math.round(t.power)}</td></tr>`).join('')}</table>`).join('');}
 function seasonSub(title,html,items,back,keep){seasonDOM();SN.sub=title;SN.back=back||null;$('snSubH').textContent=title;$('snSubBody').innerHTML=html;
   SN.sub2=snMenu('sub2','snSubMenu',items||[{label:'Back',act:()=>seasonOpen()}],keep);activeMenu=SN.sub2;mode='season';showOverlay('snSub');}
-function statLine(z){return zKeys(z).map(S=>`${S.ab} <b>${z.st[S.k]}</b>`).join(' &nbsp;');}
+function statLine(z){return zKeys(z).map(S=>`${S.ab} <b>${z.st[S.k]}</b>`).join(' &nbsp;')+zTags(z);}
+function zTags(z){const t=[],h=hurtKeys(z).length;if(z.end&&!z.kept)t.push('<b style="color:#ff7a5a">time\'s up</b>');else if(z.kept)t.push('kept');
+  if(h)t.push(`<b style="color:#ff9a6a">${h} missing</b>`);if(z.deaths)t.push(`${z.deaths} death${z.deaths===1?'':'s'}`);return t.length?' · '+t.join(' · '):'';}
 const skulls=n=>`<span class="sn-sk">${'☠'.repeat(n)}<i>${'☠'.repeat(SK_MAX-n)}</i></span>`;
 const bonesHead=()=>`<span class="sn-bones">Bones <b>${CAREER.bones.toLocaleString()}</b></span>`;
 // "The Crypt grows...": the only hint that spending opened a deeper shelf.
+function wdNews(){if(!wdOpen()||CAREER.wdSeen)return '';CAREER.wdSeen=1;careerSave();return '<div class="sn-crypt">The Crypt grows... The Witch Doctor has opened her hut.</div>';}
 function cryptLine(){const c=skullCap();if(c>(CAREER.capSeen||2)){CAREER.capSeen=c;careerSave();return '<div class="sn-crypt">The Crypt grows...</div>';}return '';}
 function seasonRoster(keep){const u=userTeam();
   seasonSub('ROSTER & TRAINING',`${cryptLine()}<div class="sn-head">Team Power ${teamPower(u)} &nbsp;·&nbsp; ${bonesHead()}</div>
@@ -312,19 +374,26 @@ function seasonRoster(keep){const u=userTeam();
      {label:'The Graveyard',sub:`sign fresh corpses · bench ${u.bench.length} of ${BENCH_MAX}`,act:()=>seasonYard()},{label:'Back',act:()=>seasonOpen()}],null,keep);}
 function bioHTML(z,extra){return `<div class="sn-who"><canvas id="snPort" width="400" height="460"></canvas><div class="sn-bio"><div class="pw">Power ${zPower(z)}</div>
   <div>${KINDS[z.kind].name}${z.frail?' (Z-team bench body)':''} · ${KINDS[z.kind].plays}</div>${extra||''}<div class="q">"${z.look.quip||'Brains.'}"</div></div></div>`;}
+function healthHTML(z){const h=hurtKeys(z),lm=lifeMax(z);
+  return `<div style="margin-top:4px">Lifespan <b>${zLife(z)}</b> of ${lm} · ${lifeWord(z)}</div>
+    <div>${z.deaths?`Died ${z.deaths} time${z.deaths===1?'':'s'}${zDmg(z)?` (−${zDmg(z)} Power)`:''}`:'Never died (yet)'}${z.games?` · ${z.games} game${z.games===1?'':'s'}`:''}</div>
+    ${h.length?`<div style="color:#ff9a6a">Missing: ${h.map(k=>PART_NAME[k]).join(', ')} (−${zInjPow(z)} Power)</div>`:''}${z.kept?`<div>Kept past the end: −${KEEP_POW} Power, no more training</div>`:''}`;}
 function seasonPlayer(id,keep,armed){const f=zFind(id);if(!f){seasonRoster(true);return;}const u=userTeam(),z=f.z,cap=skullCap(),onBench=f.where==='bench';
   const where=onBench?'On the bench':POS[f.i];
   const items=zKeys(z).map(S=>{const s=z.st[S.k],c=trainCost(s);
-    return {label:`${S.name} ${skulls(s)}`,sub:c==null?`${S.does} · fully trained`:s>=cap?`${S.does} · can't go higher yet`:`${S.does} · next skull ${c} Bones${CAREER.bones<c?' (not enough)':''}`,
+    return {label:`${S.name} ${skulls(s)}`,disabled:!!z.kept,sub:z.kept?`${S.does} · kept zombies can't train`:c==null?`${S.does} · fully trained`:s>=cap?`${S.does} · can't go higher yet`:`${S.does} · next skull ${c} Bones${CAREER.bones<c?' (not enough)':''}`,
       act:()=>{if(train(z,S.k))sfx.cheer&&sfx.cheer();else sfx.groan&&sfx.groan();seasonPlayer(id,true);}};});
   if(onBench)u.squad.forEach((s0,i)=>{if(SLOT_KIND[i]===z.kind)items.push({label:`Start at ${POS[i]}`,sub:`swap with ${s0.name} (Power ${zPower(s0)})`,act:()=>{swapIn(z.id,i);sfx.select&&sfx.select();seasonPlayer(id,true);}});});
   else u.bench.forEach(b=>{if(b.kind===z.kind)items.push({label:`Swap with ${b.name}`,sub:`from the bench (Power ${zPower(b)})`,act:()=>{swapIn(b.id,f.i);seasonPlayer(id,true);}});});
+  if(z.end&&!z.kept)items.unshift({label:`<b>Time's up</b>: decide`,sub:'keep, retire to the Mausoleum, or the Sacrifice',act:()=>seasonEndOf(z.id)});
+  else if(z.kept)items.push({label:'Retire or Sacrifice',sub:'send this old-timer off',act:()=>seasonEndOf(z.id)});
+  if(hurtKeys(z).length)items.push({label:`Stitch back on (${stitchCost(z)} Bones)`,disabled:CAREER.bones<stitchCost(z),sub:`${hurtKeys(z).map(k=>PART_NAME[k]).join(', ')} · costs ${stitchWear(z)} lifespan`,act:()=>{if(stitch(z))sfx.chomp&&sfx.chomp(0.5);seasonPlayer(id,true);}});
   const r=refundOf(z),canGo=onBench||benchFor(f.i)>=0;
   items.push({label:armed?`<b>Let ${z.name} go?</b> Press again`:`Let Go (+${r} Bones)`,disabled:!canGo,
     sub:!canGo?`a ${KINDS[z.kind].name} on the bench has to take this spot first`:armed?'this zombie is gone for good':'20% of this zombie\'s value back',
     act:()=>{if(!armed){seasonPlayer(id,true,true);return;}if(release(z.id)!=null){sfx.groan&&sfx.groan();seasonRoster(true);}}});
   items.push({label:'Back to Roster',act:()=>seasonRoster(true)});
-  seasonSub(`${z.name.toUpperCase()} #${z.num}`,`<div class="sn-head">${where} &nbsp;·&nbsp; ${bonesHead()}</div>${bioHTML(z)}`,items,()=>seasonRoster(true),keep);
+  seasonSub(`${z.name.toUpperCase()} #${z.num}`,`<div class="sn-head">${where} &nbsp;·&nbsp; ${bonesHead()}</div>${bioHTML(z,healthHTML(z))}`,items,()=>seasonRoster(true),keep);
   snPortrait(z,onBench?KINDS[z.kind].body:BODY_OF[f.i]);}
 function seasonYard(keep){const Y=yardFresh(),u=userTeam();
   seasonSub('THE GRAVEYARD',`${cryptLine()}<div class="sn-head">${bonesHead()} &nbsp;·&nbsp; Bench ${u.bench.length} of ${BENCH_MAX}</div>
@@ -346,18 +415,67 @@ function seasonSigned(z,r){const f=zFind(z.id);
   seasonSub('SIGNED!',`${bioHTML(z)}<div class="sn-line">${z.name} joins the Graveyard Shift as #${z.num}, ${f&&f.where==='squad'?`starting at ${POS[f.i]}`:'on the bench'}.${r.gone?`<br>${r.gone.name} is let go for ${r.refund} Bones.`:''}<br>Team Power is now ${teamPower(userTeam())}.</div>`,
     [{label:'Back to the Graveyard',act:()=>seasonYard()},{label:'Roster & Training',act:()=>seasonRoster()},{label:'Season Home',act:()=>seasonOpen()}],()=>seasonYard());
   snPortrait(z,f&&f.where==='squad'?BODY_OF[f.i]:KINDS[z.kind].body);}
+// ----- round 4 screens: the Stitch Shop, the Witch Doctor, the end of a lifespan, and the Mausoleum -----
+function bodyFor(z){const f=zFind(z.id);return f&&f.where==='squad'?BODY_OF[f.i]:KINDS[z.kind].body;}
+function seasonStitch(keep){const hurt=yourZombies().filter(z=>hurtKeys(z).length),t=stitchTotal();
+  seasonSub('THE STITCH SHOP',`<div class="sn-head">${bonesHead()}</div>
+    <div class="sn-line" style="margin-bottom:10px">${hurt.length?'Needle, thread and a staple gun. Missing parts cost Power until they\'re sewn back on, and every stitch costs a little lifespan.':'Nobody is missing anything. Come back after the next game.'}</div>`,
+    [...(hurt.length>1?[{label:`Sew everyone (${t} Bones)`,disabled:CAREER.bones<t,sub:CAREER.bones<t?'not enough Bones for everyone':`${hurt.length} zombies, all in one go`,act:()=>{if(stitchAll())sfx.chomp&&sfx.chomp(0.5);seasonStitch(true);}}]:[]),
+     ...hurt.map(z=>({label:`${z.name} #${z.num}`,disabled:CAREER.bones<stitchCost(z),sub:`${hurtKeys(z).map(k=>PART_NAME[k]).join(', ')} · ${stitchCost(z)} Bones · ${stitchWear(z)} lifespan`,
+       act:()=>{if(stitch(z))sfx.chomp&&sfx.chomp(0.5);seasonStitch(true);}})),{label:'Back',act:()=>seasonOpen()}],()=>seasonOpen(),keep);}
+function seasonWitch(keep){const list=yourZombies().filter(z=>z.dmg&&z.dmg.length);
+  seasonSub('THE WITCH DOCTOR',`<div class="sn-head">${bonesHead()}</div>
+    <div class="sn-line" style="margin-bottom:10px">She rattles her bones and erases the Power a zombie lost in the most recent death. Each visit for the same zombie costs double.</div>`,
+    [...list.map(z=>({label:`${z.name} #${z.num}`,disabled:CAREER.bones<wdCost(z),sub:`erase the last death · +${z.dmg[z.dmg.length-1]} Power · ${wdCost(z)} Bones${CAREER.bones<wdCost(z)?' (not enough)':''}`,
+       act:()=>{if(witch(z))sfx.cheer&&sfx.cheer();seasonWitch(true);}})),...(list.length?[]:[{label:'Nobody to fix',disabled:true,sub:'no deaths to erase right now'}]),{label:'Back',act:()=>seasonOpen()}],()=>seasonOpen(),keep);}
+function seasonEndOf(id,armed){const f=zFind(id);if(!f){seasonOpen();return;}const z=f.z,u=userTeam(),slot=f.where==='squad'?f.i:-1;
+  const fill=slot<0?'':benchFor(slot)>=0?`${u.bench[benchFor(slot)].name} moves up from the bench`:'a free Z-team walk-on takes the spot';
+  const items=[];
+  if(!z.kept)items.push({label:'Keep',sub:`plays on at −${KEEP_POW} Power and can't train any more`,act:()=>{keepZ(z);sfx.groan&&sfx.groan();seasonPlayer(id,true);}});
+  items.push({label:armed==='r'?'<b>Into the Mausoleum?</b> Press again':'Retire to the Mausoleum',sub:armed==='r'?fill||'a plaque in your hall of fame':`a plaque in your hall of fame${fill?' · '+fill:''}`,
+    act:()=>{if(armed!=='r'){seasonEndOf(id,'r');return;}const r=retireZ(id);if(r)seasonRetired(r);}});
+  items.push({label:armed==='s'?'<b>The Sacrifice?</b> Press again':'The Sacrifice',sub:armed==='s'?fill||'gone for good':`gives everything for the team: the Shift play fired up next game${fill?' · '+fill:''}`,
+    act:()=>{if(armed!=='s'){seasonEndOf(id,'s');return;}const r=sacrificeZ(id);if(r)seasonSacrificed(r);}});
+  items.push({label:'Back',act:()=>seasonOpen()});
+  seasonSub(z.kept?`${z.name.toUpperCase()}, KEPT`:`TIME'S UP FOR ${z.name.toUpperCase()}`,`<div class="sn-head">${slot<0?'On the bench':POS[slot]} &nbsp;·&nbsp; ${bonesHead()}</div>${bioHTML(z,healthHTML(z))}
+    <div class="sn-line">${z.kept?'Still shambling. When you\'re ready, send this old-timer off.':`${z.name}'s lifespan has run out. The choice is yours.`}</div>`,items,()=>seasonOpen(),!!armed);
+  snPortrait(z,bodyFor(z));}
+function walkOnLine(r){return r.walkOn?`<br>${r.walkOn.name}, a Z-team walk-on, takes the spot at ${POS[r.slot]} for free.`:r.slot>=0?`<br>${userTeam().squad[r.slot].name} moves up from the bench.`:'';}
+function seasonRetired(r){const z=r.z;sfx.cheer&&sfx.cheer();
+  seasonSub('INTO THE MAUSOLEUM',`${bioHTML(z)}<div class="sn-line">${z.name} #${z.num} retires with a plaque in your hall of fame: best Power ${Math.max(z.best||0,zPower(z))}, ${z.games||0} games, ${z.deaths||0} deaths.${walkOnLine(r)}</div>`,
+    [{label:'Season Home',act:()=>seasonOpen()},{label:'The Mausoleum',act:()=>seasonMaus()}],()=>seasonOpen());
+  snPortrait(z,KINDS[z.kind].body);}
+function seasonSacrificed(r){const z=r.z;sfx.groan&&sfx.groan();
+  seasonSub('THE SACRIFICE',`${bioHTML(z)}<div class="sn-line">Hands burst from the grave and pull ${z.name} under, proud to the last. The Graveyard Shift will play fired up next game.${walkOnLine(r)}</div>`,
+    [{label:'Season Home',act:()=>seasonOpen()}],()=>seasonOpen());
+  snPortrait(z,KINDS[z.kind].body,{bury:1});}
+function seasonMaus(){const M=CAREER.maus||[],F=CAREER.fallen||[];
+  seasonSub('THE MAUSOLEUM',`<div class="sn-line" style="margin-bottom:10px">Your hall of fame: zombies retired with honor, and the ones who gave everything for the team.</div>`,
+    [...M.map((p,i)=>({label:`<span class="sn-kind">RETIRED</span>${p.name} #${p.num}`,sub:`${KINDS[p.kind].name} · best Power ${p.best} · ${p.games} games · Season ${p.season}`,act:()=>seasonPlaque(p)})),
+     ...F.map(p=>({label:`<span class="sn-kind">FELL</span>${p.name} #${p.num}`,sub:`${KINDS[p.kind].name} · best Power ${p.best} · the Sacrifice, Season ${p.season}`,act:()=>seasonPlaque(p)})),
+     {label:'Back',act:()=>seasonOpen()}],()=>seasonOpen());}
+function seasonPlaque(p){const z={id:'p'+p.num,name:p.name,num:p.num,kind:p.kind,look:p.look,st:p.st};
+  const sk=zKeys(z).map(S=>`<div>${S.name} ${skulls(z.st[S.k])}</div>`).join('');
+  seasonSub(`${p.name.toUpperCase()} #${p.num}`,`<div class="sn-who"><canvas id="snPort" width="400" height="460"></canvas><div class="sn-bio"><div class="pw">Best Power ${p.best}</div>
+    <div>${KINDS[p.kind].name} · ${p.games} games · ${p.deaths} deaths</div><div>${p.how==='retired'?'Retired':'The Sacrifice'}, Season ${p.season} Week ${p.week}</div><div style="margin-top:4px">${sk}</div><div class="q">"${p.look&&p.look.quip||'Brains.'}"</div></div></div>`,
+    [{label:'Back to the Mausoleum',act:()=>seasonMaus()}],()=>seasonMaus());
+  snPortrait(z,KINDS[p.kind].body,{still:1});}
 // ----- the portrait: the zombie standing on his grave, doing his idle (shuffling, twitching, chewing a bone, scratching, grooving, drooling) -----
 const PORT={tok:0};
-function snPortrait(z,body){const tok=++PORT.tok,t0=performance.now();PORT.z=z;PORT.body=body||'qb';
+function snPortrait(z,body,opt){const tok=++PORT.tok,t0=performance.now();PORT.z=z;PORT.body=body||'qb';PORT.opt=opt||{};
   const step=()=>{if(tok!==PORT.tok)return;const cv=document.getElementById('snPort');if(!cv||!cv.isConnected||mode!=='season')return;
     try{drawPort(cv,(performance.now()-t0)/1000);}catch(e){}requestAnimationFrame(step);};requestAnimationFrame(step);}
 function drawPort(cv,t){const c=cv.getContext('2d'),z=PORT.z,W=cv.width,H=cv.height,B=ZBODY[PORT.body]||ZBODY.qb;c.clearRect(0,0,W,H);
   c.fillStyle='#55585e';c.strokeStyle='#1b1a17';c.lineWidth=4;c.beginPath();c.moveTo(W*0.62,H*0.84);c.lineTo(W*0.62,H*0.38);c.arc(W*0.77,H*0.38,W*0.15,Math.PI,0);c.lineTo(W*0.92,H*0.84);c.closePath();c.fill();c.stroke();
   c.fillStyle='#2b2d31';c.font='bold 30px Arial';c.textAlign='center';c.fillText('RIP',W*0.77,H*0.46);
+  const O=PORT.opt||{},bury=O.bury?Math.min(1,Math.max(0,(t-0.8)/2.4)):0;if(O.bury){c.font='bold 22px Arial';c.fillText('#'+(z.num||''),W*0.77,H*0.53);}
   c.fillStyle='#3b2a1a';c.beginPath();c.ellipse(W*0.5,H*0.9,W*0.46,H*0.07,0,0,7);c.fill();
   const size=H*0.62,x=W*0.42,y=H*0.88,idle=z.look.idle||'shuffle',seed=parseInt(String(z.id).replace(/\D/g,''))||1;
-  const o={look:z.look,team:ZSTYLE.zombie,body:PORT.body,view:'front',flip:false,phase:0,speed:0,limbs:{la:1,ra:1,ll:1,rl:1,head:1},pose:'stand',num:z.num||'',t,seed,ball:false};
+  const lm={la:1,ra:1,ll:1,rl:1,head:1};if(z.hurt)for(const k of PARTS)if(z.hurt[k])lm[k]=0;
+  const o={look:z.look,team:ZSTYLE.zombie,body:PORT.body,view:'front',flip:false,phase:0,speed:0,limbs:lm,pose:'stand',num:z.num||'',t:O.still?0:t,seed,ball:false};
   c.save();
+  if(O.bury){c.beginPath();c.rect(0,0,W,y-H*0.005);c.clip();c.translate(0,bury*bury*size*1.15);if(bury>0&&bury<1)c.translate(Math.sin(t*40)*3,0);}
+  if(O.still)t=0;
   if(idle==='shuffle'){o.pose='zombie';o.speed=0.3;o.phase=t*3.2;c.translate(Math.sin(t*1.6)*W*0.04,0);}
   else if(idle==='twitch'){const k=(t+seed*0.3)%1.6;if(k<0.18){c.translate(x,y);c.rotate(Math.sin(k*70)*0.1);c.translate(-x,-y);}}
   else if(idle==='chew'){o.pose='dance';o.prop='bone';o.dj={la:[0.2,0.3],ra:[0.6+Math.sin(t*6)*0.08,2.5]};}
@@ -366,15 +484,26 @@ function drawPort(cv,t){const c=cv.getContext('2d'),z=PORT.z,W=cv.width,H=cv.hei
   drawZombie(c,x,y,size,o);
   if(idle==='drool'){const k=size/100,my=y-k*(B.leg+B.torso+19*B.head-21*B.head*0.75),mx=x+k*2,d=(t*0.6)%1;
     c.fillStyle='rgba(200,230,150,0.85)';c.beginPath();c.ellipse(mx,my+d*k*30,k*1.6,k*(2+d*2),0,0,7);c.fill();}
-  c.restore();}
+  c.restore();
+  if(O.bury){const k=size/100;   // the grave's hands, then the dirt settling
+    for(const sx of [-1,1]){const up=Math.sin(Math.min(1,t/0.8)*Math.PI/2)*(1-Math.max(0,bury-0.7)/0.3),hx=x+sx*k*22,hy=y-up*k*26;
+      c.fillStyle='#7fa06a';c.strokeStyle='#1b1a17';c.lineWidth=3;c.beginPath();c.rect(hx-k*3,hy,k*6,up*k*26);c.fill();c.stroke();
+      for(let f=0;f<4;f++){c.beginPath();c.ellipse(hx+(f-1.5)*k*2.4,hy-k*2,k*1.2,k*3,0,0,7);c.fill();c.stroke();}}
+    if(bury>0&&bury<1)for(let i=0;i<6;i++){const a=(t*3+i)%1;c.fillStyle='#5a3f26';c.beginPath();c.arc(x+(i-2.5)*k*9,y-a*(1-a)*k*40,k*2,0,7);c.fill();}
+    if(bury>=1){c.fillStyle='#4a3320';c.beginPath();c.ellipse(x,y-k*2,k*30,k*6,0,Math.PI,0);c.fill();}}}
 function seasonStandings(){seasonSub('STANDINGS',standingsHTML());}
 function scoresHTML(res,skipYou){return res.filter(r=>!(skipYou&&(r.h===0||r.a===0))).map(r=>{const hw=r.hs>r.as,w=hw?r.h:r.a,l=hw?r.a:r.h,ws=Math.max(r.hs,r.as),ls=Math.min(r.hs,r.as);
   return `${teamDot(w)}<b>${LEAGUE[w].name} ${ws}</b>, ${LEAGUE[l].name} ${ls}`;}).join('<br>');}
 function seasonScores(w){seasonSub(`WEEK ${w+1} SCORES`,`<div class="sn-scores">${scoresHTML(CAREER.results[w],false)}</div>`);}
+function casualtyHTML(rep){if(!rep||!rep.length)return '';
+  const line=r=>{const b=[];if(r.died)b.push(`died (−${DEATH_POW} Power)`);if(r.lost.length)b.push('lost the '+r.lost.map(k=>PART_NAME[k]).join(' and the '));
+    if(r.accident)b.push('and the fall ended a lifespan early');if(r.ended&&!r.accident)b.push(b.length?'and the lifespan has run out':'has reached the end of the lifespan');return `<b>${r.name}</b> ${b.join(', ')}.`;};
+  const sew=rep.some(r=>r.lost.length),end=rep.filter(r=>r.ended);
+  return `<h2>The damage</h2><div class="sn-scores">${rep.map(line).join('<br>')}${sew?'<br><i style="color:#aab79c">The Stitch Shop can sew missing parts back on.</i>':''}${end.length?`<br><i style="color:#ff9a6a">Time's up for ${end.map(r=>r.name).join(' and ')}. Decide on the Season screen.</i>`:''}</div>`;}
 function seasonWeekScreen(S){const pay=S.won?BONES.win:BONES.loss;
   seasonSub(S.won?'A WIN FOR THE SHIFT!':'BACK TO THE GRAVE',
     `<div class="sn-line">+${S.bones} Bones: ${pay} for the ${S.won?'win':'game'}${S.tds?` and ${S.tds*BONES.td} for ${S.tds} touchdown${S.tds>1?'s':''}`:''}.<br>Record ${recStr(userTeam())} &nbsp;·&nbsp; Bones ${CAREER.bones.toLocaleString()}${CAREER.bones>=50?'<br><i style="color:#aab79c">Spend them on training, or on fresh corpses in the Graveyard.</i>':''}</div>
-     <h2>Around the league</h2><div class="sn-scores">${scoresHTML(S.res,true)}</div>`,
+     ${casualtyHTML(S.report)}<h2>Around the league</h2><div class="sn-scores">${scoresHTML(S.res,true)}</div>`,
     [{label:seasonOver()?'See Final Standings':'Continue',act:()=>seasonOpen()},{label:'Main Menu',act:()=>toTitle()}]);}
 function seasonEndScreen(){const u=userTeam(),st=standings(0),place=st.findIndex(t=>t.id===0)+1,ord=['','1st','2nd','3rd','4th','5th','6th'][place];
   const champs=[0,1].map(d=>standings(d)[0]);
@@ -391,6 +520,10 @@ const OVER_ITEMS=overMenu.items;
     if(S)$('overStats').innerHTML+=`<br>Season record: ${recStr(userTeam())} &nbsp;·&nbsp; +${S.bones} Bones`;}
   else overMenu.items=OVER_ITEMS;
   overMenu.i=0;overMenu.render();};}
+// Season casualties: who on your side died and which parts flew off. Halftime's patch-up heals the zombies on the field for the rest of the game.
+{const k0=knockOut;knockOut=function(p,why){if(p&&!p.out&&p.team===0&&p.zid&&casLive())G.season.cas.died[p.zid]=1;return k0(p,why);};}
+{const r0=removeLimb;removeLimb=function(p,k){if(p&&p.limbs&&p.limbs[k]&&!p.out&&p.team===0&&p.zid&&casLive()){const c=G.season.cas;(c.inj[p.zid]||(c.inj[p.zid]={}))[k]=1;if(k==='head')c.died[p.zid]=1;}return r0(p,k);};}
+{const h0=secondHalf;secondHalf=function(){if(G&&G.season&&G.season.cas)for(const p of G.teams[0])if(p.zid)delete G.season.cas.inj[p.zid];return h0();};}
 {let armed=0;const it={label:()=>armed>performance.now()?'<b>Bury this career?</b> Press again':'Reset Season Career',get hidden(){return !careerLoad();},
   sub:()=>armed>performance.now()?'your whole Season career will be gone':'start your Season career over',
   act:()=>{if(armed>performance.now()){careerReset();armed=0;sfx.groan&&sfx.groan();}else armed=performance.now()+4000;}};
