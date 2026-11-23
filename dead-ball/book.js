@@ -65,10 +65,11 @@ function bookBite(){if(G&&G.season&&G.play){const d=1-G.play.off;(G.season.bites
 
 // ----- the pages -----
 function bookCSS(){if(document.getElementById('bookCSS'))return;const s=document.createElement('style');s.id='bookCSS';s.textContent=`
-.sb-page{position:relative;margin:4px 6px 14px;padding:26px 30px 30px;min-height:600px;color:#2b2b6b;font-family:'Gochi Hand','Comic Sans MS',cursive;font-size:25px;line-height:1.3;
-  background:#efe3c2 repeating-linear-gradient(0deg,transparent 0 37px,rgba(70,90,160,.18) 37px 39px);box-shadow:0 6px 18px rgba(0,0,0,.6);transform:rotate(-.5deg)}
+.sb-wrap{position:relative;margin:14px 6px 14px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.55))}
+.sb-page{position:relative;padding:26px 30px 30px;min-height:600px;color:#2b2b6b;font-family:'Gochi Hand','Comic Sans MS',cursive;font-size:25px;line-height:1.3;
+  background:#efe3c2 repeating-linear-gradient(0deg,transparent 0 37px,rgba(70,90,160,.18) 37px 39px)}
 .sb-page:before{content:'';position:absolute;left:44px;top:0;bottom:0;width:2px;background:rgba(190,60,60,.35)}
-.sb-tape{position:absolute;width:118px;height:30px;background:rgba(250,236,160,.62);box-shadow:0 1px 2px rgba(0,0,0,.25);z-index:2}
+.sb-tape{position:absolute;width:118px;height:30px;background:rgba(250,236,160,.72);box-shadow:0 1px 2px rgba(0,0,0,.25);z-index:2}
 .sb-title{font-family:'Creepster',cursive;color:#4b8a1c;font-size:64px;text-align:center;line-height:1;margin:10px 0 4px;transform:rotate(-2deg);text-shadow:2px 2px 0 rgba(0,0,0,.15)}
 .sb-sub{text-align:center;font-size:30px;color:#7a1f1f;transform:rotate(1deg)}
 .sb-big{font-size:34px;color:#7a1f1f}
@@ -97,7 +98,8 @@ function bookTorn(seed){const r=yRng(seed),pts=[];for(let x=0;x<=100;x+=4)pts.pu
   for(let y=96;y>=4;y-=8)pts.push(`${(r()*0.8).toFixed(2)}% ${y}%`);return `polygon(${pts.join(',')})`;}
 function bookTape(seed,n){const r=yRng(seed*7+3),spots=[[18,-12,-9],[66,-10,7],[40,-14,-3]];
   return spots.slice(0,n||2).map(([l,t,a])=>`<div class="sb-tape" style="left:${l+r()*8}%;top:${t}px;transform:rotate(${a+r()*6-3}deg)"></div>`).join('');}
-function bookPage(seed,html,n){return `<div class="sb-page" style="clip-path:${bookTorn(seed)};transform:rotate(${(yRng(seed)()*1.6-0.8).toFixed(2)}deg)">${bookTape(seed,n)}${html}</div>`;}
+// The tape sits outside the torn page, so it can hang over the edge instead of being cut off with it.
+function bookPage(seed,html,n){return `<div class="sb-wrap" style="transform:rotate(${(yRng(seed)()*1.6-0.8).toFixed(2)}deg)">${bookTape(seed,n)}<div class="sb-page" style="clip-path:${bookTorn(seed)}">${html}</div></div>`;}
 // Per-game numbers: your team against the teams you played.
 function bookTotals(games){const T={n:games.length,pts:[0,0],yd:[0,0],bites:[0,0],limbs:[0,0],died:0,w:0,l:0};
   for(const g of games){T.pts[0]+=g.us;T.pts[1]+=g.them;T.yd[0]+=g.yd[0];T.yd[1]+=g.yd[1];T.bites[0]+=g.bites[0];T.bites[1]+=g.bites[1];T.limbs[0]+=g.limbs[0];T.limbs[1]+=g.limbs[1];T.died+=g.died;if(g.us>g.them)T.w++;else T.l++;}

@@ -277,9 +277,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script>// Testing aid: add ?debug to the address to list any script errors on screen.
 window.__errs=[];addEventListener('error',e=>{__errs.push((e.message||'error')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);if(/[?&]debug/.test(location.search)){let d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#300;color:#fbb;font:12px monospace;padding:4px;max-height:30%;overflow:auto';document.body.appendChild(d);}d.textContent=__errs.join('\n');}});</script>
-<script src="models.js?v=0.13.11"></script>
+<script src="models.js?v=0.13.12"></script>
 <script>
-const VERSION='0.13.11';
+const VERSION='0.13.12';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -3003,12 +3003,12 @@ function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
 </script>
-<script src="field.js?v=0.13.11"></script>
-<script src="halftime.js?v=0.13.11"></script>
-<script src="ceremony.js?v=0.13.11"></script>
-<script src="season.js?v=0.13.11"></script>
-<script src="yard.js?v=0.13.11"></script>
-<script src="altar.js?v=0.13.11"></script>
-<script src="book.js?v=0.13.11"></script>
+<script src="field.js?v=0.13.12"></script>
+<script src="halftime.js?v=0.13.12"></script>
+<script src="ceremony.js?v=0.13.12"></script>
+<script src="season.js?v=0.13.12"></script>
+<script src="yard.js?v=0.13.12"></script>
+<script src="altar.js?v=0.13.12"></script>
+<script src="book.js?v=0.13.12"></script>
 </body>
 </html>
