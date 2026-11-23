@@ -85,6 +85,11 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 #keysMenu .mi .kk i{font-style:normal;color:#5d6b52;font-weight:normal}
 #keysMenu .mi.cap .kk{background:#ffe14a;animation:kblink .6s infinite alternate}@keyframes kblink{to{opacity:.45}}
 #keysMenu .mi.plain{justify-content:center;text-align:center}
+#benchMenu .mi{font-size:24px;padding:3px 16px;text-align:left;display:flex;justify-content:space-between;gap:16px;min-width:500px}
+#benchMenu .mi .kk{font-family:Arial;font-weight:bold;font-size:18px;letter-spacing:0;color:#151a12;background:#e9efe0;border-radius:6px;padding:1px 9px;box-shadow:0 2px 0 #7f8a74;align-self:center;white-space:nowrap}
+#benchMenu .mi .kk.hurt{background:#ffd27a}#benchMenu .mi .kk.ko{background:#ff9a8a}
+#benchMenu .mi.plain{justify-content:center;text-align:center}
+#benchNote{font:22px 'Roboto Condensed',Arial;color:#dbe6cf;margin:-4px 0 10px;text-align:center;max-width:600px}
 #keysNote{font:22px 'Roboto Condensed',Arial;color:#dbe6cf;margin:-4px 0 10px;text-align:center;max-width:600px}
 .big{font-family:'Creepster';font-size:72px;text-align:center;color:#9dff57;text-shadow:0 4px 0 #2b5a12,0 8px 20px #000;margin-bottom:6px}
 .sub2{font-size:24px;color:#dbe6cf;margin-bottom:16px;text-align:center;max-width:600px;line-height:1.4}
@@ -187,6 +192,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <p>Pick <b>Season</b> on the title screen to coach the Graveyard Shift through a 12-team zombie league: 12 weekly games, standings in two divisions, and rival teams whose managers get stronger every week. Every game pays <b>Bones</b> (100 for a win, 30 for a loss, 10 per touchdown). Your career saves itself after every game.</p>
   <p><b>Roster &amp; Training:</b> each zombie has skulls in Speed, Hands, Bite and Grit (plus Arm for a quarterback). Every skull you buy really changes how that zombie runs, catches, tackles, holds together or throws, and raises that zombie's <b>Player Power</b>. Your seven starters' Power makes your <b>Team Power</b>, with the quarterback counting extra.</p>
   <p><b>The Graveyard:</b> fresh corpses dig their way up every week. Brainiacs play QB and Safety, Fresh corpses play running back, receiver, linebacker and corner, and Shamblers play the lines. Sign one to start (the starter moves to the bench) or to the bench. Up to three zombies sit on the bench, and when a starter is knocked out the next one comes in. With no bench left, your team plays a zombie short until halftime. Letting a zombie go pays back 20% of what it's worth.</p>
+  <p><b>Timeouts and the Coffin Corner:</b> in a Season game, press <span class="kbd">Esc</span> between plays to call a timeout. Open <b>the Coffin Corner</b> to sit any zombie on the field down and send in one from the bench. A zombie you pull early keeps only the parts it has already lost, so it costs less to stitch up after the game, and you can send it back in later. A zombie that was knocked out can't come back until halftime. Timeouts are free and unlimited.</p>
   <p><b>Deaths, the Stitch Shop and lifespan:</b> a zombie knocked out in a game has died. It plays again next week, but each death costs a little Power for good. Parts that fly off stay off after the game and cost Power until <b>the Stitch Shop</b> sews them back on. Once your spending opens it, <b>the Witch Doctor</b> can erase the Power lost in a zombie's latest death. Every zombie also has a <b>lifespan</b>: deaths, stitches and each season wear it down, and better zombies last longer. When it runs out, you choose: <b>Keep</b> it (weaker, and no more training), retire it to <b>the Mausoleum</b>, your hall of fame, or <b>the Sacrifice</b>, which fires your team up for the next game.</p>
   <h2>Controls</h2>
   <table>
@@ -239,8 +245,14 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <div id="keysMenu" class="menu"></div>
 </div>
 
+<div id="benchScr" class="overlay dim">
+  <div class="big" id="benchTitle">THE COFFIN CORNER</div>
+  <div id="benchNote"></div>
+  <div id="benchMenu" class="menu"></div>
+</div>
+
 <div id="pause" class="overlay dim">
-  <div class="big">PAUSED</div>
+  <div class="big" id="pauseTitle">PAUSED</div>
   <div id="pauseMenu" class="menu"></div>
   <div class="ver"></div>
 </div>
@@ -261,9 +273,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script>// Testing aid: add ?debug to the address to list any script errors on screen.
 window.__errs=[];addEventListener('error',e=>{__errs.push((e.message||'error')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);if(/[?&]debug/.test(location.search)){let d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#300;color:#fbb;font:12px monospace;padding:4px;max-height:30%;overflow:auto';document.body.appendChild(d);}d.textContent=__errs.join('\n');}});</script>
-<script src="models.js?v=0.13.5"></script>
+<script src="models.js?v=0.13.6"></script>
 <script>
-const VERSION='0.13.5';
+const VERSION='0.13.6';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -478,10 +490,10 @@ const sfx={
   applause(){playS('applause',0.6,1);},
   // referee whistle: a pea whistle is a ~2.8 kHz tone with a fast warble from the rattling pea
   // referee whistle: each blast differs in pitch, length, pea-rattle speed and strength, with a breathy edge.
-  // kind: 'tackle' one firm blast | 'stop' two short (incomplete/out) | 'turnover' three short | 'td' one long
+  // kind: 'tackle' one firm blast | 'stop' two short (incomplete/out) | 'turnover' three short | 'timeout' three quick and a long one | 'td' one long
   whistle(kind='tackle'){if(!this.ok())return;
     const pat={tackle:[[0,rand(0.28,0.5)]],stop:[[0,rand(0.14,0.2)],[rand(0.24,0.3),rand(0.16,0.24)]],
-      turnover:[[0,0.13],[0.2,0.13],[0.4,rand(0.25,0.35)]],td:[[0,rand(0.8,1.1)]]}[kind]||[[0,0.3]];
+      turnover:[[0,0.13],[0.2,0.13],[0.4,rand(0.25,0.35)]],timeout:[[0,0.11],[0.17,0.11],[0.34,0.13],[0.62,rand(0.75,0.9)]],td:[[0,rand(0.8,1.1)]]}[kind]||[[0,0.3]];
     const base=rand(2550,3050),vol=rand(0.15,0.24);
     try{const t=AC.currentTime;for(const [st,len] of pat){const o=AC.createOscillator(),l=AC.createOscillator(),lg=AC.createGain(),g=AC.createGain(),f=AC.createBiquadFilter();
       const fq=base*rand(0.985,1.015);o.type='triangle';o.frequency.setValueAtTime(fq*0.97,t+st);o.frequency.linearRampToValueAtTime(fq,t+st+0.03);o.frequency.setValueAtTime(fq,t+st+len*0.8);o.frequency.linearRampToValueAtTime(fq*rand(0.95,0.98),t+st+len);
@@ -830,7 +842,7 @@ function annLive(){                                     // running commentary on
 
 class Menu{
   constructor(el,items){this.el=el;this.items=items;this.i=Math.max(0,items.findIndex(x=>!x.disabled&&!x.hidden));this.render();}
-  render(){this.el.innerHTML='';if(this.items[this.i]&&this.items[this.i].hidden)this.i=Math.max(0,this.items.findIndex(x=>!x.disabled&&!x.hidden));this.items.forEach((it,idx)=>{if(it.hidden)return;const b=document.createElement('div');b.dataset.idx=idx;b.className='mi'+(it.disabled?' dis':'')+(idx===this.i?' on':'');
+  render(){this.el.innerHTML='';if(this.items[this.i]&&this.items[this.i].hidden)this.i=Math.max(0,this.items.findIndex(x=>!x.disabled&&!x.hidden));this.items.forEach((it,idx)=>{if(it.hidden)return;const b=document.createElement('div');b.dataset.idx=idx;b.className='mi'+(it.cls?' '+it.cls:'')+(it.disabled?' dis':'')+(idx===this.i?' on':'');
     b.innerHTML=(typeof it.label==='function'?it.label():it.label)+(it.sub?`<span class="sub">${typeof it.sub==='function'?it.sub():it.sub}</span>`:'');
     if(!it.disabled){b.onmouseenter=()=>{this.i=idx;this.mark();};b.onclick=()=>{audioInit();this.i=idx;this.activate();};}
     this.el.appendChild(b);});}
@@ -848,7 +860,7 @@ function toggleSound(){settings.sound=!settings.sound;if(!settings.sound)musicSt
 const TRACKS=[{id:'march',name:"Zombies' March"},{id:'hullabaloo',name:'Halloween Hullabaloo'},{id:'hallow',name:'Hallow Quest'},{id:'surf',name:'Graveyard Surf'},{id:'crusher',name:'Bone Crusher'}];
 if(!settings.music||(settings.music!=='off'&&!TRACKS.some(t=>t.id===settings.music)))settings.music='march';
 const music={el:null,g:null,tok:0,duck:false};
-function musicLevel(){if(mode==='live'||mode==='pause'||mode==='half'||mode==='entrance'||mode==='ceremony')return 0;   // the walk-out anthem has the stage to itself
+function musicLevel(){if(mode==='live'||mode==='pause'||mode==='bench'||mode==='half'||mode==='entrance'||mode==='ceremony')return 0;   // the walk-out anthem has the stage to itself
               // never during a live play
   const base=(mode==='title'||mode==='season'||mode==='half'||mode==='over'||((mode==='howto'||mode==='settings')&&!G))?0.5:0.3;return music.duck?base*0.36:base;}
 function musicUpdate(){if(!music.g||!AC)return;const v=musicLevel();if(v===music.lv)return;
@@ -938,6 +950,8 @@ const settingsMenu=new Menu($('settingsMenu'),[
   {label:'Back',act:()=>closeSettings()}]);
 const pauseMenu=new Menu($('pauseMenu'),[
   {label:'Resume',sub:()=>typeof pitchName==='function'?pitchName():'',act:()=>resumeGame()},
+  {label:'The Coffin Corner',get hidden(){try{return !(G&&G.season&&G.season.benchList);}catch(e){return true;}},get disabled(){try{return prevMode==='live';}catch(e){return false;}},   // try: the menu is built before G exists
+    get sub(){return prevMode==='live'?'swaps wait for the whistle: pause between plays':'swap zombies between the field and the bench';},act:()=>benchOpen()},
   {label:'Settings',act:()=>showSettings()},
   {label:'How to Play',act:()=>showHowTo()},
   {label:'Save & Quit to Title',sub:'continue later from the last play call',act:()=>saveAndQuit()},
@@ -974,13 +988,35 @@ function showSettings(){setFrom=mode;mode='settings';activeMenu=settingsMenu;set
 function closeSettings(){sfx.select();mode=setFrom;if(mode==='pause'){activeMenu=pauseMenu;pauseMenu.render();showOverlay('pause');}else{mode='title';activeMenu=titleMenu;titleMenu.render();showOverlay('title');}}
 function showHowTo(){howFrom=mode;mode='howto';showOverlay('howto');$('howto').querySelector('.panel').scrollTop=0;}
 function closeHowTo(){sfx.select();mode=howFrom;if(mode==='title'){activeMenu=titleMenu;showOverlay('title');}else if(mode==='pause'){activeMenu=pauseMenu;showOverlay('pause');}}
-function pauseGame(){if(!G||!['playcall','presnap','live','dead'].includes(mode))return;annStop();prevMode=mode;mode='pause';activeMenu=pauseMenu;pauseMenu.i=0;pauseMenu.render();showOverlay('pause');}
+function pauseGame(){if(!G||!['playcall','presnap','live','dead'].includes(mode))return;annStop();prevMode=mode;mode='pause';activeMenu=pauseMenu;pauseMenu.i=0;$('pauseTitle').textContent=G.season?'TIMEOUT':'PAUSED';if(G.season&&prevMode!=='live')sfx.whistle('timeout');pauseMenu.render();showOverlay('pause');}
 function resumeGame(){mode=prevMode;for(const k in keys)keys[k]=false;if(mode==='playcall')showOverlay('playcall');else showOverlay(null);}
+// ===== THE COFFIN CORNER: a Season timeout's bench. Pick a zombie on the field, then who replaces them (swaps in season.js)
+const POS_NAME=['QB','RB','WR','WR','Line','Line','Line'];
+let benchSlot=null;
+function benchTag(t){const c=t==='out cold'?' ko':/missing/.test(t)?' hurt':'';return `<span class="kk${c}">${t}</span>`;}
+function benchPow(zid){const v=typeof benchPower==='function'?benchPower(zid):null;return v==null?'':`Power ${Math.round(v)}`;}
+function benchItems(){const tm=G.teams[0];
+  if(benchSlot==null){$('benchNote').textContent='Pick a zombie on the field to sit down.';
+    return tm.map((p,i)=>({label:()=>`<span>${POS_NAME[i]||''} #${p.num} ${p.name}</span>${benchTag(benchState(p))}`,sub:benchPow(p.zid),act:()=>{benchSlot=i;benchRender();}}))
+      .concat([{label:'Back to the Timeout',cls:'plain',act:()=>benchClose()}]);}
+  const p=tm[benchSlot],free=benchFree();
+  $('benchNote').textContent=free.length?`Who comes in for ${p.name}?`:'Nobody left on the bench.';
+  return free.map(({e,k})=>({label:()=>`<span>#${e.num} ${e.name}</span>${benchTag(benchEntryState(e))}`,disabled:!!e.ko,sub:e.ko?'can play again after halftime':benchPow(e.zid),
+    act:()=>{const r=benchSwap(benchSlot,k);if(r){sfx.whistle('stop');benchSlot=null;benchRender();$('benchNote').textContent=`${r.in} comes in for ${r.out}.`;tick(`${r.in} in for ${r.out}`,false);}}}))
+    .concat([{label:`Keep ${p.name} in`,cls:'plain',act:()=>{benchSlot=null;benchRender();}}]);}
+let benchMenu=null;
+// one Menu reused, so its own re-render after a pick draws the new list
+function benchRender(){const items=benchItems();if(!benchMenu)benchMenu=new Menu($('benchMenu'),items);else benchMenu.items=items;
+  benchMenu.i=Math.max(0,items.findIndex(x=>!x.disabled&&!x.hidden));benchMenu.render();activeMenu=benchMenu;}
+function benchOpen(){if(!G||!G.season||!G.season.benchList)return;mode='bench';benchSlot=null;benchRender();showOverlay('benchScr');}
+function benchBack(){if(benchSlot!=null){benchSlot=null;benchRender();sfx.blip();return;}benchClose();}
+function benchClose(){mode='pause';activeMenu=pauseMenu;pauseMenu.render();showOverlay('pause');}
 
 function onKey(c){
   if(skipFn())return;   // skippable shows are skipped only by holding the skip box (see HOLD below), never by a key press
   if(mode==='season'&&(c==='Escape'||c==='Backspace')){seasonEsc();return;}
   if(['title','pause','over','exit','season'].includes(mode)){if(mode==='pause'&&c==='Escape'){resumeGame();return;}activeMenu&&activeMenu.key(c);return;}
+  if(mode==='bench'){if(c==='Escape'||c==='Backspace')benchBack();else activeMenu&&activeMenu.key(c);return;}
   if(mode==='settings'){if(c==='Escape'||c==='Backspace')closeSettings();else activeMenu&&activeMenu.key(c);return;}
   if(mode==='keys'){if(c==='Escape'||c==='Backspace')closeKeys();else keysMenu.key(c);return;}
   if(mode==='howto'){if(c==='Escape'||c==='Enter'||c==='Backspace')closeHowTo();
@@ -1012,7 +1048,7 @@ function newG(){return {field:typeof fieldSeedNew==='function'?fieldSeedNew():0,
      teams:[0,1].map(t=>ROSTER.map((r,i)=>makePlayer(t,i))),debris:[],splats:[],parts:[],ticker:[],big:null,
      ctrl:null,play:null,ball:null,timer:0,after:null,hut:false,res:null,stats:{yards:[0,0],limbs:[0,0],bigHits:0,kos:0},abducts:[],shake:0};}
 function snapshot(){const cm=G.cm?Object.assign({},G.cm,{used:[...G.cm.used]}):null;
-  return {v:VERSION,sv:SAVE_V,names:[TEAMS[0].name,TEAMS[1].name],season:G.season&&!G.season.booked?{season:G.season.season,week:G.season.week,opp:G.season.opp,home:G.season.home,used:(G.season.used||[0,0]).slice(),cas:G.season.cas?JSON.parse(JSON.stringify(G.season.cas)):null}:null,field:G.field,periods:G.periods,at:Date.now(),diff:settings.diff,score:G.score.slice(),quarter:G.quarter,clock:G.clock,ot:!!G.ot,poss:G.poss,los:G.los,stage:G.stage,crossed:G.crossed,
+  return {v:VERSION,sv:SAVE_V,names:[TEAMS[0].name,TEAMS[1].name],season:G.season&&!G.season.booked?{season:G.season.season,week:G.season.week,opp:G.season.opp,home:G.season.home,used:(G.season.used||[0,0]).slice(),bx:G.season.benchList?G.season.benchList[0].map(e=>({zid:e.zid,limbs:e.limbs||null,ko:e.ko||0,played:e.played||0})):null,cas:G.season.cas?JSON.parse(JSON.stringify(G.season.cas)):null}:null,field:G.field,periods:G.periods,at:Date.now(),diff:settings.diff,score:G.score.slice(),quarter:G.quarter,clock:G.clock,ot:!!G.ot,poss:G.poss,los:G.los,stage:G.stage,crossed:G.crossed,
     userTeam:G.userTeam,playsDone:G.playsDone,stats:JSON.parse(JSON.stringify(G.stats)),cm:cm&&JSON.parse(JSON.stringify(cm)),
     players:G.teams.map(tm=>tm.map(p=>({limbs:Object.assign({},p.limbs),out:p.out,ko:!!p.ko,spd:p.spd,sub:p.sub==null?-1:p.sub}))),
     debris:G.debris.filter(d=>!d.sink).slice(-60).map(d=>Object.assign({},d,{vx:0,vy:0,vz:0,z:0})),splats:G.splats.slice(-160)};}
@@ -1909,7 +1945,7 @@ function update(dt){
   holdTick(dt);
   if(mode==='half'){hsUpdate(dt);return;}
   if(mode==='ceremony'){cerUpdate(dt);return;}
-  if(['pause','howto','settings','half','over'].includes(mode))return;
+  if(['pause','bench','howto','settings','half','over'].includes(mode))return;
   if(mode==='claw'){clawUpdate(dt);for(const t of G.ticker)t.life-=dt;G.ticker=G.ticker.filter(t=>t.life>0);return;}
   if(mode==='playcall'&&(G.quarter===G.periods/2||G.quarter===G.periods)&&G.clock<=45&&G.clock>0){G.clock=Math.max(0,G.clock-dt);}
   if(mode==='playcall'){if(!coachOn())pcTimer-=dt;$('pcBar').style.width=Math.max(0,pcTimer/10*100)+'%';if(pcTimer<=0)choosePlay(pcCards[pcSel].id);}
@@ -2962,9 +2998,9 @@ function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
 </script>
-<script src="field.js?v=0.13.5"></script>
-<script src="halftime.js?v=0.13.5"></script>
-<script src="ceremony.js?v=0.13.5"></script>
-<script src="season.js?v=0.13.5"></script>
+<script src="field.js?v=0.13.6"></script>
+<script src="halftime.js?v=0.13.6"></script>
+<script src="ceremony.js?v=0.13.6"></script>
+<script src="season.js?v=0.13.6"></script>
 </body>
 </html>

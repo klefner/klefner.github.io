@@ -205,9 +205,13 @@ function seasonStats(){if(!G||!G.season||!careerLoad())return;const u=userTeam()
     setTimeout(()=>{if(G===g&&G.season)announce(`The ${TEAMS[0].name} are fired up! They play this one for ${nm}.`,3);},5200);}}
 function subApply(p,b,k){p.name=b.name;p.num=b.num;p.look=b.look;p.sk=b.sk;p.zid=b.zid;p.sub=k;}
 // Called by the engine for each knocked-out zombie at the start of a possession. True means "handled": a sub came in, or the slot plays empty.
-function seasonSubIn(p){const S=G.season;if(!S||!S.benchList)return false;const L=S.benchList[p.team],k=S.used[p.team];
+function seasonSubIn(p){const S=G.season;if(!S||!S.benchList)return false;const L=S.benchList[p.team];
+  if(p.team===0&&p.zid){   // your side: the zombie who went down goes to the bench (out cold), the first fit zombie on the bench comes in
+    benchOut(p);const on=new Set(G.teams[0].map(q=>q.zid)),k=L.findIndex(e=>!on.has(e.zid)&&!e.ko);
+    if(k>=0){S.used[0]++;benchIn(p,k);announce(`${p.name} comes off the bench for the ${TEAMS[0].name}!`,2);return true;}}
+  else{const k=S.used[p.team];
   if(k<L.length){S.used[p.team]++;subApply(p,L[k],k);p.out=false;p.ko=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};
-    announce(`${p.name} comes off the bench for the ${TEAMS[p.team].name}!`,2);return true;}
+    announce(`${p.name} comes off the bench for the ${TEAMS[p.team].name}!`,2);return true;}}
   const n=G.teams[p.team].filter(q=>!q.out).length;
   if(!(S.short||(S.short={}))[p.team+':'+n]){S.short[p.team+':'+n]=1;announce(`No bench left! The ${TEAMS[p.team].name} play with ${n} until halftime.`,2);}
   return true;}
@@ -215,7 +219,25 @@ function seasonSubIn(p){const S=G.season;if(!S||!S.benchList)return false;const 
 function seasonFloor(){for(const t of [0,1]){const tm=G.teams[t];if(tm.some(p=>!p.out))continue;const p=tm[0];p.out=false;p.ko=false;p.limbs={la:1,ra:1,ll:1,rl:1,head:1};
   announce(`${p.name} crawls back on. Somebody has to play!`,2);}}
 function seasonRestore(Snap){const S=G.season;if(!S)return;if(Snap.season&&Snap.season.used)S.used=Snap.season.used.slice();
+  if(Snap.season&&Snap.season.bx){const L=S.benchList[0];Snap.season.bx.forEach((x,k)=>{   // starters the coach sat down, and who is hurt or out cold on the bench
+    if(k>=L.length){const f=zFind(x.zid);if(!f)return;const sk=skOf(f.z);if(S.fired)for(const q in sk)sk[q]*=FIRED_UP;L.push({name:f.z.name,num:f.z.num,look:f.z.look,sk,zid:f.z.id,started:1});}
+    const e=L[k];if(e&&e.zid===x.zid){e.limbs=x.limbs||null;e.ko=x.ko?1:0;e.played=x.played?1:0;}});}
   Snap.players.forEach((tm,t)=>tm.forEach((q,i)=>{const b=S.benchList&&q.sub>=0&&S.benchList[t][q.sub];if(b)subApply(G.teams[t][i],b,q.sub);}));}
+// ----- timeouts: in a Season game the coach calls a timeout (Esc) and swaps zombies between the field and the bench, between plays.
+// A zombie taken off keeps what it lost (fewer parts to stitch after the game if you pull it early); one that went down stays out cold.
+// Starters who sit are added to the bench list, so they can go back in later. Halftime still heals only the zombies on the field.
+function benchOut(p){const S=G.season,L=S.benchList[0];let k=L.findIndex(e=>e.zid===p.zid);
+  if(k<0){L.push({name:p.name,num:p.num,look:p.look,sk:p.sk,zid:p.zid,started:1});k=L.length-1;}
+  L[k].limbs=Object.assign({},p.limbs);L[k].ko=p.out?1:0;L[k].played=1;return k;}
+function benchIn(p,k){const e=G.season.benchList[0][k];subApply(p,e,k);p.out=false;p.ko=false;e.played=1;
+  p.limbs=e.limbs?Object.assign({},e.limbs):{la:1,ra:1,ll:1,rl:1,head:1};if(!p.limbs.head)p.limbs.head=1;}
+function benchFree(){const on=new Set(G.teams[0].map(p=>p.zid));return G.season.benchList[0].map((e,k)=>({e,k})).filter(x=>!on.has(x.e.zid));}
+function benchSwap(i,k){const S=G.season,p=G.teams[0][i],e=S&&S.benchList[0][k];if(!p||!e||G.teams[0].some(q=>q.zid===e.zid)||e.ko)return null;
+  const out=p.name;benchOut(p);benchIn(p,k);S.swaps=(S.swaps||0)+1;return {out,in:p.name};}
+function benchLost(limbs){return limbs?['la','ra','ll','rl'].filter(k=>!limbs[k]).length:0;}
+function benchState(p){if(p.out)return 'out cold';const n=benchLost(p.limbs);return n?`${n} part${n>1?'s':''} missing`:'fit';}
+function benchEntryState(e){if(e.ko)return 'out cold';const n=benchLost(e.limbs);return n?`${n} part${n>1?'s':''} missing`:(e.played?'rested':'fresh');}
+function benchPower(zid){const f=zid&&zFind(zid);return f?zPower(f.z):null;}
 // ----- spending: training, signing from the Graveyard, letting zombies go, and moving them between the bench and the lineup -----
 function spend(c){CAREER.bones-=c;CAREER.spent+=c;}
 function train(z,k){const s=z.st[k],c=trainCost(s);if(z.kept||c==null||s>=skullCap()||CAREER.bones<c)return false;
@@ -253,7 +275,7 @@ function lifeCheck(){const out=[];for(const z of yourZombies())if(!z.kept&&!z.en
 const pendingEnd=()=>yourZombies().filter(z=>z.end&&!z.kept);
 function casLive(){return !!(G&&G.season)&&!['finale','ceremony','over','entrance','title','season','half'].includes(mode);}
 function careerAfterGame(S){const u=userTeam(),cas=S.cas||{died:{},inj:{}},rep=[];
-  const played=new Set(u.squad.map(z=>z.id).concat(S.benchList?S.benchList[0].slice(0,S.used?S.used[0]:0).map(b=>b.zid):[]));
+  const played=new Set(u.squad.map(z=>z.id).concat(S.benchList?S.benchList[0].filter((b,j)=>b.played||j<(S.used?S.used[0]:0)).map(b=>b.zid):[]));
   for(const z of yourZombies()){if(!played.has(z.id))continue;z.games=(z.games||0)+1;z.best=Math.max(z.best||0,zPower(z));
     const d=cas.died[z.id],inj=cas.inj[z.id],lost=inj?PARTS.filter(k=>inj[k]):[];let accident=false;
     if(d){(z.dmg||(z.dmg=[])).push(DEATH_POW);z.deaths=(z.deaths||0)+1;z.wear=(z.wear||0)+WEAR.death;
@@ -523,7 +545,9 @@ const OVER_ITEMS=overMenu.items;
 // Season casualties: who on your side died and which parts flew off. Halftime's patch-up heals the zombies on the field for the rest of the game.
 {const k0=knockOut;knockOut=function(p,why){if(p&&!p.out&&p.team===0&&p.zid&&casLive())G.season.cas.died[p.zid]=1;return k0(p,why);};}
 {const r0=removeLimb;removeLimb=function(p,k){if(p&&p.limbs&&p.limbs[k]&&!p.out&&p.team===0&&p.zid&&casLive()){const c=G.season.cas;(c.inj[p.zid]||(c.inj[p.zid]={}))[k]=1;if(k==='head')c.died[p.zid]=1;}return r0(p,k);};}
-{const h0=secondHalf;secondHalf=function(){if(G&&G.season&&G.season.cas)for(const p of G.teams[0])if(p.zid)delete G.season.cas.inj[p.zid];return h0();};}
+{const h0=secondHalf;secondHalf=function(){if(G&&G.season&&G.season.cas)for(const p of G.teams[0])if(p.zid)delete G.season.cas.inj[p.zid];
+  if(G&&G.season&&G.season.benchList)for(const e of G.season.benchList[0])e.ko=0;   // the ones out cold on the bench can play again after the break
+  return h0();};}
 {let armed=0;const it={label:()=>armed>performance.now()?'<b>Bury this career?</b> Press again':'Reset Season Career',get hidden(){return !careerLoad();},
   sub:()=>armed>performance.now()?'your whole Season career will be gone':'start your Season career over',
   act:()=>{if(armed>performance.now()){careerReset();armed=0;sfx.groan&&sfx.groan();}else armed=performance.now()+4000;}};
