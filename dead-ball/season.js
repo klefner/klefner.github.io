@@ -5,7 +5,7 @@
 // Round 3: stats are skulls (0 to 5) with hidden Crypt Rank caps, Player Power, the Graveyard market (corpses fit to positions, with looks,
 // idle animations and quips), women zombies across the league, the bench that fills in when a starter goes down, and letting zombies go.
 // Round 4: deaths that leave a lasting mark, injuries the Stitch Shop sews back on, the Witch Doctor, lifespan, and Keep, the Mausoleum or the Sacrifice.
-// Later rounds add the draft, twists and the Scrapbook.
+// Later rounds add twists and the Scrapbook.
 
 const CAREER_KEY='rotball_career',CAREER_V=1;
 const DIVS=['Crypt Division','Bog Division'];
@@ -196,13 +196,43 @@ function poWeek(userResult){const c=CAREER,po=c.po;if(!po||po.round>2)return nul
   c.teams.forEach(lgGM);po.round++;if(po.round<3)po.games.push(poPairs(po,po.round));else{po.champ=poWin(games[0]);po.divChamps=po.games[1].map(poWin);}
   careerSave();return games;}
 function careerNextSeason(){const c=CAREER;
+  if(!draftDone())draftAuto();const dp=c.draft&&c.draft.picks.find(p=>p.t===0);
   const po=c.po,fate=po?poFate():-1;
-  c.history.push({season:c.season,champs:po&&po.divChamps?po.divChamps:[0,1].map(d=>standings(d)[0].id),bowl:po&&po.champ!=null?po.champ:null,you:[userTeam().w,userTeam().l],po:fate});
+  c.history.push({season:c.season,champs:po&&po.divChamps?po.divChamps:[0,1].map(d=>standings(d)[0].id),bowl:po&&po.champ!=null?po.champ:null,you:[userTeam().w,userTeam().l],po:fate,draft:dp?(dp.trade?'traded':dp.name):null});
   if(fate===3)c.bowls=(c.bowls||0)+1;
-  c.season++;c.week=0;c.results=[];c.schedule=lgSchedule();delete c.po;
+  c.season++;c.week=0;c.results=[];c.schedule=lgSchedule();delete c.po;delete c.draft;
   for(const t of c.teams){t.w=t.l=t.pf=t.pa=0;if(t.id!==0)t.power=Math.min(99,t.power+1);}   // the whole league gets a little stronger
   for(const z of yourZombies())z.wear=(z.wear||0)+WEAR.season;lifeCheck();userTeam().power=teamPower(userTeam());   // a season of wear on your own zombies
   careerSave();}
+
+// ----- the Exhumation Draft: between seasons every team digs up one corpse from a special draft class, worst record first.
+// Bad teams get the best bodies, so the league stays close without ever looking the same. Your pick is free. -----
+const nth=n=>n+((n%10===1&&n%100!==11)?'st':(n%10===2&&n%100!==12)?'nd':(n%10===3&&n%100!==13)?'rd':'th');
+function draftOrder(){return CAREER.teams.slice().sort((a,b)=>(a.w-b.w)||((a.pf-a.pa)-(b.pf-b.pa))||(a.power-b.power)).map(t=>t.id);}
+function draftStart(){const c=CAREER;if(c.draft)return c.draft;const cap=Math.min(SK_MAX,skullCap()+1),kinds=['brain','brain','brain','fresh','fresh','fresh','fresh','fresh','line','line','line','line'],pool=[];
+  for(let i=0;i<20;i++)pool.push(zNew(kinds[i%12],{cap}));
+  const cls=pool.sort((a,b)=>zValue(b)-zValue(a)).slice(0,12);
+  c.draft={order:draftOrder(),cls,picks:[]};draftRun();careerSave();return c.draft;}
+const draftNext=()=>{const d=CAREER.draft;return d&&d.picks.length<d.order.length?d.order[d.picks.length]:null;};
+const draftDone=()=>!!(CAREER.draft&&draftNext()==null);
+// A rival's pick: the best body left (the Gambler grabs a long shot), worth a lift to Team Power that's bigger for weaker teams.
+function draftRival(id){const d=CAREER.draft,t=CAREER.teams[id],G0=GMS[t.gm]||GMS.tinkerer;
+  const i=G0.swing?Math.floor(Math.random()*Math.min(4,d.cls.length)):0,z=d.cls.splice(i,1)[0];
+  const lift=Math.max(0.4,(zPower(z)-t.power)/6)*Math.max(0.1,1-t.power/110);t.power=Math.min(99,t.power+lift);
+  if(t.roster){const sl=SLOT_KIND.map((k,j)=>k===z.kind?j:-1).filter(j=>j>=0),j=lgPick(sl),sp=LEAGUE[id].sp;t.roster[j]=[z.name,t.roster[j][1],lgLook(sp,!!(z.look&&z.look.hair))];}
+  d.picks.push({t:id,name:z.name,kind:z.kind,pow:zPower(z)});}
+function draftRun(){while(draftNext()!=null&&draftNext()!==0)draftRival(draftNext());}
+// Your pick: it starts if it beats your weakest zombie at that spot, or sits on the bench. Trading the pick pays a quarter of the best body's worth.
+const draftTradeBones=()=>{const d=CAREER.draft;return d&&d.cls.length?Math.round(zValue(d.cls[0])*0.25):0;};
+function draftPick(zid){const d=CAREER.draft;if(draftNext()!==0)return null;const u=userTeam();let res={};
+  if(zid==null){res.trade=draftTradeBones();CAREER.bones+=res.trade;d.picks.push({t:0,trade:res.trade});}
+  else{const i=d.cls.findIndex(z=>z.id===zid);if(i<0)return null;const z=d.cls[i],p=yardPlan(z);if(p.full)return null;
+    d.cls.splice(i,1);z.num=freeNum(u,z.kind);
+    if(p.slot==='bench')u.bench.push(z);else{const old=u.squad[p.slot];u.squad[p.slot]=z;if(u.bench.length<BENCH_MAX)u.bench.push(old);else{res.gone=old;res.refund=refundOf(old);CAREER.bones+=res.refund;}}
+    u.power=teamPower(u);res.z=z;d.picks.push({t:0,name:z.name,kind:z.kind,pow:zPower(z)});}
+  draftRun();careerSave();return res;}
+// Draft for you: the best body that fits, or trade the pick when the bench is full.
+function draftAuto(){if(!CAREER.draft)draftStart();if(draftNext()===0){const z=CAREER.draft.cls.find(z=>!yardPlan(z).full);draftPick(z?z.id:null);}draftRun();}
 
 // ----- putting a league team on the field: name, roster, colors and species for the engine's team slot 1 -----
 const TEAMS_HOME=JSON.parse(JSON.stringify(TEAMS[0])),TEAMS_AWAY=JSON.parse(JSON.stringify(TEAMS[1]));
@@ -395,7 +425,7 @@ function seasonOpen(){careerLoad();seasonDOM();leagueReset();annStop&&annStop();
   if(!CAREER){$('seasonH').textContent='SEASON';
     $('seasonBody').innerHTML=`<div class="sn-line">Coach the <b style="color:#f3c34b">Graveyard Shift</b> through a 12-team zombie league. Win games, earn <b style="color:#efe6cf">Bones</b>, train your zombies and sign fresh corpses from the Graveyard to build a team that's all yours, against rivals who grow every week too.<br><br>Your career saves itself after every game.</div><br>`;
     SN.menu=snMenu('menu','seasonMenu',[{label:'Start My Career',act:()=>{CAREER=careerNew();careerSave();seasonOpen();}},{label:'Main Menu',act:()=>toTitle()}]);}
-  else if(seasonOver()){poStart();if(poLive()){seasonPlayoffs();return;}seasonEndScreen();return;}
+  else if(seasonOver()){poStart();if(poLive()){seasonPlayoffs();return;}if(CAREER.draft){seasonDraft();return;}seasonEndScreen();return;}
   else{const u=userTeam(),opp=nextOpp(),g=userGame(CAREER,CAREER.week),o=CAREER.teams[opp];
     $('seasonH').textContent=`SEASON ${CAREER.season}`;
     $('seasonBody').innerHTML=`<div class="sn-head">Week ${CAREER.week+1} of ${CAREER.schedule.length} &nbsp;·&nbsp; ${recStr(u)} &nbsp;·&nbsp; <span class="sn-bones">Bones <b>${CAREER.bones.toLocaleString()}</b></span></div>
@@ -592,9 +622,24 @@ function seasonEndScreen(){const u=userTeam(),st=standings(0),place=st.findIndex
   const you=fate===3?'and won the Rot Bowl!':fate===-1?'and missed the playoffs.':fate===2?'and lost in the Rot Bowl.':`and went out in the ${PO_NAME[fate]}.`;
   seasonSub(`SEASON ${CAREER.season} IS OVER`,
     `${champ!=null?`<div class="sn-crypt">${LEAGUE[champ].name} win the Rot Bowl!</div>`:''}<div class="sn-line">You finished <b style="color:#f3c34b">${ord}</b> in the ${DIVS[0]} at ${recStr(u)}, ${you}<br>${divs.map(id=>`${teamDot(id)}${LEAGUE[id].name} won the ${DIVS[LEAGUE[id].div]} title`).join('<br>')}</div>${bracketHTML()}${standingsHTML()}`,
-    [{label:`Start Season ${CAREER.season+1}`,act:()=>{careerNextSeason();seasonOpen();}},{label:'Main Menu',act:()=>toTitle()}]);}
+    [{label:'On to the Exhumation Draft',sub:'every team digs up one fresh corpse, worst record first',act:()=>{draftStart();seasonOpen();}},{label:'Main Menu',act:()=>toTitle()}]);}
+// ----- the draft screens -----
+function draftListHTML(){const d=CAREER.draft;return d.picks.map((p,i)=>`${i+1}. ${teamDot(p.t)}${p.t===0?'<b>':''}${LEAGUE[p.t].name}${p.t===0?'</b>':''}: ${p.trade?`traded the pick for ${p.trade} Bones`:`${p.name} <span style="color:#9dff57">${KINDS[p.kind].name}</span> · Power ${p.pow}`}`).join('<br>');}
+function seasonDraft(){const d=CAREER.draft,me=d.order.indexOf(0)+1;
+  if(draftDone()){const mine=d.picks.find(p=>p.t===0);
+    seasonSub('DRAFT DAY IS DONE',`<div class="sn-line">${mine.trade?`You traded your pick for <b style="color:#f3c34b">${mine.trade} Bones</b>.`:`<b style="color:#f3c34b">${mine.name}</b> climbed out for the ${LEAGUE[0].name}.`}</div><h2>The picks</h2><div class="sn-scores">${draftListHTML()}</div>`,
+      [{label:`Start Season ${CAREER.season+1}`,act:()=>{careerNextSeason();seasonOpen();}},{label:'Roster & Training',act:()=>seasonRoster()},{label:'Main Menu',act:()=>toTitle()}]);return;}
+  $('seasonH').textContent='THE EXHUMATION DRAFT';
+  $('seasonBody').innerHTML=`<div class="sn-head">Season ${CAREER.season+1} draft class &nbsp;·&nbsp; ${bonesHead()}</div>
+    <div class="sn-line" style="margin-bottom:8px">Every team digs up one corpse, worst record first. You pick <b style="color:#f3c34b">${nth(me)}</b>, and it's free.</div>${d.picks.length?`<div class="sn-scores">${draftListHTML()}</div>`:''}<h2>Your pick</h2>`;
+  SN.menu=snMenu('menu','seasonMenu',[...d.cls.map(z=>{const full=yardPlan(z).full;return {label:`<span class="sn-kind">${KINDS[z.kind].name}</span>${z.name}`,disabled:full,
+      sub:`Power <b>${zPower(z)}</b> · ${statLine(z)} · ${yardPlanLine(z)}${(p=>p.letGo?` (${p.over.name} goes for ${refundOf(p.over)} Bones)`:'')(yardPlan(z))}`,act:()=>{draftPick(z.id);seasonOpen();}};}),
+    {label:`Trade the pick for ${draftTradeBones()} Bones`,act:()=>{draftPick(null);seasonOpen();}},
+    {label:'Roster & Training',sub:'make room on the bench first',act:()=>seasonRoster()},{label:'Main Menu',act:()=>toTitle()}]);
+  activeMenu=SN.menu;showOverlay('season');}
 function seasonLabel(){const c=careerLoad();if(!c)return 'start a career in the Zombie League';const u=c.teams[0];
   if(seasonOver()&&c.po&&c.po.round<3)return `Season ${c.season} Playoffs · ${PO_NAME[c.po.round]}`;
+  if(seasonOver()&&c.draft)return `Season ${c.season+1} Exhumation Draft`;
   return seasonOver()?`Season ${c.season} is over · ${recStr(u)}`:`Season ${c.season} · Week ${c.week+1} · ${recStr(u)}`;}
 
 // ----- hooks into the game: the end-of-game screen, and the career reset in Settings -----
