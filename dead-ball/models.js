@@ -162,7 +162,7 @@ function zHead(c,S,B,o,hx,hy,view){
     if(S.species==='mummy'){c.strokeStyle=S.skinDk;c.lineWidth=1.6;for(let i=0;i<4;i++){c.beginPath();c.moveTo(hx-r,hy+r*(0.4+i*0.18));c.lineTo(hx+r,hy+r*(0.5+i*0.18));c.stroke();}}}
   else zFace(c,S,hx,hy,r,o,view);
   if(H&&view==='back')zHair(c,H,hx,hy,r,view,o);
-  zHelmet(c,S,hx,hy,r,view,o);}
+  if(!o.noHelmet)zHelmet(c,S,hx,hy,r,view,o);}   // o.noHelmet: a corpse still in burial clothes
 function drawZombie(c,x,y,size,o){
   const CH=o.cheer,S=CH?cheerStyle(o.team,CH):o.look&&o.look.skin?zSkinOf(o.team,o.look.skin):o.team,B=CH?zCheerBody(ZBODY[o.body||CH.build]||ZBODY.wr,CH):ZBODY[o.body||'qb'],L=o.limbs||{la:1,ra:1,ll:1,rl:1,head:1},mum=S.species==='mummy';
   let view=o.view||'front',pose=o.pose||'run';if(view!=='side'&&pose!=='down'&&pose!=='dive')o=Object.assign({},o,{flip:false});const ph=o.phase||0,spd=o.speed==null?1:o.speed;

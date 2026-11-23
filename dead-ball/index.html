@@ -191,7 +191,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <h2>Season</h2>
   <p>Pick <b>Season</b> on the title screen to coach the Graveyard Shift through a 12-team zombie league: 12 weekly games, standings in two divisions, and rival teams whose managers get stronger every week. Every game pays <b>Bones</b> (100 for a win, 30 for a loss, 10 per touchdown). Your career saves itself after every game.</p>
   <p><b>Roster &amp; Training:</b> each zombie has skulls in Speed, Hands, Bite and Grit (plus Arm for a quarterback). Every skull you buy really changes how that zombie runs, catches, tackles, holds together or throws, and raises that zombie's <b>Player Power</b>. Your seven starters' Power makes your <b>Team Power</b>, with the quarterback counting extra.</p>
-  <p><b>The Graveyard:</b> fresh corpses dig their way up every week. Brainiacs play QB and Safety, Fresh corpses play running back, receiver, linebacker and corner, and Shamblers play the lines. Sign one to start (the starter moves to the bench) or to the bench. Up to three zombies sit on the bench, and when a starter is knocked out the next one comes in. With no bench left, your team plays a zombie short until halftime. Letting a zombie go pays back 20% of what it's worth.</p>
+  <p><b>The Graveyard:</b> walk the graveyard at night. It starts out a pleasant place and gets nastier as the season goes on. Every headstone carries the name of a fresh corpse. Hover a headstone (or tap it) to see that zombie's Power, skulls, price and where it would play, then double-click (or double-tap) the dirt in front of it to dig it up. It climbs out, the bats dress it in your uniform, and it starts if it beats your weakest zombie at its spot, or joins the bench if not. Brainiacs play QB and Safety, Fresh corpses play running back, receiver, linebacker and corner, and Shamblers play the lines. Up to three zombies sit on the bench, and when a starter is knocked out the next one comes in. With no bench left, your team plays a zombie short until halftime. Letting a zombie go pays back 20% of what it's worth.</p>
   <p><b>Timeouts and the Coffin Corner:</b> in a Season game, press <span class="kbd">Esc</span> between plays to call a timeout. Open <b>the Coffin Corner</b> to sit any zombie on the field down and send in one from the bench. A zombie you pull early keeps only the parts it has already lost, so it costs less to stitch up after the game, and you can send it back in later. A zombie that was knocked out can't come back until halftime. Timeouts are free and unlimited.</p>
   <p><b>Deaths, the Stitch Shop and lifespan:</b> a zombie knocked out in a game has died. It plays again next week, but each death costs a little Power for good. Parts that fly off stay off after the game and cost Power until <b>the Stitch Shop</b> sews them back on. Once your spending opens it, <b>the Witch Doctor</b> can erase the Power lost in a zombie's latest death. Every zombie also has a <b>lifespan</b>: deaths, stitches and each season wear it down, and better zombies last longer. When it runs out, you choose: <b>Keep</b> it (weaker, and no more training), retire it to <b>the Mausoleum</b>, your hall of fame, or <b>the Sacrifice</b>, which fires your team up for the next game.</p>
   <h2>Controls</h2>
@@ -273,9 +273,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script>// Testing aid: add ?debug to the address to list any script errors on screen.
 window.__errs=[];addEventListener('error',e=>{__errs.push((e.message||'error')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);if(/[?&]debug/.test(location.search)){let d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#300;color:#fbb;font:12px monospace;padding:4px;max-height:30%;overflow:auto';document.body.appendChild(d);}d.textContent=__errs.join('\n');}});</script>
-<script src="models.js?v=0.13.6"></script>
+<script src="models.js?v=0.13.7"></script>
 <script>
-const VERSION='0.13.6';
+const VERSION='0.13.7';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -429,7 +429,7 @@ function playS(group,vol=1,rate=null,delay=0,fx=null){
 let amb=null;
 const CROWD={hype:[0,0],live:[0,0],gap:false};
 const sidePan=t=>t==null?0:(t===0?-0.8:0.8);
-function ambUpdate(){const want=((!!G&&['playcall','presnap','live','dead','half'].includes(mode))||mode==='title'||mode==='season'||((mode==='howto'||mode==='settings')&&!G))&&sfx.ok();
+function ambUpdate(){const want=((!!G&&['playcall','presnap','live','dead','half'].includes(mode))||mode==='title'||mode==='season'||mode==='yard'||((mode==='howto'||mode==='settings')&&!G))&&sfx.ok();
   if(want&&!amb&&SND.buf.crowd_amb){try{amb={};for(const t of [0,1]){const s=AC.createBufferSource();s.buffer=SND.buf.crowd_amb;s.loop=true;s.playbackRate.value=t?1.04:0.97;
       const g=AC.createGain();g.gain.value=0;let out=s;if(AC.createStereoPanner){const pn=AC.createStereoPanner();pn.pan.value=sidePan(t);s.connect(pn);out=pn;}
       out.connect(g);g.connect(master);s.start(0,t*7.3);amb[t]={s,g,lv:-1};}}catch(e){amb=null;}}
@@ -862,7 +862,7 @@ if(!settings.music||(settings.music!=='off'&&!TRACKS.some(t=>t.id===settings.mus
 const music={el:null,g:null,tok:0,duck:false};
 function musicLevel(){if(mode==='live'||mode==='pause'||mode==='bench'||mode==='half'||mode==='entrance'||mode==='ceremony')return 0;   // the walk-out anthem has the stage to itself
               // never during a live play
-  const base=(mode==='title'||mode==='season'||mode==='half'||mode==='over'||((mode==='howto'||mode==='settings')&&!G))?0.5:0.3;return music.duck?base*0.36:base;}
+  const base=(mode==='title'||mode==='season'||mode==='yard'||mode==='half'||mode==='over'||((mode==='howto'||mode==='settings')&&!G))?0.5:0.3;return music.duck?base*0.36:base;}
 function musicUpdate(){if(!music.g||!AC)return;const v=musicLevel();if(v===music.lv)return;
   music.lv=v;try{music.g.gain.setTargetAtTime(v,AC.currentTime,v===0?0.12:0.6);}catch(e){}}
 function musicPlay(){if(!AC||!settings.sound||settings.music==='off')return musicStop();
@@ -1014,6 +1014,7 @@ function benchClose(){mode='pause';activeMenu=pauseMenu;pauseMenu.render();showO
 
 function onKey(c){
   if(skipFn())return;   // skippable shows are skipped only by holding the skip box (see HOLD below), never by a key press
+  if(mode==='yard'){if(typeof yardKey==='function')yardKey(c);return;}
   if(mode==='season'&&(c==='Escape'||c==='Backspace')){seasonEsc();return;}
   if(['title','pause','over','exit','season'].includes(mode)){if(mode==='pause'&&c==='Escape'){resumeGame();return;}activeMenu&&activeMenu.key(c);return;}
   if(mode==='bench'){if(c==='Escape'||c==='Backspace')benchBack();else activeMenu&&activeMenu.key(c);return;}
@@ -2993,14 +2994,15 @@ document.addEventListener('visibilitychange',()=>{
   if(document.hidden){if(G&&['playcall','presnap','live','dead'].includes(mode))pauseGame();if(G&&G.snap)saveNow();try{if(music.el)music.el.pause();}catch(e){}try{if(AC&&AC.state==='running')AC.suspend();}catch(e){}}
   else{try{if(AC&&AC.state==='suspended'&&settings.sound)AC.resume();}catch(e){}}});
 function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
-  try{update(dt);draw();drawHold();updateTouchUI();ambUpdate();musicUpdate();djUpdate();menuBtnUpdate();updatePCBar();cheerUpdate();fieldCheerUpdate();errN=0;}catch(e){console.error(e);if(++errN>=30)showCrash(e);}
+  try{update(dt);draw();if(mode==='yard'&&typeof yardFrame==='function')yardFrame(dt);drawHold();updateTouchUI();ambUpdate();musicUpdate();djUpdate();menuBtnUpdate();updatePCBar();cheerUpdate();fieldCheerUpdate();errN=0;}catch(e){console.error(e);if(++errN>=30)showCrash(e);}
   for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
 </script>
-<script src="field.js?v=0.13.6"></script>
-<script src="halftime.js?v=0.13.6"></script>
-<script src="ceremony.js?v=0.13.6"></script>
-<script src="season.js?v=0.13.6"></script>
+<script src="field.js?v=0.13.7"></script>
+<script src="halftime.js?v=0.13.7"></script>
+<script src="ceremony.js?v=0.13.7"></script>
+<script src="season.js?v=0.13.7"></script>
+<script src="yard.js?v=0.13.7"></script>
 </body>
 </html>
