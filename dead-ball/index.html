@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Rotball</title>
-<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Bangers&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Bangers&family=Gochi+Hand&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
 <style>
 html,body{margin:0;height:100%;background:#070a06;overflow:hidden;font-family:'Roboto Condensed',Arial,sans-serif;color:#e6eedc;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
 .panel{touch-action:pan-y}
@@ -192,6 +192,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <p>Pick <b>Season</b> on the title screen to coach the Graveyard Shift through a 12-team zombie league: 12 weekly games, standings in two divisions, and rival teams whose managers get stronger every week. Every game pays <b>Bones</b> (100 for a win, 30 for a loss, 10 per touchdown). Your career saves itself after every game.</p>
   <p><b>The playoffs:</b> after week 12 the top four in each division go on. In the Wild Card round 1st hosts 4th and 2nd hosts 3rd, the winners meet in the Graveyard Championship, and the two division champions play the <b>Rot Bowl</b>. Playoff wins pay big: 150 Bones in the Wild Card, 250 in the Championship and 500 for the Rot Bowl. Miss out, or get knocked out, and you can watch the rest play out or skip straight to the winner. The Graveyard gets a fresh shelf before every playoff round.</p>
   <p><b>The Exhumation Draft:</b> between seasons every team digs up one corpse from a special draft class, worst record first, so bad teams get the best bodies. Your pick is free: it starts if it beats your weakest zombie at that spot, or joins the bench. With a full bench and nobody better, make room in Roster &amp; Training first, or trade the pick for Bones.</p>
+  <p><b>The Scrapbook:</b> every season fills a scrapbook with your team's numbers against the teams you played, photos of your touchdowns, head-offs, eaten brains, halftime shows and The Rotties, and every result. When the season ends it goes on the shelf in <b>The Library</b>, where you can flip through any past season.</p>
   <p><b>Roster &amp; Training:</b> each zombie has skulls in Speed, Hands, Bite and Grit (plus Arm for a quarterback). Every skull you buy really changes how that zombie runs, catches, tackles, holds together or throws, and raises that zombie's <b>Player Power</b>. Your seven starters' Power makes your <b>Team Power</b>, with the quarterback counting extra.</p>
   <p><b>The Graveyard:</b> walk the graveyard at night. It starts out a pleasant place and gets nastier as the season goes on. Every headstone carries the name of a fresh corpse. Hover a headstone (or tap it) to see that zombie's Power, skulls, price and where it would play, then double-click (or double-tap) the dirt in front of it to dig it up. It climbs out, the bats dress it in your uniform, and it starts if it beats your weakest zombie at its spot, or joins the bench if not. Brainiacs play QB and Safety, Fresh corpses play running back, receiver, linebacker and corner, and Shamblers play the lines. Up to three zombies sit on the bench, and when a starter is knocked out the next one comes in. With no bench left, your team plays a zombie short until halftime. Letting a zombie go pays back 20% of what it's worth.</p>
   <p><b>Timeouts and the Coffin Corner:</b> in a Season game, press <span class="kbd">Esc</span> between plays to call a timeout. Open <b>the Coffin Corner</b> to sit any zombie on the field down and send in one from the bench. A zombie you pull early keeps only the parts it has already lost, so it costs less to stitch up after the game, and you can send it back in later. A zombie that was knocked out can't come back until halftime. Timeouts are free and unlimited.</p>
@@ -276,9 +277,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script>// Testing aid: add ?debug to the address to list any script errors on screen.
 window.__errs=[];addEventListener('error',e=>{__errs.push((e.message||'error')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);if(/[?&]debug/.test(location.search)){let d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#300;color:#fbb;font:12px monospace;padding:4px;max-height:30%;overflow:auto';document.body.appendChild(d);}d.textContent=__errs.join('\n');}});</script>
-<script src="models.js?v=0.13.10"></script>
+<script src="models.js?v=0.13.11"></script>
 <script>
-const VERSION='0.13.10';
+const VERSION='0.13.11';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -3002,11 +3003,12 @@ function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
 </script>
-<script src="field.js?v=0.13.10"></script>
-<script src="halftime.js?v=0.13.10"></script>
-<script src="ceremony.js?v=0.13.10"></script>
-<script src="season.js?v=0.13.10"></script>
-<script src="yard.js?v=0.13.10"></script>
-<script src="altar.js?v=0.13.10"></script>
+<script src="field.js?v=0.13.11"></script>
+<script src="halftime.js?v=0.13.11"></script>
+<script src="ceremony.js?v=0.13.11"></script>
+<script src="season.js?v=0.13.11"></script>
+<script src="yard.js?v=0.13.11"></script>
+<script src="altar.js?v=0.13.11"></script>
+<script src="book.js?v=0.13.11"></script>
 </body>
 </html>

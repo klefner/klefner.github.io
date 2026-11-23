@@ -434,7 +434,7 @@ function seasonOpen(){careerLoad();seasonDOM();leagueReset();annStop&&annStop();
     const due=pendingEnd()[0];
     SN.menu=snMenu('menu','seasonMenu',[
       {label:`Play Week ${CAREER.week+1}`,disabled:!!due,sub:due?`decide about ${due.name} first`:'',act:()=>seasonPlay()},
-      ...snShops(),
+      ...snShops(),...(typeof snBooks==='function'?snBooks():[]),
       {label:'League Standings',act:()=>seasonStandings()},
       {label:'Last Week\'s Scores',hidden:!CAREER.results.length,act:()=>seasonScores(CAREER.results.length-1)},
       {label:'The Mausoleum',hidden:!((CAREER.maus||[]).length+(CAREER.fallen||[]).length),sub:'your hall of fame',act:()=>seasonMaus()},{label:'Main Menu',act:()=>toTitle()}]);}
@@ -601,7 +601,7 @@ function seasonPlayoffs(){const po=CAREER.po,r=po.round,g=poUserGame(),fate=poFa
       {label:'Skip to the Rot Bowl winner',hidden:r>=2,act:()=>{while(poLive())poWeek(null);seasonOpen();}}];}
   $('seasonBody').innerHTML=body;
   SN.menu=snMenu('menu','seasonMenu',[...items,...snShops(),
-    {label:'The Bracket',hidden:!g,act:()=>seasonSub('THE BRACKET',bracketHTML())},
+    {label:'The Bracket',hidden:!g,act:()=>seasonSub('THE BRACKET',bracketHTML())},...(typeof snBooks==='function'?snBooks():[]),
     {label:'League Standings',act:()=>seasonStandings()},
     {label:'The Mausoleum',hidden:!((CAREER.maus||[]).length+(CAREER.fallen||[]).length),sub:'your hall of fame',act:()=>seasonMaus()},{label:'Main Menu',act:()=>toTitle()}]);
   activeMenu=SN.menu;showOverlay('season');}
