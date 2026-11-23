@@ -58,6 +58,7 @@ Generated with the Kokoro text-to-speech model (Apache 2.0). Re-encoded to 32 kb
 
 | `chew1-4`, `swallow1-2` | Original, made for Rotball | Synthesized from scratch by `tools/make_sfx.py` (no samples) |
 | `ghost1-5` | Original, made for Rotball | Synthesized from scratch by `tools/make_ghost.py` (no samples) |
+| `ahem1-3` | Original, made for Rotball | The announcer's chuckle and "ahem", synthesized from scratch by `tools/make_ahem.py` (no samples) |
 | `anthem` | "Rise of the Rotten", original walk-out fanfare made for Rotball | Melody, arrangement and sound synthesized from scratch by `tools/make_anthem.py` (no samples) |
 | `finale` | "Rotten Glory", original closing anthem for the awards ceremony | Melody, arrangement and sound synthesized from scratch by `tools/make_anthem.py` (no samples) |
 

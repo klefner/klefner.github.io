@@ -60,6 +60,20 @@ function hsPickGags(T){let kinds=['arm','fight','throw'].sort(()=>Math.random()-
   for(let i=0;i<Math.min(n,win.length);i++){const w=win[i],k=kinds[i],at=w[0]+Math.random()*(w[1]-w[0]),c=[0,1,3,4][Math.floor(Math.random()*4)];
     out.push({k,at,len:k==='throw'?4.6:k==='fight'?4.2:5.2,r:k==='arm'?1:(Math.random()<0.5?1:2),c,c2:c+(c<2?1:-1)});}
   return out;}
+// after the fight is over: one of the two brawlers is out cold on the turf beside his dropped instrument for the rest of the show,
+// the other has lost an arm, wears a bandage and plays on one-handed with a wobble
+function hsFought(m){const g=(HS.gags||[]).find(g=>g.k==='fight');if(!g||HS.t<g.at+g.len||m.r!==g.r)return null;return m.c===g.c?'ko':m.c===g.c2?'hurt':null;}
+function hsDrawKO(m,size){const S=STYLE_OF(m.team),k=size/100;ctx.save();ctx.translate(m.hx-size*0.25,m.hy+size*0.12);
+  drawZombie(ctx,0,0,size,{team:S,body:'rb',view:'side',pose:'down',limbs:m.limbs,num:'',t:time,seed:m.seed,ball:false,speed:0});
+  // his shako knocked off, lying on its side
+  ctx.save();ctx.translate(-size*0.78,-size*0.02);ctx.rotate(-1.35);ctx.fillStyle='#14121a';ctx.fillRect(-11,-24,22,26);ctx.fillStyle=S.trim;ctx.fillRect(-11,-2,22,4);ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.strokeRect(-11,-24,22,26);ctx.restore();
+  // stars and Zs over his head
+  for(let i=0;i<3;i++){const a=time*3+i*2.1;ctx.fillStyle='#ffe14a';ctx.font='20px Arial';ctx.textAlign='center';ctx.fillText('✶',-size*0.38+Math.cos(a)*22,-size*0.4+Math.sin(a)*7);}
+  const zk=(time*0.8)%1;ctx.globalAlpha=1-zk;ctx.font='22px Bangers, Arial';ctx.lineWidth=4;ctx.strokeStyle='#000';ctx.fillStyle='#bfe6ff';ctx.strokeText('Z',-size*0.15+zk*14,-size*0.5-zk*30);ctx.fillText('Z',-size*0.15+zk*14,-size*0.5-zk*30);ctx.globalAlpha=1;
+  ctx.restore();
+  // his instrument where it fell, a step away
+  ctx.save();ctx.translate(m.hx+size*(m.inst==='tuba'?0.95:0.62),m.hy+size*0.1);ctx.rotate(m.inst==='tuba'?-0.5:1.25);ctx.translate(0,m.inst==='tuba'?size*0.35:size*0.55);
+  hsInstrument(m,size,'front',0,0,0);ctx.restore();}
 function hsGag(k){const t=HS.t;return (HS.gags||[]).find(g=>g.k===k&&t>=g.at&&t<g.at+g.len)||null;}
 function hsAudioStart(){if(HS.card>0||!HT.buf||!AC||!sfx.ok()||HS.src||HS.ph!=='show'||!HS.T||HS.t>HS.T.fwEnd-0.5)return;htDecode();
   try{const s=AC.createBufferSource(),g=AC.createGain();s.buffer=HT.buf;g.gain.value=0.7;s.connect(g);g.connect(master);s.start(0,Math.max(0,HS.t));HS.src=s;HS.gain=g;}catch(e){}}
@@ -295,10 +309,13 @@ function hsDrawBand(t,ex,beat){const T=HS.T,size=78;
       else if(m.limbs.la===0&&!(ga&&m.r===ga.r&&m.c===ga.c))m.limbs.la=1;
       if(gf&&m.r===gf.r&&(m.c===gf.c||m.c===gf.c2))hide=t-gf.at>0.45;
       if(gt){const k=t-gt.at;duck=Math.min(1,k/0.3,(gt.len-k)/0.4);}}
+    const fought=hsFought(m);
+    if(fought==='ko'){hsDrawKO(m,size);continue;}
+    if(fought==='hurt'){m.limbs.la=0;slump=Math.max(slump,0.35);}
     if(hide)continue;
     if(duck>0)slump=0;
     const sway=Math.sin(beat*Math.PI+m.c*0.4)*3,bob=-Math.abs(Math.sin(beat*Math.PI))*3;
-    const S=STYLE_OF(m.team);ctx.save();ctx.translate(x+sway,y+bob+slump*6);
+    const S=STYLE_OF(m.team);ctx.save();ctx.translate(x+sway,y+bob+slump*6);if(fought==='hurt')ctx.rotate(Math.sin(time*2.2+m.seed)*0.08-0.06);
     if(lurch){ctx.scale(1+lurch*0.08,1+lurch*0.08);}
     if(duck>0){ctx.translate(0,duck*10);ctx.scale(1,1-duck*0.12);}
     drawZombie(ctx,0,0,size,{team:S,body:'rb',view,phase:ph,speed:spd,limbs:m.limbs,pose,num:'',t:time,seed:m.seed,ball:false});
@@ -310,6 +327,9 @@ function hsDrawBand(t,ex,beat){const T=HS.T,size=78;
     const hy=-size*0.98;ctx.fillStyle='#14121a';ctx.fillRect(-11,hy-24,22,26);ctx.fillStyle=S.trim;ctx.fillRect(-11,hy-2,22,4);ctx.fillRect(-11,hy-24,22,3);
     ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.strokeRect(-11,hy-24,22,26);
     ctx.fillStyle=m.team?'#ff8a3a':'#b06aff';ctx.beginPath();ctx.ellipse(Math.sin(t*6+m.seed)*2,hy-34,5,11,Math.sin(t*6+m.seed)*0.2,0,7);ctx.fill();
+    if(fought==='hurt'){ctx.strokeStyle='#f4efe2';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-14,-size*0.86);ctx.lineTo(10,-size*0.7);ctx.moveTo(10,-size*0.86);ctx.lineTo(-12,-size*0.72);ctx.stroke();   // a crossed bandage on his face
+      ctx.fillStyle='#4a2a5a';ctx.globalAlpha=0.6;ctx.beginPath();ctx.ellipse(8,-size*0.74,6,5,0,0,7);ctx.fill();ctx.globalAlpha=1;            // and a black eye
+      if((time%2.6)<0.5){ctx.font='20px Bangers, Arial';ctx.textAlign='center';ctx.lineWidth=4;ctx.strokeStyle='#000';ctx.fillStyle='#ffe14a';ctx.strokeText('ow',26,-size*1.25);ctx.fillText('ow',26,-size*1.25);}}
     ctx.restore();
     // music notes float up from the horns while the song plays
     if(HS.ph==='show'&&T&&t>T.a0&&t<T.end&&m.r<2&&Math.random()<0.012)HS.fx.push({note:true,x:x,y:y-size*1.1,vx:(Math.random()-0.5)*20,vy:-50,l:1.4,L:1.4,g:0,drag:1,c:'#ffe14a'});
@@ -409,7 +429,7 @@ function hsDrawCheer(t,ex,beat){const T=HS.T,size=96;
     if(HS.ph==='exit'){if(m.ex0==null)m.ex0={x,y};const k=Math.max(0,ex-m.exitD);x=m.ex0.x+m.side*(k*k*160+k*120);y=m.ex0.y+(m.i===5&&k<0.6?k*120:m.i===5?72:0);view='side';flip=m.side<0;pose='run';spd=0.7;
       if(x<-80||x>W+80)continue;}
     const S=STYLE_OF(m.team);ctx.save();
-    // the toss: on the last note the top cheerleader flies up, her head pops off and comes back down
+    // the toss: on the last note the top cheerleader flies up, their head pops off and comes back down
     let headOff=false,hx=0,hy=0;
     if(T&&HS.ph==='show'&&m.i===5&&t>=T.final&&p.pyr>=1){const k=t-T.final;if(k<1.3){airborne=Math.sin(Math.min(1,k/1.3)*Math.PI)*170;rot=k*Math.PI*2/1.3;}
       if(k>0.35&&k<2.3){headOff=true;const hk=(k-0.35)/1.95;hx=Math.sin(hk*Math.PI*2)*30;hy=-airborne-size*0.86-Math.sin(hk*Math.PI)*230;}}
@@ -419,17 +439,11 @@ function hsDrawCheer(t,ex,beat){const T=HS.T,size=96;
       if(t>=T.brk&&t<T.b0){const bb=(t-T.brk)/T.bt;pose='zombie';spd=0.35;view='front';ctx.translate(Math.sin(bb*Math.PI)*8,0);}
       else{m.danceT=m.danceT||0;D=danceRig(m,size*0.4);ctx.translate(Math.max(-30,Math.min(30,D.dx||0)),0);pose=D.pose;view=D.view;flip=D.flip;st=D.dj&&D.dj.la&&D.dj.la[0]>2?'up':'wave';}}
     const lim=headOff?{la:1,ra:1,ll:1,rl:1,head:0}:m.limbs;
-    drawZombie(ctx,0,0,size,{team:S,body:'wr',view,flip,phase:HS.ph==='exit'?ex*10+m.i:t*8+m.i,speed:spd,limbs:lim,pose,num:m.num,t:time,seed:m.i+11,ball:false,dj:D&&D.dj});
-    // pompoms
-    if(D&&D.pose==='dance'){const T2=STYLE_OF(m.team);for(const s2 of [-1,1]){const hp=danceHand(D,s2,size,'wr');if(!hp)continue;   // pompoms stay in their hands through every move
-      for(let k=0;k<10;k++){const a=k/10*6.28;ctx.fillStyle=k%2?T2.trim:T2.jersey;ctx.beginPath();ctx.arc(hp[0]+Math.cos(a)*8,hp[1]+Math.sin(a)*8,6.5,0,7);ctx.fill();}}}
-    else if(view==='front'){const T2=STYLE_OF(m.team),up=p.pyr>=1||t>=(T?T.final:1e9)||st==='up'?1:0,b=Math.sin(time*10+m.i)*6;
-      for(const s2 of [-1,1]){const px=s2*size*(up?0.3:0.42),py=(up?-size*1.08:-size*0.5)+b*(s2>0?1:-1);
-        for(let k=0;k<10;k++){const a=k/10*6.28;ctx.fillStyle=k%2?T2.trim:T2.jersey;ctx.beginPath();ctx.arc(px+Math.cos(a)*8,py+Math.sin(a)*8,6.5,0,7);ctx.fill();}}}
+    const cl=cheerSquad(m.team)[Math.floor(m.i/2)],sz=size*(0.97+(cl.size-1)*0.35)/cl.size;   // keep the pyramid stackable: sizes vary less here
+    const up=view==='front'&&!D&&(p.pyr>=1||t>=(T?T.final:1e9)||st==='up');
+    drawCheerleader(ctx,sz,m.team,cl,{view,flip,phase:HS.ph==='exit'?ex*10+m.i:t*8+m.i,speed:spd,limbs:lim,pose,D,up,bob:Math.sin(time*10+m.i)*6});
     ctx.restore();
-    if(headOff){ctx.save();ctx.translate(x+hx,y+hy);ctx.rotate(t*9);ctx.fillStyle=S.skin;ctx.beginPath();ctx.arc(0,0,17,0,7);ctx.fill();ctx.strokeStyle='#1b1a17';ctx.lineWidth=3;ctx.stroke();
-      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-6,-3,5,0,7);ctx.arc(6,-2,4,0,7);ctx.fill();ctx.fillStyle='#1b1a17';ctx.beginPath();ctx.arc(-6,-3,2,0,7);ctx.arc(6,-2,2,0,7);ctx.fill();
-      ctx.beginPath();ctx.arc(0,6,6,0,Math.PI);ctx.fill();ctx.restore();
+    if(headOff){drawCheerHead(ctx,x+hx,y+hy,size,STYLE_OF(m.team),cheerSquad(m.team)[Math.floor(m.i/2)],time,t*9);
       if(t-T.final>0.6&&t-T.final<1.4){ctx.save();ctx.font='34px Bangers, Arial';ctx.textAlign='center';ctx.lineWidth=6;ctx.strokeStyle='#1b0d05';ctx.fillStyle='#9dff57';ctx.strokeText('HEADS UP!',x,y-size*2.6);ctx.fillText('HEADS UP!',x,y-size*2.6);ctx.restore();}}
   }
 }

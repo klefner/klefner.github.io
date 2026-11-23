@@ -261,9 +261,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script>// Testing aid: add ?debug to the address to list any script errors on screen.
 window.__errs=[];addEventListener('error',e=>{__errs.push((e.message||'error')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);if(/[?&]debug/.test(location.search)){let d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#300;color:#fbb;font:12px monospace;padding:4px;max-height:30%;overflow:auto';document.body.appendChild(d);}d.textContent=__errs.join('\n');}});</script>
-<script src="models.js?v=0.13.4"></script>
+<script src="models.js?v=0.13.5"></script>
 <script>
-const VERSION='0.13.4';
+const VERSION='0.13.5';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -392,7 +392,7 @@ function audioInit(){annUnlock();
 function noiseBuf(dur){const n=Math.max(1,Math.floor(AC.sampleRate*dur)),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;return b;}
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec);}
 // ===== recorded sound clips (sounds/*.mp3); synthesized sounds are the fallback =====
-const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,chew:4,swallow:2,brains:1,laugh:1,quip:6,halfq:4,ooh:2,aww:2,boo:2,yeah:2,eww:2,gogo:1,chant_brains:1,chant_def:1,laughc:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0,ghost:5,anthem:0,finale:0},raw:{},buf:{},bags:{},last:{}};
+const SND={groups:{hit:6,splat:6,burst:2,bone:7,groan:9,grunt:8,snarl:5,chomp:6,chew:4,swallow:2,brains:1,laugh:1,quip:6,halfq:4,ooh:2,aww:2,boo:2,yeah:2,eww:2,gogo:1,chant_brains:1,chant_def:1,laughc:1,cheer_td:0,cheer_small:0,crowd_amb:0,applause:0,ghost:5,ahem:3,anthem:0,finale:0},raw:{},buf:{},bags:{},last:{}};
 function sndNames(){const L=[];for(const k in SND.groups){const n=SND.groups[k];if(n)for(let i=1;i<=n;i++)L.push(k+i);else L.push(k);}return L;}
 for(const n of sndNames())fetch('sounds/'+n+'.mp3').then(r=>r.ok?r.arrayBuffer():null).then(b=>{if(b){SND.raw[n]=b;decodeSnd(n);}}).catch(()=>{});
 function decodeSnd(n){if(!AC||!SND.raw[n]||SND.buf[n])return;const b=SND.raw[n];SND.raw[n]=null;
@@ -680,12 +680,17 @@ function annUnlock(){if(!ANN.idx&&!ANN.loading)annLoad();}
 function annOn(){if(AC&&AC.state!=='running')try{AC.resume();}catch(e){}return ANN.idx&&settings.sound&&settings.ann!==false&&AC;}
 function annCut(){const c=ANN.cur;ANN.cur=null;if(c&&c.src){try{c.g.gain.setTargetAtTime(0,AC.currentTime,0.02);c.src.stop(AC.currentTime+0.08);}catch(e){}}}
 function annStop(){ANN.q=[];annCut();}
+// A quieter announcer: about a third of the routine calls go unspoken (the ticker still shows them), calls go stale fast
+// so the voice never talks about a play that's already over, and big moments (pri 3 and up) always play.
+const ANN_SKIP=0.33;
 function annSay(text,pri,voice){
   if(!annOn())return;pri=pri||2;voice=voice||'pbp';const e=ANN.idx[annKey(text)];if(!e)return;
-  const it={e,pri,voice,born:now_s(),ttl:voice==='color'?4.5:[0,1.3,1.8,2.8,6][Math.min(4,pri)]};
-  const t=now_s(),stale=ANN.cur&&voice==='pbp'&&pri>=2&&pri===ANN.cur.pri&&t-ANN.cur.start>0.9;   // the play moved on: cut the old call
+  if(pri<3&&Math.random()<ANN_SKIP)return;
+  if(pri<3&&voice==='color'&&ANN.cur)return;   // color talk never queues behind another line
+  const it={e,pri,voice,born:now_s(),ttl:voice==='color'?2.5:[0,0.8,1.1,2.4,6][Math.min(4,pri)]};
+  const t=now_s(),stale=ANN.cur&&voice==='pbp'&&pri>=2&&pri===ANN.cur.pri&&t-ANN.cur.start>0.6;   // the play moved on: cut the old call
   if(ANN.cur&&(pri>ANN.cur.pri||stale||(ANN.cur.voice==='color'&&voice==='pbp'&&pri>=2))){ANN.q=ANN.q.filter(x=>x.pri>=pri);ANN.q.unshift(it);annCut();annNext();return;}
-  ANN.q.push(it);ANN.q.sort((a,b)=>b.pri-a.pri);if(ANN.q.length>3)ANN.q.length=3;
+  ANN.q.push(it);ANN.q.sort((a,b)=>b.pri-a.pri);if(ANN.q.length>2)ANN.q.length=2;
   if(!ANN.cur)annNext();}
 function annNext(){
   const t=now_s();if(t<ANN.busyUntil){clearTimeout(ANN.wait);ANN.wait=setTimeout(annNext,(ANN.busyUntil-t)*1000+30);return;}ANN.q=ANN.q.filter(x=>t-x.born<x.ttl);const it=ANN.q.shift();if(!it){ANN.cur=null;return;}
@@ -724,7 +729,14 @@ const CALLS={
   lead:['{team} out in front.','The {team} have the lead.'],tied:["We're all tied up!",'Tie game!'],
   half:["That's halftime!"],final:['And that is the final whistle!'],};
 function leadCall(pri){const [a,b]=G.score;if(a===b)call('tied',{},pri);else call('lead',{team:TEAMS[a>b?0:1].name},pri);}
-function call(key,o,pri,voice){const a0=key.split('.').reduce((a,k)=>a&&a[k],CALLS);if(!a0)return;const arr=heFree(a0,o&&o.n);if(!arr.length)return;const t=fill(annPick(arr===a0?key:key+'~w',arr),o||{});tick(t,voice==='color');annSay(t,pri,voice);}
+function annDur(t){const e=ANN.idx&&ANN.idx[annKey(t)];return e?e[2]:9;}
+function call(key,o,pri,voice){const a0=key.split('.').reduce((a,k)=>a&&a[k],CALLS);if(!a0)return;const arr=heFree(a0,o&&o.n);if(!arr.length)return;
+  let t=fill(annPick(arr===a0?key:key+'~w',arr),o||{});
+  if(mode==='live'&&annDur(t)>1.6){const sh=arr.map(x=>fill(x,o||{})).filter(x=>annDur(x)<=1.6);if(sh.length)t=pick(sh);}   // mid-play, the short version
+  tick(t,voice==='color');annSay(t,pri,voice);}
+// Now and then the announcer laughs at the carnage, catches himself, and clears his throat.
+function annSlip(){if(!G||!annOn()||ANN.cur||ANN.q.length||time-(G.slipAt||-999)<120)return false;G.slipAt=time;
+  const s=playS('ahem',0.95,1);if(!s)return false;ANN.busyUntil=now_s()+2.6;musicDuck(true);setTimeout(()=>musicDuck(false),2500);tick('Heh heh... ahem. Excuse me.',true);return true;}
 function tick(t,col){if(!G)return;G.ticker.push({t,life:4.5,col});if(G.ticker.length>3)G.ticker.shift();}
 // ===== between-play commentary: situation-aware lines, the most specific one that fits wins =====
 // c = what just happened (see commCtx). pri: higher = more specific. tone: how it is recorded. Lines never repeat in a game.
@@ -1199,7 +1211,7 @@ function removeLimb(p,k){
   bloodBurst(p.x,p.y,26,a,1.2,9);bloodBurst(p.x,p.y,10,a+Math.PI,0.6,5);
   p.squirt=k==='head'?1.4:0.9;p.squirtSide=k[1]==='a'?(k==='la'?-1:1):(k==='ll'?-1:1);p.squirtHead=k==='head';
   shake(k==='head'?9:5);sfx.pop();
-  {const l=pickFor(LINES[kind],p.name);if(l)announce(l.split('{n}').join(p.name),kind==='head'?3:(G.ball&&G.ball.carrier===p?2:1));}if(G.play)G.play.callLimbs=(G.play.callLimbs||0)+1;
+  {const l=pickFor(LINES[kind],p.name);if(l)announce(l.split('{n}').join(p.name),kind==='head'?3:(G.ball&&G.ball.carrier===p?2:1));}if(Math.random()<0.12){const g=G;setTimeout(()=>{if(G===g)annSlip();},1900);}if(G.play)G.play.callLimbs=(G.play.callLimbs||0)+1;
   if(k!=='head'&&!p.limbs.la&&!p.limbs.ra&&!p.limbs.ll&&!p.limbs.rl){   // no limbs left: the bats carry him off; he's back after the next change of possession
     {const g=G;setTimeout(()=>{if(G&&G===g&&!p.out)knockOut(p,'limbless');},350);}}
   if(k==='head'&&G.play)G.play.headOff=1;
@@ -2631,20 +2643,30 @@ function drawStands(){
     if(boo){ctx.save();ctx.globalAlpha=Math.min(1,CROWD.boo[side]);ctx.font='20px Bangers, Arial';ctx.fillStyle='#ff6a5a';ctx.textAlign='center';
       for(let i=0;i<3;i++){const yy=HUD+120+i*260+Math.sin(time*3+i)*20;ctx.fillText('BOO!',x0+SW/2,yy);}ctx.restore();}
     drawSquad(side);}}
+// ===== each team's own cheer squad (makeCheerSquad in models.js): the same faces in the stands, on the field and at halftime
+const SQUADS={};
+function cheerSquad(side){const T=TEAMS[side]||{},sp=STYLE_OF(side).species,k=(T.name||'side'+side)+'|'+sp;return SQUADS[k]||(SQUADS[k]=makeCheerSquad(T.name||'side'+side,sp,3));}
+function teamLetter(side){const w=((TEAMS[side]&&TEAMS[side].name)||'R').split(' ').filter(x=>x&&!/^the$/i.test(x));return (w[w.length-1]||'R')[0].toUpperCase();}
+// one cheerleader at the canvas origin (feet), with pompoms in team colours. o: view, flip, pose, D (dance rig), speed, phase, limbs, up, bob
+function drawCheerleader(c,size,side,cl,o){const sz=size*cl.size,T=STYLE_OF(side),D=o.D,L=o.limbs||{la:1,ra:1,ll:1,rl:1,head:1};
+  drawZombie(c,0,0,sz,{team:T,cheer:cl,letter:teamLetter(side),body:cl.build,view:o.view||'front',flip:o.flip||false,phase:o.phase||0,speed:o.speed==null?0.3:o.speed,limbs:L,pose:o.pose||'stand',num:'',t:time,seed:cl.seed,ball:false,
+    dj:D&&D.dj,arms:D&&D.die&&D.die.arms,knee:D&&D.die&&D.die.knee,slump:D&&D.die&&D.die.slump,noShadow:o.noShadow});
+  const pr=Math.max(3.5,sz*0.085);
+  for(const s2 of [-1,1]){if(!(s2<0?L.la:L.ra))continue;const hp=D&&danceHand(D,s2,sz,cl.build);
+    const px=hp?hp[0]:s2*sz*(o.up?0.3:0.34),py=hp?hp[1]:(o.up?-sz*1.08:-sz*0.55)+(o.bob||0)*(s2>0?1:-1);
+    for(let k=0;k<9;k++){const a=k/9*6.28+time*2*s2;c.fillStyle=k%2?T.trim:T.jersey;c.beginPath();c.arc(px+Math.cos(a)*pr,py+Math.sin(a)*pr,pr*0.85,0,7);c.fill();}}}
 function drawSquad(side){                          // three cheerleaders at the front of each stand
   if(fcOn(side))return;                             // they're down on the field right now
   const T=STYLE_OF(side),on=CHEER.cur&&CHEER.cur.side===side,sq=CHEER.squads[side]||(CHEER.squads[side]={routine:makeRoutine(true),danceT:0});
   if(on){sq.danceT+=1/60;if(sq.danceT>3.8){sq.danceT=0;sq.routine=makeRoutine(true);}}
   const size=46,x=side?W-SW/2:SW/2;
-  for(let i=0;i<3;i++){const y=HUD+FH*(0.38+i*0.14);const m={team:side,idx:2,danceT:sq.danceT+i*0.04,routine:sq.routine,dance:1};
+  const sqd=cheerSquad(side);
+  for(let i=0;i<3;i++){const y=HUD+FH*(0.38+i*0.14),cl=sqd[i],m={team:side,idx:2,danceT:sq.danceT*cl.speed+i*0.04,routine:sq.routine,dance:1};
     ctx.fillStyle=on?'rgba(255,225,120,0.35)':'rgba(255,255,255,0.12)';ctx.beginPath();ctx.ellipse(x,y+2,SW*0.46,9,0,0,7);ctx.fill();
     ctx.fillStyle='#120b18';ctx.fillRect(x-SW/2+2,y-size*1.15,SW-4,size*1.2);ctx.globalAlpha=1;
     ctx.save();ctx.translate(x,y);let pose='stand',D=null;
-    if(on){D=danceRig(m,size*0.4);D.dx=Math.max(-SW*0.2,Math.min(SW*0.2,D.dx||0));ctx.translate(D.dx,0);pose=D.pose;}else ctx.translate(Math.sin(time*2+i)*1.5,0);
-    drawZombie(ctx,0,0,size,{team:T,body:'wr',view:D?D.view:'front',flip:D?D.flip:false,phase:time*6+i,speed:0.3,limbs:{la:1,ra:1,ll:1,rl:1,head:1},pose,num:'',t:time,seed:i+side*5,ball:false,dj:D&&D.dj,arms:D&&D.die&&D.die.arms,knee:D&&D.die&&D.die.knee,slump:D&&D.die&&D.die.slump});
-    const b=on?0:Math.sin(time*2+i)*1.5;
-    for(const s2 of [-1,1]){const hp=D&&danceHand(D,s2,size,'wr');const px=hp?hp[0]:s2*size*0.32,py=hp?hp[1]:-size*0.55+b*(s2>0?1:-1);
-      for(let k=0;k<8;k++){const a=k/8*6.28;ctx.fillStyle=k%2?T.trim:T.jersey;ctx.beginPath();ctx.arc(px+Math.cos(a)*5,py+Math.sin(a)*5,4,0,7);ctx.fill();}}
+    if(on){D=danceRig(m,size*0.4);D.dx=Math.max(-SW*0.2,Math.min(SW*0.2,D.dx||0));ctx.translate(D.dx,0);pose=D.pose;}else ctx.translate(Math.sin(time*2*cl.speed+i)*1.5,0);
+    drawCheerleader(ctx,size,side,cl,{view:D?D.view:'front',flip:D?D.flip:false,phase:time*6+i,pose,D,bob:on?0:Math.sin(time*2+i)*1.5});
     ctx.restore();}}
 function cheerStart(){                            // queue both squads for this break, the side that needs it most first
   if(!G||!G.play)return;const off=G.poss,toGo=off===0?110-G.los:G.los-10;
@@ -2688,10 +2710,10 @@ function fieldCheerUpdate(){
     const key=w+':'+(w==='red'?Math.round(G.los)+':'+Math.round(G.ball&&G.ball.y||0):'');if(!S.tg||(S.key!==key&&!(w==='red'&&mode==='live'))){S.want=w;S.key=key;S.tg=fcTargets(side,w);}   // a new spot each play, never mid-play
     else if(w==='td')S.tg=fcTargets(side,w);                    // at a touchdown they keep to what the camera shows
     let home=0;
-    S.m.forEach((m,i)=>{const t=S.tg[i],dx=t.x-m.x,dy=t.y-m.y,d=Math.hypot(dx,dy),sp=w==='td'?11:7;
+    S.m.forEach((m,i)=>{const t=S.tg[i],dx=t.x-m.x,dy=t.y-m.y,d=Math.hypot(dx,dy),cl=cheerSquad(side)[i],sp=(w==='td'?11:7)*(0.55+0.45*cl.speed);
       if(!m.moving&&d<1.5&&d>0.02){const k=Math.min(1,2*dt/d);m.x+=dx*k;m.y+=dy*k;}               // a small drift: keep dancing
       if(d>0.25&&(m.moving||d>=1.5)){const k=Math.min(1,sp*dt/d);m.vx=dx*k/dt;m.vy=dy*k/dt;m.x+=dx*k;m.y+=dy*k;m.moving=true;}
-      else{m.vx=m.vy=0;m.moving=false;home++;m.danceT+=dt;if(m.danceT>3.8){m.danceT=0;m.routine=makeRoutine(true);}}});
+      else{m.vx=m.vy=0;m.moving=false;home++;m.danceT+=dt*cl.speed;if(m.danceT>3.8){m.danceT=0;m.routine=makeRoutine(true);}}});
     if(!w&&home===3)S.on=false;}}                                  // back off the field: gone until the next time
 function drawFieldCheer(){
   if(!G)return;const size=SS*2.75*0.85,all=[];
@@ -2703,10 +2725,7 @@ function drawFieldCheer(){
     let pose='run',view='front',flip=false,D=null;
     if(m.moving){const sx=m.vy,sy=-m.vx;if(Math.abs(sx)>Math.abs(sy)){view='side';flip=sx<0;}else view=sy<0?'back':'front';}
     else{D=danceRig({team:side,idx:2,danceT:m.danceT,routine:m.routine,dance:1},size*0.4);D.dx=Math.max(-size*0.4,Math.min(size*0.4,D.dx||0));ctx.translate(D.dx,D.dy||0);pose=D.pose;view=D.view;flip=D.flip;}
-    drawZombie(ctx,0,0,size,{team:T,body:'wr',view,flip,phase:time*9+i*2,speed:m.moving?0.9:0.3,limbs:{la:1,ra:1,ll:1,rl:1,head:1},pose,num:'',t:time,seed:i+side*5,ball:false,
-      dj:D&&D.dj,arms:D&&D.die&&D.die.arms,knee:D&&D.die&&D.die.knee,slump:D&&D.die&&D.die.slump});
-    for(const s2 of [-1,1]){const hp=D&&danceHand(D,s2,size,'wr');const px=hp?hp[0]:s2*size*0.32,py=hp?hp[1]:-size*0.55+Math.sin(time*14+i+s2)*3;
-      for(let k=0;k<8;k++){const a=k/8*6.28;ctx.fillStyle=k%2?T.trim:T.jersey;ctx.beginPath();ctx.arc(px+Math.cos(a)*size*0.09,py+Math.sin(a)*size*0.09,size*0.075,0,7);ctx.fill();}}
+    drawCheerleader(ctx,size,side,cheerSquad(side)[i],{view,flip,phase:time*9+i*2,speed:m.moving?0.9:0.3,pose,D,noShadow:true,bob:Math.sin(time*14+i)*3});
     ctx.restore();}}
 // ===== SPECIAL SKILLS: one per zombie type, by role and species; usable once every 3 plays (R key / SKILL button) =====
 // On defense every player has his species' tackling skill. The computer uses skills too, at most one per team per play.
@@ -2943,9 +2962,9 @@ function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
 </script>
-<script src="field.js?v=0.13.4"></script>
-<script src="halftime.js?v=0.13.4"></script>
-<script src="ceremony.js?v=0.13.4"></script>
-<script src="season.js?v=0.13.4"></script>
+<script src="field.js?v=0.13.5"></script>
+<script src="halftime.js?v=0.13.5"></script>
+<script src="ceremony.js?v=0.13.5"></script>
+<script src="season.js?v=0.13.5"></script>
 </body>
 </html>
