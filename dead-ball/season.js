@@ -5,7 +5,7 @@
 // Round 3: stats are skulls (0 to 5) with hidden Crypt Rank caps, Player Power, the Graveyard market (corpses fit to positions, with looks,
 // idle animations and quips), women zombies across the league, the bench that fills in when a starter goes down, and letting zombies go.
 // Round 4: deaths that leave a lasting mark, injuries the Stitch Shop sews back on, the Witch Doctor, lifespan, and Keep, the Mausoleum or the Sacrifice.
-// Later rounds add send-offs, playoffs, the draft, twists and the Scrapbook.
+// Later rounds add the draft, twists and the Scrapbook.
 
 const CAREER_KEY='rotball_career',CAREER_V=1;
 const DIVS=['Crypt Division','Bog Division'];
@@ -171,9 +171,35 @@ function lgWeek(userResult){const c=CAREER,w=c.week,res=[];
   res.forEach(lgApply);c.teams.forEach(lgGM);c.results.push(res);c.week++;careerSave();return res;}
 function standings(div){return CAREER.teams.filter(t=>LEAGUE[t.id].div===div).sort((a,b)=>(b.w-a.w)||((b.pf-b.pa)-(a.pf-a.pa))||(b.power-a.power));}
 function seasonOver(){return CAREER.week>=CAREER.schedule.length;}
+// ----- the playoffs: the top four in each division go on. Wild Card (1st hosts 4th, 2nd hosts 3rd), the Graveyard Championship
+// (the division final, the higher seed hosts), then the Rot Bowl between the two division champions (the better record hosts). -----
+const PO_NAME=['Wild Card','Graveyard Championship','Rot Bowl'],PO_BONES=[150,250,500];
+const poWin=g=>g.hs>g.as?g.h:g.a,poLose=g=>g.hs>g.as?g.a:g.h,poPlayed=g=>g.hs!=null;
+function poStart(){const c=CAREER;if(c.po)return c.po;
+  c.po={round:0,seeds:[0,1].map(d=>standings(d).slice(0,4).map(t=>t.id)),games:[]};c.po.games.push(poPairs(c.po,0));careerSave();return c.po;}
+function poSeed(po,id){for(const s of po.seeds){const i=s.indexOf(id);if(i>=0)return i+1;}return 0;}
+function poBetter(a,b){const T=CAREER.teams,x=T[a],y=T[b];return ((y.w-x.w)||((y.pf-y.pa)-(x.pf-x.pa))||(y.power-x.power))<=0;}
+function poPairs(po,r){if(r===0)return [0,1].flatMap(d=>{const s=po.seeds[d];return [{h:s[0],a:s[3],d},{h:s[1],a:s[2],d}];});
+  if(r===1)return [0,1].map(d=>{const w=po.games[0].filter(g=>g.d===d).map(poWin).sort((a,b)=>poSeed(po,a)-poSeed(po,b));return {h:w[0],a:w[1],d};});
+  const [x,y]=po.games[1].map(poWin);return [poBetter(x,y)?{h:x,a:y,d:-1}:{h:y,a:x,d:-1}];}
+const poLive=()=>!!(CAREER.po&&CAREER.po.round<3);
+function poUserGame(){const po=CAREER.po;return po&&po.round<3?po.games[po.round].find(g=>g.h===0||g.a===0)||null:null;}
+// How far the Shift got: -1 missed the playoffs, 0 to 2 lost in that round, 3 won the Rot Bowl, null still alive.
+function poFate(){const po=CAREER.po;if(!po||!po.seeds.some(s=>s.includes(0)))return -1;
+  for(let r=0;r<3;r++){const g=po.games[r]&&po.games[r].find(g=>g.h===0||g.a===0);if(!g||!poPlayed(g))return null;if(poWin(g)!==0)return r;}return 3;}
+function poPay(g,r){const T=CAREER.teams,w=poWin(g),l=poLose(g),ws=Math.max(g.hs,g.as),ls=Math.min(g.hs,g.as);
+  const bw=PO_BONES[r]+Math.floor(ws/7)*BONES.td,bl=BONES.loss+Math.floor(ls/7)*BONES.td;T[w].bones+=bw;T[l].bones+=bl;
+  if(w===0)CAREER.bones+=bw;if(l===0)CAREER.bones+=bl;}
+// Play out the current round: your game's result if you're in it, simulated games for everyone else.
+function poWeek(userResult){const c=CAREER,po=c.po;if(!po||po.round>2)return null;const r=po.round,games=po.games[r];
+  for(const g of games){if(poPlayed(g))continue;const s=(g.h===0||g.a===0)&&userResult?userResult:lgSim(g.h,g.a);g.hs=s.hs;g.as=s.as;poPay(g,r);}
+  c.teams.forEach(lgGM);po.round++;if(po.round<3)po.games.push(poPairs(po,po.round));else{po.champ=poWin(games[0]);po.divChamps=po.games[1].map(poWin);}
+  careerSave();return games;}
 function careerNextSeason(){const c=CAREER;
-  c.history.push({season:c.season,champs:[0,1].map(d=>standings(d)[0].id),you:[userTeam().w,userTeam().l]});
-  c.season++;c.week=0;c.results=[];c.schedule=lgSchedule();
+  const po=c.po,fate=po?poFate():-1;
+  c.history.push({season:c.season,champs:po&&po.divChamps?po.divChamps:[0,1].map(d=>standings(d)[0].id),bowl:po&&po.champ!=null?po.champ:null,you:[userTeam().w,userTeam().l],po:fate});
+  if(fate===3)c.bowls=(c.bowls||0)+1;
+  c.season++;c.week=0;c.results=[];c.schedule=lgSchedule();delete c.po;
   for(const t of c.teams){t.w=t.l=t.pf=t.pa=0;if(t.id!==0)t.power=Math.min(99,t.power+1);}   // the whole league gets a little stronger
   for(const z of yourZombies())z.wear=(z.wear||0)+WEAR.season;lifeCheck();userTeam().power=teamPower(userTeam());   // a season of wear on your own zombies
   careerSave();}
@@ -189,7 +215,11 @@ function leagueApply(id){const d=LEAGUE[id],t=careerLoad()&&CAREER.teams[id];
 function leagueReset(){TEAMS[0]=JSON.parse(JSON.stringify(TEAMS_HOME));TEAMS[1]=JSON.parse(JSON.stringify(TEAMS_AWAY));TEAM_STYLE[0]=TEAM_STYLE[1]=null;if(typeof PITCH!=='undefined')PITCH.seed=null;}
 
 // ----- the game itself: start your week's game, and book the result when it ends -----
-function seasonPlay(){careerLoad();if(!CAREER||seasonOver())return;const opp=nextOpp(),g=userGame(CAREER,CAREER.week);
+const PO_CALL=["It's the Wild Card round! Win or go back in the ground!","The Graveyard Championship! The winner plays in the Rot Bowl!","Welcome to the ROT BOWL! One game for the whole graveyard!"];
+function seasonPlay(){careerLoad();if(!CAREER)return;
+  if(seasonOver()){const g=poUserGame();if(!g||poPlayed(g))return;const opp=g.h===0?g.a:g.h,r=CAREER.po.round;
+    leagueApply(opp);startGame();G.season={season:CAREER.season,week:CAREER.week,opp,home:g.h===0,po:r};seasonStats();annStop();announce(PO_CALL[r],3);return;}
+  const opp=nextOpp(),g=userGame(CAREER,CAREER.week);
   leagueApply(opp);startGame();G.season={season:CAREER.season,week:CAREER.week,opp,home:g.h===0};seasonStats();}
 // Season stats on the field: your zombies from their skulls, the opponent's from its Team Power (with a little spread).
 // Each side also brings its bench: when a starter is knocked out, the next bench zombie takes his slot at the next possession.
@@ -258,7 +288,8 @@ function release(id){const u=userTeam(),f=zFind(id);if(!f)return null;
 function swapIn(benchId,slot){const u=userTeam(),j=u.bench.findIndex(z=>z.id===benchId);if(j<0||u.bench[j].kind!==SLOT_KIND[slot])return false;
   const b=u.bench[j];u.bench[j]=u.squad[slot];u.squad[slot]=b;u.power=teamPower(u);careerSave();return true;}
 // The Graveyard's shelf: three to six corpses each week, from the shelves the Crypt has opened, plus one Z-team bench body.
-function yardFresh(){const c=CAREER,at=c.season*100+c.week;if(c.yard&&c.yard.at===at)return c.yard;
+function yardFresh(){const c=CAREER,at=c.season*100+c.week+(c.po?c.po.round+1:0);   // a new shelf every week, and every playoff round
+  if(c.yard&&c.yard.at===at)return c.yard;
   const cap=skullCap(),n=3+Math.floor(Math.random()*4),kinds=['brain','fresh','fresh','line','line'],list=[];
   for(let i=0;i<n;i++)list.push(zNew(i===0?'brain':i===1?'fresh':i===2?'line':lgPick(kinds),{cap}));
   list.push(zNew(lgPick(['fresh','line','brain']),{frail:1}));
@@ -311,8 +342,9 @@ function sacrificeZ(id){const f=zFind(id);if(!f||f.z.free)return null;const b=sa
   const r=removeZ(id);CAREER.bones+=b;r.bones=b;CAREER.fired=f.z.name;careerSave();return r;}
 function seasonBook(){if(!G||!G.season||G.season.booked||!careerLoad())return null;const S=G.season;S.booked=true;
   if(CAREER.season!==S.season||CAREER.week!==S.week)return null;   // this week was already played some other way
+  if(S.po!=null&&!(CAREER.po&&CAREER.po.round===S.po))return null;
   const [a,b]=G.score,r=S.home?{h:0,a:S.opp,hs:a,as:b}:{h:S.opp,a:0,hs:b,as:a};
-  const before=CAREER.bones;S.report=careerAfterGame(S);const res=lgWeek(r);S.bones=CAREER.bones-before;S.tds=Math.floor(a/7);S.won=a>b;S.res=res;return S;}
+  const before=CAREER.bones;S.report=careerAfterGame(S);const res=S.po!=null?poWeek(r):lgWeek(r);S.bones=CAREER.bones-before;S.tds=Math.floor(a/7);S.won=a>b;S.res=res;return S;}
 
 // ----- screens -----
 function seasonCSS(){if(document.getElementById('seasonCSS'))return;const s=document.createElement('style');s.id='seasonCSS';s.textContent=`
@@ -346,6 +378,7 @@ function seasonCSS(){if(document.getElementById('seasonCSS'))return;const s=docu
 .sn-bio .pw{font-family:'Bangers';font-size:40px;color:#f3c34b;letter-spacing:1px;line-height:1}
 .sn-bio .q{color:#efe6cf;font-style:italic;margin-top:6px}
 .sn-sk{letter-spacing:1px;color:#efe6cf}.sn-sk i{font-style:normal;opacity:.22}
+.sn-seed{display:inline-block;min-width:22px;color:#f3c34b;font-family:'Bangers';font-size:20px;text-align:left}
 .sn-crypt{text-align:center;font-family:'Creepster';color:#9dff57;font-size:30px;margin:-4px 0 8px;letter-spacing:1px}
 `;document.head.appendChild(s);}
 function seasonDOM(){if(document.getElementById('season'))return;seasonCSS();
@@ -362,25 +395,30 @@ function seasonOpen(){careerLoad();seasonDOM();leagueReset();annStop&&annStop();
   if(!CAREER){$('seasonH').textContent='SEASON';
     $('seasonBody').innerHTML=`<div class="sn-line">Coach the <b style="color:#f3c34b">Graveyard Shift</b> through a 12-team zombie league. Win games, earn <b style="color:#efe6cf">Bones</b>, train your zombies and sign fresh corpses from the Graveyard to build a team that's all yours, against rivals who grow every week too.<br><br>Your career saves itself after every game.</div><br>`;
     SN.menu=snMenu('menu','seasonMenu',[{label:'Start My Career',act:()=>{CAREER=careerNew();careerSave();seasonOpen();}},{label:'Main Menu',act:()=>toTitle()}]);}
-  else if(seasonOver()){seasonEndScreen();return;}
-  else{const u=userTeam(),opp=nextOpp(),g=userGame(CAREER,CAREER.week),o=CAREER.teams[opp],D=LEAGUE[opp];
+  else if(seasonOver()){poStart();if(poLive()){seasonPlayoffs();return;}seasonEndScreen();return;}
+  else{const u=userTeam(),opp=nextOpp(),g=userGame(CAREER,CAREER.week),o=CAREER.teams[opp];
     $('seasonH').textContent=`SEASON ${CAREER.season}`;
     $('seasonBody').innerHTML=`<div class="sn-head">Week ${CAREER.week+1} of ${CAREER.schedule.length} &nbsp;·&nbsp; ${recStr(u)} &nbsp;·&nbsp; <span class="sn-bones">Bones <b>${CAREER.bones.toLocaleString()}</b></span></div>
-      <div class="sn-card"><div class="sn-team" style="background:${LEAGUE[0].jersey};color:#fff"><div class="nm">${LEAGUE[0].name}</div><div class="pw">${Math.round(u.power)}</div><div class="lb">Team Power · ${recStr(u)}</div></div>
-      <div class="sn-vs">${g.h===0?'VS':'AT'}</div>
-      <div class="sn-team" style="background:${D.jersey};color:${D.trim}"><div class="nm">${D.name}</div><div class="pw">${Math.round(o.power)}</div><div class="lb">Team Power · ${recStr(o)}</div></div></div>
+      ${matchCard(opp,g.h===0)}
       <div class="sn-verdict">${favored(u.power,o.power)} ${g.h===0?'Home game.':'Road game.'}</div>${wdNews()}`;
-    const due=pendingEnd()[0],parts=yourZombies().reduce((n,z)=>n+hurtKeys(z).length,0),wdz=yourZombies().filter(z=>z.dmg&&z.dmg.length).length;
+    const due=pendingEnd()[0];
     SN.menu=snMenu('menu','seasonMenu',[
       {label:`Play Week ${CAREER.week+1}`,disabled:!!due,sub:due?`decide about ${due.name} first`:'',act:()=>seasonPlay()},
-      {label:`Time's up for ${due?due.name:''}`,hidden:!due,sub:'keep, retire to the Mausoleum, or the Sacrifice',act:()=>seasonEndOf(due.id)},{label:'Roster & Training',get sub(){return `Team Power ${Math.round(userTeam().power)} · ${CAREER.bones.toLocaleString()} Bones to spend`;},act:()=>seasonRoster()},
-      {label:'The Graveyard',get sub(){const n=yardFresh().list.length;return `${n} fresh corpse${n===1?'':'s'} this week`;},act:()=>yardOpen()},
-      {label:'The Stitch Shop',sub:parts?`${parts} part${parts===1?'':'s'} to sew back on · ${stitchTotal()} Bones`:'everyone is in one piece',act:()=>seasonStitch()},
-      {label:'The Witch Doctor',hidden:!wdOpen(),sub:wdz?`${wdz} zombie${wdz===1?'':'s'} carry deaths she can erase`:'no deaths to erase right now',act:()=>seasonWitch()},
+      ...snShops(),
       {label:'League Standings',act:()=>seasonStandings()},
       {label:'Last Week\'s Scores',hidden:!CAREER.results.length,act:()=>seasonScores(CAREER.results.length-1)},
       {label:'The Mausoleum',hidden:!((CAREER.maus||[]).length+(CAREER.fallen||[]).length),sub:'your hall of fame',act:()=>seasonMaus()},{label:'Main Menu',act:()=>toTitle()}]);}
   activeMenu=SN.menu;showOverlay('season');}
+// The places you spend Bones, the same on the week screen and in the playoffs.
+function snShops(){const due=pendingEnd()[0],parts=yourZombies().reduce((n,z)=>n+hurtKeys(z).length,0),wdz=yourZombies().filter(z=>z.dmg&&z.dmg.length).length;
+  return [{label:`Time's up for ${due?due.name:''}`,hidden:!due,sub:'keep, retire to the Mausoleum, or the Sacrifice',act:()=>seasonEndOf(due.id)},{label:'Roster & Training',get sub(){return `Team Power ${Math.round(userTeam().power)} · ${CAREER.bones.toLocaleString()} Bones to spend`;},act:()=>seasonRoster()},
+      {label:'The Graveyard',get sub(){const n=yardFresh().list.length;return `${n} fresh corpse${n===1?'':'s'} ${seasonOver()?'this round':'this week'}`;},act:()=>yardOpen()},
+      {label:'The Stitch Shop',sub:parts?`${parts} part${parts===1?'':'s'} to sew back on · ${stitchTotal()} Bones`:'everyone is in one piece',act:()=>seasonStitch()},
+      {label:'The Witch Doctor',hidden:!wdOpen(),sub:wdz?`${wdz} zombie${wdz===1?'':'s'} carry deaths she can erase`:'no deaths to erase right now',act:()=>seasonWitch()}];}
+function matchCard(opp,home){const u=userTeam(),o=CAREER.teams[opp],D=LEAGUE[opp];
+  return `<div class="sn-card"><div class="sn-team" style="background:${LEAGUE[0].jersey};color:#fff"><div class="nm">${LEAGUE[0].name}</div><div class="pw">${Math.round(u.power)}</div><div class="lb">Team Power · ${recStr(u)}</div></div>
+      <div class="sn-vs">${home?'VS':'AT'}</div>
+      <div class="sn-team" style="background:${D.jersey};color:${D.trim}"><div class="nm">${D.name}</div><div class="pw">${Math.round(o.power)}</div><div class="lb">Team Power · ${recStr(o)}</div></div></div>`;}
 function standingsHTML(){return [0,1].map(d=>`<h2>${DIVS[d]}</h2><table class="sn-tbl"><tr><th>Team</th><th>W</th><th>L</th><th>+/-</th><th>Power</th></tr>${
   standings(d).map(t=>`<tr class="${t.id===0?'you':''}"><td>${teamDot(t.id)}${LEAGUE[t.id].name}</td><td>${t.w}</td><td>${t.l}</td><td>${t.pf-t.pa>0?'+':''}${t.pf-t.pa}</td><td>${Math.round(t.power)}</td></tr>`).join('')}</table>`).join('');}
 function seasonSub(title,html,items,back,keep){seasonDOM();SN.sub=title;SN.back=back||null;$('snSubH').textContent=title;$('snSubBody').innerHTML=html;
@@ -511,19 +549,58 @@ function seasonWeekScreen(S){const pay=S.won?BONES.win:BONES.loss;
   seasonSub(S.won?'A WIN FOR THE SHIFT!':'BACK TO THE GRAVE',
     `<div class="sn-line">+${S.bones} Bones: ${pay} for the ${S.won?'win':'game'}${S.tds?` and ${S.tds*BONES.td} for ${S.tds} touchdown${S.tds>1?'s':''}`:''}.<br>Record ${recStr(userTeam())} &nbsp;·&nbsp; Bones ${CAREER.bones.toLocaleString()}${CAREER.bones>=50?'<br><i style="color:#aab79c">Spend them on training, or on fresh corpses in the Graveyard.</i>':''}</div>
      ${casualtyHTML(S.report)}<h2>Around the league</h2><div class="sn-scores">${scoresHTML(S.res,true)}</div>`,
-    [{label:seasonOver()?'See Final Standings':'Continue',act:()=>seasonOpen()},{label:'Main Menu',act:()=>toTitle()}]);}
+    [{label:seasonOver()?'On to the Playoffs':'Continue',act:()=>seasonOpen()},{label:'Main Menu',act:()=>toTitle()}]);}
+// ----- playoff screens -----
+const seedTag=id=>{const n=CAREER.po?poSeed(CAREER.po,id):0;return n?`<span class="sn-seed">${n}</span>`:'';};
+function poGameHTML(g){if(!poPlayed(g))return `${seedTag(g.h)}${teamDot(g.h)}${LEAGUE[g.h].name} <span style="color:#9dff57">vs</span> ${seedTag(g.a)}${teamDot(g.a)}${LEAGUE[g.a].name}`;
+  const w=poWin(g),l=poLose(g);return `${seedTag(w)}${teamDot(w)}<b>${LEAGUE[w].name} ${Math.max(g.hs,g.as)}</b>, ${LEAGUE[l].name} ${Math.min(g.hs,g.as)}`;}
+function bracketHTML(){const po=CAREER.po;if(!po)return '';
+  return po.games.map((gs,r)=>`<h2>${r<2?PO_NAME[r]:'The Rot Bowl'}</h2><div class="sn-scores">${
+    r<2?[0,1].map(d=>`<span style="color:#f3c34b">${DIVS[d]}</span><br>${gs.filter(g=>g.d===d).map(poGameHTML).join('<br>')}`).join('<br>'):gs.map(poGameHTML).join('<br>')}</div>`).join('');}
+const PO_NEXT=['Win and you play for the Graveyard Championship.','Win and you play in the Rot Bowl.','Win and the whole graveyard is yours.'];
+function seasonPlayoffs(){const po=CAREER.po,r=po.round,g=poUserGame(),fate=poFate(),u=userTeam(),due=pendingEnd()[0];
+  $('seasonH').textContent=`SEASON ${CAREER.season} PLAYOFFS`;
+  const head=`<div class="sn-head">${r<2?PO_NAME[r]:'The Rot Bowl'} &nbsp;·&nbsp; ${recStr(u)} &nbsp;·&nbsp; ${bonesHead()}</div>`;
+  let body,items;
+  if(g){const opp=g.h===0?g.a:g.h,o=CAREER.teams[opp];
+    body=`${head}${matchCard(opp,g.h===0)}<div class="sn-verdict">${favored(u.power,o.power)} ${g.h===0?'Home game.':'Road game.'}<br>${PO_NEXT[r]} A win pays ${PO_BONES[r]} Bones.</div>${wdNews()}`;
+    items=[{label:`Play the ${PO_NAME[r]}`,disabled:!!due,sub:due?`decide about ${due.name} first`:'',act:()=>seasonPlay()}];}
+  else{const why=fate===-1?`The ${LEAGUE[0].name} missed the playoffs this year.`:`The ${LEAGUE[0].name} went out in the ${PO_NAME[fate]}.`;
+    body=`${head}<div class="sn-line">${why} Rest up, spend your Bones, and see who takes the Rot Bowl.</div>${bracketHTML()}`;
+    items=[{label:`Watch the ${PO_NAME[r]}`,sub:'the other teams play it out',act:()=>poWatch()},
+      {label:'Skip to the Rot Bowl winner',hidden:r>=2,act:()=>{while(poLive())poWeek(null);seasonOpen();}}];}
+  $('seasonBody').innerHTML=body;
+  SN.menu=snMenu('menu','seasonMenu',[...items,...snShops(),
+    {label:'The Bracket',hidden:!g,act:()=>seasonSub('THE BRACKET',bracketHTML())},
+    {label:'League Standings',act:()=>seasonStandings()},
+    {label:'The Mausoleum',hidden:!((CAREER.maus||[]).length+(CAREER.fallen||[]).length),sub:'your hall of fame',act:()=>seasonMaus()},{label:'Main Menu',act:()=>toTitle()}]);
+  activeMenu=SN.menu;showOverlay('season');}
+// A round you're not in: the other teams play it, and you see the scores.
+function poWatch(){const r=CAREER.po.round,res=poWeek(null);
+  seasonSub(r<2?PO_NAME[r].toUpperCase():'THE ROT BOWL',`<div class="sn-scores">${res.map(poGameHTML).join('<br>')}</div>${r===2?`<div class="sn-crypt">${LEAGUE[CAREER.po.champ].name} win the Rot Bowl!</div>`:''}`,
+    [{label:'Continue',act:()=>seasonOpen()},{label:'Main Menu',act:()=>toTitle()}]);}
+const PO_WON=['ON TO THE CHAMPIONSHIP!','ON TO THE ROT BOWL!','ROT BOWL CHAMPIONS!'],PO_LOST=['ONE AND DONE','SO CLOSE','ROT BOWL RUNNERS-UP'];
+function poResultScreen(S){const r=S.po,pay=S.won?PO_BONES[r]:BONES.loss,others=S.res.filter(g=>!(g.h===0||g.a===0));
+  const line=S.won?(r===2?`The ${LEAGUE[0].name} win the Rot Bowl! Season ${S.season} belongs to you.`:`${PO_NEXT[r].replace('Win and you play','Next you play')}`):
+    `The ${LEAGUE[0].name} are out. There's always next season, and your zombies keep everything they learned.`;
+  seasonSub(S.won?PO_WON[r]:PO_LOST[r],
+    `${S.won&&r===2?'<div class="sn-crypt">☠ ROT BOWL CHAMPIONS ☠</div>':''}<div class="sn-line">${line}<br>+${S.bones} Bones: ${pay} for the ${S.won?PO_NAME[r]+' win':'game'}${S.tds?` and ${S.tds*BONES.td} for ${S.tds} touchdown${S.tds>1?'s':''}`:''}.<br>Bones ${CAREER.bones.toLocaleString()}</div>
+     ${casualtyHTML(S.report)}${others.length?`<h2>Around the playoffs</h2><div class="sn-scores">${others.map(poGameHTML).join('<br>')}</div>`:''}`,
+    [{label:'Continue',act:()=>seasonOpen()},{label:'Main Menu',act:()=>toTitle()}]);}
 function seasonEndScreen(){const u=userTeam(),st=standings(0),place=st.findIndex(t=>t.id===0)+1,ord=['','1st','2nd','3rd','4th','5th','6th'][place];
-  const champs=[0,1].map(d=>standings(d)[0]);
+  const po=CAREER.po,fate=poFate(),champ=po&&po.champ!=null?po.champ:null,divs=po&&po.divChamps?po.divChamps:[0,1].map(d=>standings(d)[0].id);
+  const you=fate===3?'and won the Rot Bowl!':fate===-1?'and missed the playoffs.':fate===2?'and lost in the Rot Bowl.':`and went out in the ${PO_NAME[fate]}.`;
   seasonSub(`SEASON ${CAREER.season} IS OVER`,
-    `<div class="sn-line">You finished <b style="color:#f3c34b">${ord}</b> in the ${DIVS[0]} at ${recStr(u)}.<br>${champs.map(t=>`${teamDot(t.id)}${LEAGUE[t.id].name} win the ${DIVS[LEAGUE[t.id].div]}`).join('<br>')}<br><i style="color:#aab79c">Playoffs and the Rot Bowl are on their way.</i></div>${standingsHTML()}`,
+    `${champ!=null?`<div class="sn-crypt">${LEAGUE[champ].name} win the Rot Bowl!</div>`:''}<div class="sn-line">You finished <b style="color:#f3c34b">${ord}</b> in the ${DIVS[0]} at ${recStr(u)}, ${you}<br>${divs.map(id=>`${teamDot(id)}${LEAGUE[id].name} won the ${DIVS[LEAGUE[id].div]} title`).join('<br>')}</div>${bracketHTML()}${standingsHTML()}`,
     [{label:`Start Season ${CAREER.season+1}`,act:()=>{careerNextSeason();seasonOpen();}},{label:'Main Menu',act:()=>toTitle()}]);}
 function seasonLabel(){const c=careerLoad();if(!c)return 'start a career in the Zombie League';const u=c.teams[0];
+  if(seasonOver()&&c.po&&c.po.round<3)return `Season ${c.season} Playoffs · ${PO_NAME[c.po.round]}`;
   return seasonOver()?`Season ${c.season} is over · ${recStr(u)}`:`Season ${c.season} · Week ${c.week+1} · ${recStr(u)}`;}
 
 // ----- hooks into the game: the end-of-game screen, and the career reset in Settings -----
 const OVER_ITEMS=overMenu.items;
 {const base=gameOver;gameOver=function(){base();
-  if(G&&G.season){const S=seasonBook();overMenu.items=[{label:'Season Results',act:()=>{if(S)seasonWeekScreen(S);else seasonOpen();}},{label:'Main Menu',act:()=>toTitle()}];
+  if(G&&G.season){const S=seasonBook();overMenu.items=[{label:'Season Results',act:()=>{if(S)(S.po!=null?poResultScreen:seasonWeekScreen)(S);else seasonOpen();}},{label:'Main Menu',act:()=>toTitle()}];
     if(S)$('overStats').innerHTML+=`<br>Season record: ${recStr(userTeam())} &nbsp;·&nbsp; +${S.bones} Bones`;}
   else overMenu.items=OVER_ITEMS;
   overMenu.i=0;overMenu.render();};}
