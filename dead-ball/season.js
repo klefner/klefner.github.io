@@ -300,10 +300,15 @@ function plaqueOf(z,how){return {name:z.name,num:z.num,kind:z.kind,look:z.look,b
 // Take a zombie off the team. A starter's spot goes to a bench zombie of the same kind, or to a free Z-team walk-on.
 function removeZ(id){const u=userTeam(),f=zFind(id);if(!f)return null;let walkOn=null;
   if(f.where==='bench')u.bench.splice(f.i,1);
-  else{const j=benchFor(f.i);if(j>=0)u.squad[f.i]=u.bench.splice(j,1)[0];else{u.squad[f.i]=null;walkOn=zNew(SLOT_KIND[f.i],{frail:1});walkOn.num=freeNum({squad:u.squad.filter(Boolean),bench:u.bench},walkOn.kind);u.squad[f.i]=walkOn;}}
+  else{const j=benchFor(f.i);if(j>=0)u.squad[f.i]=u.bench.splice(j,1)[0];else{u.squad[f.i]=null;walkOn=zNew(SLOT_KIND[f.i],{frail:1});walkOn.free=1;walkOn.num=freeNum({squad:u.squad.filter(Boolean),bench:u.bench},walkOn.kind);u.squad[f.i]=walkOn;}}
   u.power=teamPower(u);return {z:f.z,walkOn,slot:f.where==='squad'?f.i:-1};}
 function retireZ(id){const f=zFind(id);if(!f)return null;(CAREER.maus||(CAREER.maus=[])).push(plaqueOf(f.z,'retired'));const r=removeZ(id);careerSave();return r;}
-function sacrificeZ(id){const f=zFind(id);if(!f)return null;(CAREER.fallen||(CAREER.fallen=[])).push(plaqueOf(f.z,'sacrificed'));const r=removeZ(id);CAREER.fired=f.z.name;careerSave();return r;}
+// The Sacrifice pays Bones back: 20% to 60% of what the zombie is worth, more for a spry, healthy one, less for a worn-out has-been.
+// A free Z-team walk-on pays nothing (or you could farm them). The team plays fired up next game either way.
+function sacBones(z){if(!z||z.free)return 0;const lf=z.kept?0:Math.max(0,Math.min(1,zLife(z)/lifeMax(z))),pen=Math.min(1,zPenalty(z)/30);
+  return Math.max(5,Math.round(zValue(z)*(0.2+0.28*lf+0.12*(1-pen))));}
+function sacrificeZ(id){const f=zFind(id);if(!f||f.z.free)return null;const b=sacBones(f.z),pl=plaqueOf(f.z,'sacrificed');pl.bones=b;(CAREER.fallen||(CAREER.fallen=[])).push(pl);
+  const r=removeZ(id);CAREER.bones+=b;r.bones=b;CAREER.fired=f.z.name;careerSave();return r;}
 function seasonBook(){if(!G||!G.season||G.season.booked||!careerLoad())return null;const S=G.season;S.booked=true;
   if(CAREER.season!==S.season||CAREER.week!==S.week)return null;   // this week was already played some other way
   const [a,b]=G.score,r=S.home?{h:0,a:S.opp,hs:a,as:b}:{h:S.opp,a:0,hs:b,as:a};
@@ -436,8 +441,8 @@ function seasonEndOf(id,armed){const f=zFind(id);if(!f){seasonOpen();return;}con
   if(!z.kept)items.push({label:'Keep',sub:`plays on at −${KEEP_POW} Power and can't train any more`,act:()=>{keepZ(z);sfx.groan&&sfx.groan();seasonPlayer(id,true);}});
   items.push({label:armed==='r'?'<b>Into the Mausoleum?</b> Press again':'Retire to the Mausoleum',sub:armed==='r'?fill||'a plaque in your hall of fame':`a plaque in your hall of fame${fill?' · '+fill:''}`,
     act:()=>{if(armed!=='r'){seasonEndOf(id,'r');return;}const r=retireZ(id);if(r)seasonRetired(r);}});
-  items.push({label:armed==='s'?'<b>The Sacrifice?</b> Press again':'The Sacrifice',sub:armed==='s'?fill||'gone for good':`gives everything for the team: the Shift play fired up next game${fill?' · '+fill:''}`,
-    act:()=>{if(armed!=='s'){seasonEndOf(id,'s');return;}const r=sacrificeZ(id);if(r)seasonSacrificed(r);}});
+  if(!z.free)items.push({label:'The Sacrifice',sub:`Madame Morgue pays ${sacBones(z)} Bones at the Altar, and the team plays fired up next game`,
+    act:()=>{if(typeof altarGo==='function'){sfx.select&&sfx.select();yardOpen();altarGo(id);return;}const r=sacrificeZ(id);if(r)seasonSacrificed(r);}});
   items.push({label:'Back',act:()=>seasonOpen()});
   seasonSub(z.kept?`${z.name.toUpperCase()}, KEPT`:`TIME'S UP FOR ${z.name.toUpperCase()}`,`<div class="sn-head">${slot<0?'On the bench':POS[slot]} &nbsp;·&nbsp; ${bonesHead()}</div>${bioHTML(z,healthHTML(z))}
     <div class="sn-line">${z.kept?'Still shambling. When you\'re ready, send this old-timer off.':`${z.name}'s lifespan has run out. The choice is yours.`}</div>`,items,()=>seasonOpen(),!!armed);

@@ -10,7 +10,7 @@ const Y_SLOTS=[[0,178],[0,362],[0,546],[1,122],[1,362],[1,600],[2,205],[2,518]];
 const Y_STONES=['round','pointed','cross','obelisk','slab','celtic','round','slab'];
 const Y_METHODS=['claw','burst','topple','rise','gopher','coffin','corkscrew'];
 const Y_TREE={x:58,base:790,top:330};
-const YD={on:false,t:0,graves:[],hover:-1,sel:-1,ev:[],evNext:1.2,parts:[],msg:null,ask:null,tap:{i:-1,t:-9},bag:[],sc:null,bg:null,mood:0};
+const YD={view:0,pan:0,on:false,t:0,graves:[],hover:-1,sel:-1,ev:[],evNext:1.2,parts:[],msg:null,ask:null,tap:{i:-1,t:-9},bag:[],sc:null,bg:null,mood:0};
 // burial clothes: a dark, frayed funeral suit and no helmet (its own helmet colour keeps the skin cache apart from the uniform)
 const Y_BURIAL=Object.assign({},ZSTYLE.zombie,{jersey:'#403d47',jerseyDk:'#28262d',trim:'#d4cdb9',stripe:'#d4cdb9',pants:'#35323b',pantsDk:'#211f25',sock:'#1d1c21',helmet:'#5a2389'});
 function yRng(seed){let a=seed>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
@@ -21,7 +21,7 @@ function yGnarlOverride(){if(typeof window!=='undefined'&&window.__YARD_G!=null)
 
 // ----- the scene: one per week, the same every time you visit that week
 function yardScene(){const c=CAREER,seed=c.season*1009+c.week*31+7,r=yRng(seed),ov=yGnarlOverride();
-  const g=ov!=null?ov:yClamp(r()*0.8+c.week/12*0.3,0,1);
+  const g=ov!=null?ov:yClamp(r()*0.45+Math.min(1,c.week/11)*0.55,0,1);   // early weeks lean pristine, late ones gnarly
   const S={seed,g,stars:[],trees:[],clouds:[],tufts:[],bones:[],flowers:[],cracks:[],lanterns:[],fog:[],stones:[]};
   for(let i=0;i<Math.round(110*(1-g)+15);i++)S.stars.push([r()*YW,r()*Y_HZ*0.85,r()*1.6+0.4,r()*6]);
   S.moon={x:yLerp(470,600,r()),y:yLerp(150,230,r()),r:yLerp(62,84,r())};
@@ -45,7 +45,7 @@ function yardSlots(list){const used=new Set(list.filter(z=>z.ys!=null).map(z=>z.
   let ch=false;for(const z of list)if(z.ys==null||z.ys>=Y_SLOTS.length){z.ys=free.shift();ch=true;}if(ch)careerSave();}
 
 function yardOpen(){const Y=yardFresh();yardDOM();YD.sc=yardScene();YD.bg=null;yardSlots(Y.list);
-  YD.t=0;YD.hover=-1;YD.sel=-1;YD.ev=[];YD.evNext=1.2;YD.parts=[];YD.msg=null;YD.ask=null;YD.tap={i:-1,t:-9};
+  YD.t=0;YD.view=0;YD.pan=0;YD.hover=-1;YD.sel=-1;YD.ev=[];YD.evNext=1.2;YD.parts=[];YD.msg=null;YD.ask=null;YD.tap={i:-1,t:-9};
   YD.graves=Y_SLOTS.map(([row,x],i)=>{const R=Y_ROWS[row];return {i,row,x,y:R.y,s:R.s,st:YD.sc.stones[i],z:null,state:'empty'};});
   for(const z of Y.list){const g=YD.graves[z.ys];if(g){g.z=z;g.state='buried';}}
   for(const g of YD.graves)if(!g.z)g.state='old';
@@ -68,11 +68,14 @@ function yHitZombie(g,x,y){const sz=250*g.s;return g.state==='risen'&&Math.abs(x
 function yGraveAt(x,y){for(let k=YD.graves.length-1;k>=0;k--){const g=YD.graves[k];if(!g.z)continue;
   if(yHitMound(g,x,y))return {i:k,part:'mound'};if(yHitStone(g,x,y)||yHitZombie(g,x,y))return {i:k,part:'stone'};}return null;}
 const Y_BACK={x:14,y:20,w:150,h:62};
-function yardPointer(kind,x,y,ptype){if(!YD.on)return;
+function yardPointer(kind,x,y,ptype){if(!YD.on)return;if(YD.pan!==YD.view)return;
+  if(YD.view===1&&!YD.ask){if(typeof altarPointer==='function')altarPointer(kind,x,y,ptype);return;}
+  if(kind==='move'){YD.signHover=YD.view===0&&yIn(Y_SIDE,x,y)?1:0;}
   if(kind==='move'){if(ptype&&ptype!=='mouse')return;const h=yGraveAt(x,y);YD.hover=h?h.i:-1;
-    const cv=document.getElementById('yardCv');if(cv&&cv.style)cv.style.cursor=(h&&h.part==='mound'&&YD.graves[h.i].state==='buried')||yIn(Y_BACK,x,y)||(YD.ask&&YD.ask.btns.some(b=>yIn(b,x,y)))?'pointer':'default';return;}
+    const cv=document.getElementById('yardCv');if(cv&&cv.style)cv.style.cursor=(h&&h.part==='mound'&&YD.graves[h.i].state==='buried')||yIn(Y_BACK,x,y)||YD.signHover||(YD.ask&&YD.ask.btns.some(b=>yIn(b,x,y)))?'pointer':'default';return;}
   if(YD.ask){for(const b of YD.ask.btns)if(yIn(b,x,y)){const fn=b.fn;YD.ask=null;fn();return;}return;}
   if(yIn(Y_BACK,x,y)){sfx.select&&sfx.select();yardClose();return;}
+  if(yIn(Y_SIDE,x,y)){yardSide(1);return;}
   const h=yGraveAt(x,y);if(!h){YD.sel=-1;return;}YD.sel=h.i;if(!ptype||ptype!=='mouse')YD.hover=h.i;
   const again=YD.tap.i===h.i&&YD.tap.part===h.part&&YD.t-YD.tap.t<0.45;
   if(h.part==='mound'&&again){YD.tap={i:-1,t:-9};yardDig(h.i);return;}
@@ -80,10 +83,14 @@ function yardPointer(kind,x,y,ptype){if(!YD.on)return;
   YD.tap={i:h.i,t:YD.t,part:h.part};}
 const yIn=(b,x,y)=>x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h;
 function yardKey(c){if(YD.ask){if(c==='Escape'||c==='Backspace'){YD.ask=null;return;}if(c==='Enter'||c==='Space'||c==='NumpadEnter'){const b=YD.ask.btns[0];YD.ask=null;b.fn();}return;}
+  if(YD.pan!==YD.view)return;
+  if(YD.view===1){if(typeof altarKey==='function')altarKey(c);return;}
   if(c==='Escape'||c==='Backspace'){yardClose();return;}
-  const list=YD.graves.filter(g=>g.z).map(g=>g.i);if(!list.length)return;
+  if(c==='KeyE'||c==='PageDown'){yardSide(1);return;}
+  const list=YD.graves.filter(g=>g.z).map(g=>g.i);if(!list.length){if(c==='ArrowRight'||c==='KeyD')yardSide(1);return;}
   if(c==='ArrowLeft'||c==='KeyA'||c==='ArrowUp'||c==='KeyW'||c==='ArrowRight'||c==='KeyD'||c==='ArrowDown'||c==='KeyS'){
     const ord=list.slice().sort((a,b)=>YD.graves[b].row-YD.graves[a].row||YD.graves[a].x-YD.graves[b].x),k=ord.indexOf(YD.sel),d=c==='ArrowLeft'||c==='KeyA'||c==='ArrowUp'||c==='KeyW'?-1:1;
+    if(d>0&&(c==='ArrowRight'||c==='KeyD')&&k===ord.length-1){yardSide(1);return;}   // past the last grave: walk over to the Altar
     YD.sel=ord[(k<0?0:k+d+ord.length)%ord.length];YD.hover=YD.sel;sfx.blip&&sfx.blip();return;}
   if((c==='Enter'||c==='Space'||c==='NumpadEnter')&&YD.sel>=0)yardDig(YD.sel);}
 function yMsg(t,d){YD.msg={t,life:d||3.5,max:d||3.5};}
@@ -110,12 +117,21 @@ function yDigNow(g,p){const z=g.z,r=sign(z,p.slot);if(!r){sfx.groan&&sfx.groan()
   const f=zFind(z.id),where=f&&f.where==='squad'?`starts at ${POS[f.i].split(' ')[0]}`:'joins the bench';
   g.line=`${z.name} ${where}.`+(r.gone?` ${r.gone.name} is let go for ${r.refund} Bones.`:p.over&&f&&f.where==='squad'?` ${p.over.name} moves to the bench.`:'');
   sfx.select&&sfx.select();if(sfx.noise)sfx.noise(0.5,'lowpass',300,0.35,1);}
-function yAskLayout(){const A=YD.ask;A.y=520;A.btns.forEach((b,k)=>{b.x=90+k*290;b.y=A.y+150;b.w=250;b.h=70;});}
+function yAskLines(c,text){c.font='22px Arial';const out=[];let line='';for(const w of text.split(' ')){if(line&&c.measureText(line+w).width>540){out.push(line.trim());line='';}line+=w+' ';}if(line.trim())out.push(line.trim());return out;}
+function yAskLayout(){const A=YD.ask,cv=document.getElementById('yardCv'),c=cv&&cv.getContext?cv.getContext('2d'):null;
+  A.lines=c&&c.measureText?yAskLines(c,A.text):[A.text];A.h=70+A.lines.length*30+96;A.y=Math.round((YH-A.h)/2)-60;A.btns.forEach((b,k)=>{b.x=90+k*290;b.y=A.y+A.h-96;b.w=250;b.h=70;});}
 const Y_TIMES={claw:2.6,burst:1.7,topple:2.5,rise:3.0,gopher:2.9,coffin:2.9,corkscrew:2.2};
 
 // ----- each frame (called from the main loop while the Graveyard is open)
 function yardFrame(dt){if(!YD.on||mode!=='yard')return;YD.t+=dt;const cv=document.getElementById('yardCv');
-  yTick(dt);if(cv){const c=cv.getContext('2d');try{yDraw(c);}catch(e){console.error(e);}}}
+  if(YD.pan!==YD.view){const d=YD.view-YD.pan,st=dt*2.4;YD.pan=Math.abs(d)<=st?YD.view:YD.pan+Math.sign(d)*st;}
+  yTick(dt);if(typeof altarTick==='function')altarTick(dt);
+  if(cv){const c=cv.getContext('2d'),e=yEase(YD.pan);try{
+    if(YD.pan<1){c.setTransform(1,0,0,1,-e*YW,0);yDraw(c);}
+    if(YD.pan>0&&typeof altarDraw==='function'){c.setTransform(1,0,0,1,(1-e)*YW,0);altarDraw(c);}
+    c.setTransform(1,0,0,1,0,0);if(YD.ask&&YD.pan===YD.view)yAsk(c);}catch(err){console.error(err);}}}
+// move to the other side of the graveyard: 0 = the graves, 1 = the Altar
+function yardSide(v){if(YD.view===v)return;YD.view=v;YD.ask=null;YD.hover=-1;sfx.select&&sfx.select();if(sfx.noise)sfx.noise(0.6,'lowpass',500,0.25,1);if(v===1&&typeof altarEnter==='function')altarEnter();}
 function yTick(dt){const T=YD.t,S=YD.sc;
   if(YD.msg&&(YD.msg.life-=dt)<=0)YD.msg=null;
   for(const g of YD.graves){if(g.shake>0)g.shake-=dt;if(g.state!=='dig'&&g.state!=='risen')continue;const k=T-g.t0,D=Y_TIMES[g.method];
@@ -177,7 +193,7 @@ function yEvent(f){const S=YD.sc;let name=f;
 function yNight(){if(!sfx.tone)return;sfx.tone('sine',220,180,1.4,0.04);}
 
 // ----- drawing
-function yDraw(c){const S=YD.sc,T=YD.t;c.save();c.setTransform(1,0,0,1,0,0);
+function yDraw(c){const S=YD.sc,T=YD.t;c.save();
   if(!YD.bg){YD.bg=yBackground();}
   if(YD.bg&&YD.bg.getContext)c.drawImage(YD.bg,0,0);else yBackDraw(c);
   yMoonGlow(c,T);
@@ -190,9 +206,15 @@ function yDraw(c){const S=YD.sc,T=YD.t;c.save();c.setTransform(1,0,0,1,0,0);
   for(const p of YD.parts){c.globalAlpha=yClamp(p.life/p.max*1.5,0,1);c.fillStyle=p.k==='spark'?['#b4ff5a','#ffe14a','#ffffff'][Math.floor(p.r)%3]:p.col;c.beginPath();c.arc(p.x,p.y,p.r,0,7);c.fill();}c.globalAlpha=1;
   for(const g of YD.graves)if(g.bats&&!g.bats.done)for(const b of g.bats.list)yBat(c,b.x,b.y,b.ph,(20+b.h*10)*Math.max(0.6,g.s));
   for(const e of YD.ev)if(e.n==='lightning'||e.n==='fog')yEv(c,e,T);
-  yVignette(c);yHUD(c,T);
-  const hv=YD.hover>=0?YD.hover:YD.sel;if(hv>=0&&!YD.ask){const g=YD.graves[hv];if(g&&g.z)yCard(c,g);}
-  if(YD.ask)yAsk(c);c.restore();}
+  ySign(c,Y_SIDE,'THE ALTAR',1,T);yVignette(c);yHUD(c,T);
+  const hv=YD.hover>=0?YD.hover:YD.sel;if(hv>=0&&!YD.ask&&YD.pan===0){const g=YD.graves[hv];if(g&&g.z)yCard(c,g);}
+  c.restore();}
+// a wooden signpost to the other side of the graveyard (dir 1 points right, -1 left)
+const Y_SIDE={x:612,y:940,w:102,h:120};
+function ySign(c,B,text,dir,T){const hov=YD.signHover===dir,x=B.x+B.w/2;c.save();c.fillStyle='#3b2817';c.fillRect(x-6,B.y+30,12,B.h-30);
+  c.translate(x,B.y+38+Math.sin(T*2)*1.5);c.fillStyle=hov?'#8a6339':'#6e4c2b';c.strokeStyle=hov?'#b4ff5a':'#2a180c';c.lineWidth=3;c.beginPath();
+  const w=B.w/2+4;c.moveTo(-w*dir,-26);c.lineTo((w-18)*dir,-26);c.lineTo(w*dir,0);c.lineTo((w-18)*dir,26);c.lineTo(-w*dir,26);c.closePath();c.fill();c.stroke();
+  c.fillStyle='#f2e6c8';c.textAlign='center';const [a,b]=text.split(' ');c.font='15px Bangers, Arial';c.fillText(a,-6*dir,-5);c.font='19px Bangers, Arial';c.fillText(b||'',-6*dir,16);c.restore();}
 function yBackground(){let cv=null;try{cv=document.createElement('canvas');cv.width=YW;cv.height=YH;}catch(e){}
   const c=cv&&cv.getContext&&cv.getContext('2d');if(!c||!c.fillRect)return null;yBackDraw(c);return cv;}
 function yBackDraw(c){const S=YD.sc,g=S.g,r=yRng(S.seed+5);
@@ -336,9 +358,9 @@ function yCard(c,g){const z=g.z,risen=g.state!=='buried',W=300,keys=zKeys(z),H=r
 function yFitText(c,t,x,y,w){if(c.measureText(t).width<=w){c.fillText(t,x,y);return;}let s=t;while(s.length>4&&c.measureText(s+'…').width>w)s=s.slice(0,-1);c.fillText(s.replace(/[\s,.:;·]+$/,'')+'…',x,y);}
 function yFitFont(c,t,x,y,w,px,fam){let n=px;c.font=n+'px '+fam;while(n>10&&c.measureText(t).width>w){n--;c.font=n+'px '+fam;}c.fillText(t,x,y);}
 function yTouch(){try{return typeof touchOn!=='undefined'&&touchOn;}catch(e){return false;}}
-function yAsk(c){const A=YD.ask;c.save();c.fillStyle='rgba(0,0,0,0.55)';c.fillRect(0,0,YW,YH);c.fillStyle='#1b2414';c.strokeStyle='#9dff57';c.lineWidth=4;c.fillRect(60,A.y,600,250);c.strokeRect(60,A.y,600,250);
-  c.fillStyle='#e6eedc';c.font='22px Arial';c.textAlign='left';const words=A.text.split(' ');let line='',yy=A.y+46;for(const w of words){if(c.measureText(line+w).width>540){c.fillText(line,90,yy);line='';yy+=30;}line+=w+' ';}c.fillText(line,90,yy);
-  c.textAlign='center';for(const b of A.btns){c.fillStyle='#2f5a24';c.fillRect(b.x,b.y,b.w,b.h);c.strokeStyle='#9dff57';c.lineWidth=2;c.strokeRect(b.x,b.y,b.w,b.h);c.fillStyle='#fff';c.font='24px Bangers, Arial';c.fillText(b.label.slice(0,22),b.x+b.w/2,b.y+b.h/2+9);}c.restore();}
+function yAsk(c){const A=YD.ask;if(!A.lines)yAskLayout();c.save();c.fillStyle='rgba(0,0,0,0.55)';c.fillRect(0,0,YW,YH);c.fillStyle='#1b2414';c.strokeStyle='#9dff57';c.lineWidth=4;c.fillRect(60,A.y,600,A.h);c.strokeRect(60,A.y,600,A.h);
+  c.fillStyle='#e6eedc';c.font='22px Arial';c.textAlign='left';A.lines.forEach((l,i)=>c.fillText(l,90,A.y+46+i*30));
+  c.textAlign='center';for(const b of A.btns){c.fillStyle=b.danger?'#6a1f16':'#2f5a24';c.fillRect(b.x,b.y,b.w,b.h);c.strokeStyle=b.danger?'#ff8a6a':'#9dff57';c.lineWidth=2;c.strokeRect(b.x,b.y,b.w,b.h);c.fillStyle='#fff';yFitFont(c,b.label,b.x+b.w/2,b.y+b.h/2+9,b.w-16,24,'Bangers, Arial');}c.restore();}
 function yHUD(c,T){const u=userTeam();c.save();let gr=c.createLinearGradient(0,0,0,120);gr.addColorStop(0,'rgba(0,0,0,0.85)');gr.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=gr;c.fillRect(0,0,YW,130);
   c.textAlign='center';c.font='54px Bangers, Arial';c.lineWidth=7;c.strokeStyle='#0b1306';c.fillStyle='#9dff57';c.strokeText('THE GRAVEYARD',YW/2+70,66);c.fillText('THE GRAVEYARD',YW/2+70,66);
   const B=Y_BACK;c.fillStyle='rgba(20,30,15,0.9)';c.fillRect(B.x,B.y,B.w,B.h);c.strokeStyle='#9dff57';c.lineWidth=2;c.strokeRect(B.x,B.y,B.w,B.h);c.fillStyle='#fff';c.font='30px Bangers, Arial';c.fillText('◀ BACK',B.x+B.w/2,B.y+42);

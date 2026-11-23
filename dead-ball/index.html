@@ -194,6 +194,7 @@ canvas{display:block;width:720px;height:1280px;background:#000}
   <p><b>The Graveyard:</b> walk the graveyard at night. It starts out a pleasant place and gets nastier as the season goes on. Every headstone carries the name of a fresh corpse. Hover a headstone (or tap it) to see that zombie's Power, skulls, price and where it would play, then double-click (or double-tap) the dirt in front of it to dig it up. It climbs out, the bats dress it in your uniform, and it starts if it beats your weakest zombie at its spot, or joins the bench if not. Brainiacs play QB and Safety, Fresh corpses play running back, receiver, linebacker and corner, and Shamblers play the lines. Up to three zombies sit on the bench, and when a starter is knocked out the next one comes in. With no bench left, your team plays a zombie short until halftime. Letting a zombie go pays back 20% of what it's worth.</p>
   <p><b>Timeouts and the Coffin Corner:</b> in a Season game, press <span class="kbd">Esc</span> between plays to call a timeout. Open <b>the Coffin Corner</b> to sit any zombie on the field down and send in one from the bench. A zombie you pull early keeps only the parts it has already lost, so it costs less to stitch up after the game, and you can send it back in later. A zombie that was knocked out can't come back until halftime. Timeouts are free and unlimited.</p>
   <p><b>Deaths, the Stitch Shop and lifespan:</b> a zombie knocked out in a game has died. It plays again next week, but each death costs a little Power for good. Parts that fly off stay off after the game and cost Power until <b>the Stitch Shop</b> sews them back on. Once your spending opens it, <b>the Witch Doctor</b> can erase the Power lost in a zombie's latest death. Every zombie also has a <b>lifespan</b>: deaths, stitches and each season wear it down, and better zombies last longer. When it runs out, you choose: <b>Keep</b> it (weaker, and no more training), retire it to <b>the Mausoleum</b>, your hall of fame, or <b>the Sacrifice</b>, which fires your team up for the next game.</p>
+  <p><b>The Altar:</b> walk right from the graves (the signpost, or → past the last grave) to the Altar, where Madame Morgue buys zombies for Bones. Pick a zombie from the line, then a station: the Spider's Loom, the Cauldron, the Bone Mill or the Trapdoor. A spry, healthy zombie pays more than a worn-out has-been, free Z-team walk-ons pay nothing, and your team plays fired up next game. A zombie whose time is up can go straight to the Altar from its Time's up screen.</p>
   <h2>Controls</h2>
   <table>
    <tr><th>Key</th><th>On offense</th><th>On defense</th></tr>
@@ -273,9 +274,9 @@ canvas{display:block;width:720px;height:1280px;background:#000}
 
 <script>// Testing aid: add ?debug to the address to list any script errors on screen.
 window.__errs=[];addEventListener('error',e=>{__errs.push((e.message||'error')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);if(/[?&]debug/.test(location.search)){let d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#300;color:#fbb;font:12px monospace;padding:4px;max-height:30%;overflow:auto';document.body.appendChild(d);}d.textContent=__errs.join('\n');}});</script>
-<script src="models.js?v=0.13.7"></script>
+<script src="models.js?v=0.13.8"></script>
 <script>
-const VERSION='0.13.7';
+const VERSION='0.13.8';
 document.querySelectorAll('.ver').forEach(e=>e.textContent='v'+VERSION);document.title='Rotball v'+VERSION;
 
 'use strict';
@@ -2999,10 +3000,11 @@ function frame(now){annTick();const dt=Math.min(0.05,(now-last)/1000);last=now;
 toTitle();requestAnimationFrame(frame);
 window.__DB={get Z(){return Z;},get G(){return G;},get mode(){return mode;},startGame,choosePlay,get joy(){return joy;}};
 </script>
-<script src="field.js?v=0.13.7"></script>
-<script src="halftime.js?v=0.13.7"></script>
-<script src="ceremony.js?v=0.13.7"></script>
-<script src="season.js?v=0.13.7"></script>
-<script src="yard.js?v=0.13.7"></script>
+<script src="field.js?v=0.13.8"></script>
+<script src="halftime.js?v=0.13.8"></script>
+<script src="ceremony.js?v=0.13.8"></script>
+<script src="season.js?v=0.13.8"></script>
+<script src="yard.js?v=0.13.8"></script>
+<script src="altar.js?v=0.13.8"></script>
 </body>
 </html>
